@@ -48,7 +48,7 @@ fun DetailScreen(
             uiState.error != null -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(uiState.error!!, color = CinemaTextMuted, fontSize = 14.sp)
+                        Text(uiState.error ?: "", color = CinemaTextMuted, fontSize = 14.sp)
                         Spacer(Modifier.height(16.dp))
                         ActionButton("返回", false, onBack)
                     }
@@ -104,9 +104,10 @@ fun DetailScreen(
                                         uiState.isFavorite
                                     ) { viewModel.toggleFavorite() }
 
-                                    if (uiState.lastEpisode != null && d.episodes.isNotEmpty()) {
-                                        val ep = uiState.lastEpisode!!
-                                        val sId = uiState.lastSourceId ?: d.episodes.first().sourceId
+                                    val lastEp = uiState.lastEpisode
+                                    if (lastEp != null && d.episodes.isNotEmpty()) {
+                                        val ep = lastEp
+                                        val sId = uiState.lastSourceId ?: d.episodes.firstOrNull()?.sourceId ?: 0
                                         var pf by remember { mutableStateOf(false) }
                                         Button(
                                             onClick = { onPlayClick(d.vod.sourceType.name, d.vod.id, sId, ep) },

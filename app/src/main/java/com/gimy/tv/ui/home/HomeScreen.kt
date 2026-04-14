@@ -57,7 +57,7 @@ fun HomeScreen(
     ) {
         when {
             uiState.isLoading -> LoadingOverlay()
-            uiState.error != null -> ErrorOverlay(uiState.error!!) { viewModel.loadHome() }
+            uiState.error != null -> ErrorOverlay(uiState.error ?: "") { viewModel.loadHome() }
             else -> {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 48.dp)) {
                     // ── Top bar ──
@@ -231,7 +231,7 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
         // ── Button: outside Crossfade so focus persists across transitions ──
         var btnFocused by remember { mutableStateOf(false) }
         Button(
-            onClick = { onItemClick(items[idx]) },
+            onClick = { items.getOrNull(idx)?.let(onItemClick) },
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = 96.dp, bottom = 44.dp)

@@ -24,10 +24,10 @@ class VodRepositoryImpl @Inject constructor(
 ) : VodRepository {
 
     // In-memory home row cache (survives Activity recreation since VodRepositoryImpl is @Singleton)
-    private var gimyHomeCache: List<HomeRowData>? = null
-    private var gimyHomeCacheTime: Long = 0L
-    private var movieffmHomeCache: List<HomeRowData>? = null
-    private var movieffmHomeCacheTime: Long = 0L
+    @Volatile private var gimyHomeCache: List<HomeRowData>? = null
+    @Volatile private var gimyHomeCacheTime: Long = 0L
+    @Volatile private var movieffmHomeCache: List<HomeRowData>? = null
+    @Volatile private var movieffmHomeCacheTime: Long = 0L
     private val homeCacheTtlMs = 5 * 60 * 1000L // 5 minutes
 
     private fun getSource(sourceType: SourceType): SiteSource = when (sourceType) {

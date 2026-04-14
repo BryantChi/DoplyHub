@@ -69,6 +69,8 @@ class HomeViewModel @Inject constructor(
                     // GimyMax returned nothing — keep loading, let Phase 2 try
                     _uiState.update { it.copy(rows = emptyList()) }
                 }
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 // Don't set isLoading=false yet — Phase 2 might still succeed
                 _uiState.update { it.copy(rows = emptyList()) }
@@ -91,6 +93,8 @@ class HomeViewModel @Inject constructor(
                         state.copy(isLoading = false)
                     }
                 }
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                throw e
             } catch (_: Exception) {
                 _uiState.update { state ->
                     if (state.rows.isEmpty() && state.isLoading) {

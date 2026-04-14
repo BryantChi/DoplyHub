@@ -46,10 +46,6 @@ fun PlayerScreen(
         }
     }
 
-    // Release ExoPlayer on lifecycle destroy as safety net
-    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
-    var playerReleased by remember { mutableStateOf(false) }
-
     // Optimized ExoPlayer with better audio and buffering
     val exoPlayer = remember {
         val loadControl = DefaultLoadControl.Builder()
@@ -145,26 +141,11 @@ fun PlayerScreen(
         }
         exoPlayer.addListener(listener)
         onDispose {
-            if (!playerReleased) {
-                playerReleased = true
-                viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
-                exoPlayer.removeListener(listener)
-                loudnessEnhancer?.release()
-                exoPlayer.release()
-            }
+            viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
+            exoPlayer.removeListener(listener)
+            loudnessEnhancer?.release()
+            exoPlayer.release()
         }
-    }
-
-    // Safety net: release on lifecycle destroy (covers fast navigation scenarios)
-    DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_DESTROY && !playerReleased) {
-                playerReleased = true
-                exoPlayer.release()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -225,7 +206,7 @@ fun PlayerScreen(
         if (uiState.error != null && !uiState.isLoading) {
             Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(uiState.error!!, color = CinemaRed, fontSize = 15.sp)
+                    Text(uiState.error ?: "", color = CinemaRed, fontSize = 15.sp)
                     Spacer(Modifier.height(20.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(onClick = onBack, colors = ButtonDefaults.colors(containerColor = CinemaSurface)) { Text("返回", color = Color.White) }

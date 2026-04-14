@@ -52,9 +52,10 @@ fun SearchScreen(
         if (uiState.hasSearched) viewModel.clearResults() else onBack()
     }
 
-    // Auto-focus the input on first load
+    // Auto-focus the input on first load (delay to ensure layout is ready on TV)
     LaunchedEffect(Unit) {
-        inputFocusRequester.requestFocus()
+        kotlinx.coroutines.delay(100)
+        try { inputFocusRequester.requestFocus() } catch (_: Exception) { }
     }
 
     Column(

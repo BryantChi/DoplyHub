@@ -45,7 +45,7 @@ class FavoriteRepositoryImpl @Inject constructor(
 
     private fun FavoriteEntity.toVod() = Vod(
         id = vodId,
-        sourceType = SourceType.valueOf(sourceType),
+        sourceType = runCatching { SourceType.valueOf(sourceType) }.getOrDefault(SourceType.GIMYMAX),
         title = title,
         coverUrl = coverUrl,
         category = category,
