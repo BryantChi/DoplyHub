@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 var showSplash by remember { mutableStateOf(true) }
 
-                // Minimum 1.5s display, then dismiss
+                // Splash: 1.5s minimum — data loads in background during this time
                 LaunchedEffect(Unit) {
                     delay(1500L)
                     showSplash = false
@@ -59,8 +59,8 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                             onSearchClick = { navController.navigate(Screen.Search.route) },
-                            onBrowseClick = { typeId ->
-                                navController.navigate(Screen.Browse.createRoute(typeId))
+                            onBrowseClick = { sourceType, typeId ->
+                                navController.navigate(Screen.Browse.createRoute(sourceType.name, typeId))
                             },
                             onFavoritesClick = { navController.navigate(Screen.Favorites.route) },
                             onHistoryClick = { navController.navigate(Screen.History.route) }
@@ -69,7 +69,10 @@ class MainActivity : ComponentActivity() {
 
                     composable(
                         Screen.Browse.route,
-                        arguments = listOf(navArgument("typeId") { type = NavType.StringType })
+                        arguments = listOf(
+                            navArgument("sourceType") { type = NavType.StringType },
+                            navArgument("typeId") { type = NavType.StringType }
+                        )
                     ) {
                         BrowseScreen(
                             onVodClick = { sourceType, vodId ->
@@ -103,6 +106,11 @@ class MainActivity : ComponentActivity() {
                             onPlayClick = { sourceType, vodId, sourceId, epNum ->
                                 navController.navigate(
                                     Screen.Player.createRoute(sourceType, vodId, sourceId, epNum)
+                                )
+                            },
+                            onVodClick = { sourceType, vodId ->
+                                navController.navigate(
+                                    Screen.Detail.createRoute(sourceType.name, vodId)
                                 )
                             },
                             onBack = { navController.popBackStack() }

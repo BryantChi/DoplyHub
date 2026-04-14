@@ -3,11 +3,11 @@ package com.gimy.tv.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gimy.tv.domain.model.*
+import com.gimy.tv.domain.repository.HomeRowData
 import com.gimy.tv.domain.repository.VodRepository
 import com.gimy.tv.domain.repository.WatchHistoryEntry
 import com.gimy.tv.domain.repository.WatchHistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -15,7 +15,8 @@ import javax.inject.Inject
 data class HomeRow(
     val title: String,
     val typeId: Int,
-    val items: List<Vod>
+    val items: List<Vod>,
+    val sourceType: SourceType = SourceType.GIMYMAX
 )
 
 data class HomeUiState(
@@ -34,6 +35,12 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    // Movieffm typeId → matching gimymax typeId for interleaving
+    private val ffmToGimyMap = mapOf(
+        101 to 1, 201 to 20, 202 to 13, 203 to 16, 204 to 21,
+        205 to 4, 207 to 14, 208 to 15, 206 to 29
+    )
+
     init {
         loadHome()
         observeContinueWatching()
@@ -48,43 +55,71 @@ class HomeViewModel @Inject constructor(
     }
 
     fun loadHome() {
+        // Phase 1: Load gimymax (fast — show immediately)
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val source = SourceType.GIMYMAX
-                val categories = listOf(
-                    20 to "韓劇",
-                    13 to "陸劇",
-                    16 to "美劇",
-                    21 to "日劇",
-                    1 to "電影",
-                    4 to "動漫",
-                    14 to "台劇",
-                    15 to "港劇",
-                    29 to "綜藝",
-                    30 to "紀錄片",
-                )
+                val gimyRows = vodRepository.getGimyHomeRows()
+                    .filter { it.items.isNotEmpty() }
+                    .map { HomeRow(it.title, it.typeId, it.items, it.sourceType) }
 
-                val deferredRows = categories.map { (typeId, name) ->
-                    viewModelScope.async {
-                        try {
-                            val result = vodRepository.getVodList(source, typeId, 1)
-                            HomeRow(title = name, typeId = typeId, items = result.items.take(15))
-                        } catch (e: Exception) {
-                            HomeRow(title = name, typeId = typeId, items = emptyList())
-                        }
-                    }
+                if (gimyRows.isNotEmpty()) {
+                    _uiState.update { it.copy(isLoading = false, rows = gimyRows) }
+                } else {
+                    // GimyMax returned nothing — keep loading, let Phase 2 try
+                    _uiState.update { it.copy(rows = emptyList()) }
                 }
-
-                val rows = deferredRows.mapNotNull { deferred ->
-                    val row = deferred.await()
-                    if (row.items.isNotEmpty()) row else null
-                }
-
-                _uiState.update { it.copy(isLoading = false, rows = rows) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = e.message) }
+                // Don't set isLoading=false yet — Phase 2 might still succeed
+                _uiState.update { it.copy(rows = emptyList()) }
             }
         }
+
+        // Phase 2: Load movieffm in background (append when ready)
+        viewModelScope.launch {
+            try {
+                val ffmRows = vodRepository.getMovieffmHomeRows()
+                    .filter { it.items.isNotEmpty() }
+
+                _uiState.update { state ->
+                    if (ffmRows.isNotEmpty()) {
+                        val merged = interleaveRows(state.rows, ffmRows)
+                        state.copy(isLoading = false, rows = merged)
+                    } else if (state.rows.isEmpty()) {
+                        state.copy(isLoading = false, error = "無法載入內容，請檢查網路連線")
+                    } else {
+                        state.copy(isLoading = false)
+                    }
+                }
+            } catch (_: Exception) {
+                _uiState.update { state ->
+                    if (state.rows.isEmpty() && state.isLoading) {
+                        state.copy(isLoading = false, error = "無法載入內容，請檢查網路連線")
+                    } else {
+                        state.copy(isLoading = false)
+                    }
+                }
+            }
+        }
+    }
+
+    /** Insert movieffm rows after their matching gimymax rows */
+    private fun interleaveRows(gimyRows: List<HomeRow>, ffmData: List<HomeRowData>): List<HomeRow> {
+        val ffmByGimyId = ffmData.groupBy { ffmToGimyMap[it.typeId] }
+        val result = mutableListOf<HomeRow>()
+        for (row in gimyRows) {
+            result.add(row)
+            ffmByGimyId[row.typeId]?.forEach {
+                result.add(HomeRow(it.title, it.typeId, it.items, it.sourceType))
+            }
+        }
+        // Append any unmatched movieffm rows at the end
+        val matchedGimyIds = gimyRows.map { it.typeId }.toSet()
+        for ((gimyId, rows) in ffmByGimyId) {
+            if (gimyId == null || gimyId !in matchedGimyIds) {
+                rows.forEach { result.add(HomeRow(it.title, it.typeId, it.items, it.sourceType)) }
+            }
+        }
+        return result
     }
 }

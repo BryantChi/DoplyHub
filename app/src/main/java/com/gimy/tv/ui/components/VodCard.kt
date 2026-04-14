@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.*
 import coil.compose.AsyncImage
+import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.ui.theme.*
 
@@ -30,8 +31,6 @@ fun VodCard(
 ) {
     var focused by remember { mutableStateOf(false) }
 
-    // Use TV Card's built-in focusedScale — applies graphicsLayer transform,
-    // no layout shift, no jitter
     Card(
         onClick = onClick,
         onLongClick = onLongClick ?: {},
@@ -52,17 +51,47 @@ fun VodCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
+            // Bottom gradient for text readability
             Box(
-                Modifier.fillMaxWidth().height(72.dp).align(Alignment.BottomCenter)
+                Modifier.fillMaxWidth().height(82.dp).align(Alignment.BottomCenter)
                     .background(Brush.verticalGradient(
-                        0f to Color.Transparent, 0.3f to CinemaBlack.copy(0.5f), 1f to CinemaBlack.copy(0.95f)
+                        0f to Color.Transparent, 0.2f to CinemaBlack.copy(0.5f), 1f to CinemaBlack.copy(0.95f)
                     ))
             )
-            Text(
-                vod.title, color = CinemaTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp,
-                modifier = Modifier.align(Alignment.BottomStart).padding(horizontal = 8.dp, vertical = 6.dp).fillMaxWidth()
-            )
+            // Title + metadata at bottom
+            Column(
+                Modifier.align(Alignment.BottomStart)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .fillMaxWidth()
+            ) {
+                Text(
+                    vod.title, color = CinemaTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp
+                )
+                // Subtitle row: year + rating + category
+                val subtitle = buildList {
+                    if (vod.year > 0) add(vod.year.toString())
+                    vod.rating?.let { add("★%.1f".format(it)) }
+                    if (vod.category.isNotBlank()) add(vod.category)
+                }.joinToString(" · ")
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        subtitle, color = CinemaTextMuted, fontSize = 10.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            // Top-left: source badge for movieffm
+            if (vod.sourceType == SourceType.MOVIEFFM) {
+                Box(
+                    Modifier.align(Alignment.TopStart).padding(4.dp)
+                        .background(Color(0xFF3B82F6).copy(0.92f), RoundedCornerShape(3.dp))
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                    Text("FFM", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            // Top-right: status badge
             if (vod.status.isNotBlank()) {
                 Box(
                     Modifier.align(Alignment.TopEnd).padding(4.dp)

@@ -2,7 +2,6 @@ package com.gimy.tv.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.domain.repository.SearchHistoryRepository
 import com.gimy.tv.domain.repository.VodRepository
@@ -56,8 +55,8 @@ class SearchViewModel @Inject constructor(
             searchHistoryRepository.addSearch(q)
             _uiState.update { it.copy(isSearching = true, error = null, hasSearched = true, results = emptyList(), currentPage = 1, hasMore = false) }
             try {
-                val result = vodRepository.search(SourceType.GIMYMAX, q, 1)
-                val unique = result.items.distinctBy { it.id }
+                val result = vodRepository.searchAllSources(q, 1)
+                val unique = result.items.distinctBy { "${it.sourceType}_${it.id}" }
                 _uiState.update { it.copy(isSearching = false, results = unique, currentPage = 1, hasMore = result.hasMore) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSearching = false, error = e.message, results = emptyList()) }
@@ -72,8 +71,8 @@ class SearchViewModel @Inject constructor(
             _uiState.update { it.copy(isLoadingMore = true) }
             try {
                 val nextPage = state.currentPage + 1
-                val result = vodRepository.search(SourceType.GIMYMAX, state.query, nextPage)
-                val combined = (state.results + result.items).distinctBy { it.id }
+                val result = vodRepository.searchAllSources(state.query, nextPage)
+                val combined = (state.results + result.items).distinctBy { "${it.sourceType}_${it.id}" }
                 val hasNew = combined.size > state.results.size
                 _uiState.update { it.copy(isLoadingMore = false, results = combined, currentPage = nextPage, hasMore = result.hasMore && hasNew) }
             } catch (e: Exception) {

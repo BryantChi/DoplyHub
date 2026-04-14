@@ -3,12 +3,25 @@ package com.gimy.tv.domain.repository
 import com.gimy.tv.domain.model.*
 import kotlinx.coroutines.flow.Flow
 
+data class HomeRowData(
+    val title: String,
+    val sourceType: SourceType,
+    val typeId: Int,
+    val items: List<Vod>
+)
+
 interface VodRepository {
     suspend fun getCategories(sourceType: SourceType): List<Category>
     suspend fun getVodList(sourceType: SourceType, typeId: Int, page: Int): PaginatedResult<Vod>
     suspend fun getVodDetail(sourceType: SourceType, vodId: Long): VodDetail
     suspend fun getPlayerData(sourceType: SourceType, episodeUrl: String): PlayerData
     suspend fun search(sourceType: SourceType, keyword: String, page: Int): PaginatedResult<Vod>
+
+    // Multi-source integration
+    suspend fun searchAllSources(keyword: String, page: Int): PaginatedResult<Vod>
+    suspend fun getEnrichedVodDetail(sourceType: SourceType, vodId: Long, cachedPrimary: VodDetail? = null): VodDetail
+    suspend fun getGimyHomeRows(): List<HomeRowData>
+    suspend fun getMovieffmHomeRows(): List<HomeRowData>
 }
 
 interface FavoriteRepository {

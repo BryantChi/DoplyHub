@@ -43,3 +43,10 @@ data class SearchHistoryEntity(
     @PrimaryKey val keyword: String,
     val searchedAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "movieffm_slugs")
+data class MovieffmSlugEntity(
+    @PrimaryKey val vodId: Long,
+    val slug: String,
+    val contentType: String // "movies" or "drama"
+)

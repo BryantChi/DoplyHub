@@ -24,7 +24,10 @@ data class BrowseUiState(
 private val categoryNames = mapOf(
     2 to "電視劇", 1 to "電影", 4 to "動漫", 29 to "綜藝",
     13 to "陸劇", 20 to "韓劇", 16 to "美劇", 21 to "日劇",
-    14 to "台劇", 15 to "港劇", 30 to "紀錄片", 3 to "紀錄片"
+    14 to "台劇", 15 to "港劇", 30 to "紀錄片", 3 to "紀錄片",
+    100 to "電影", 101 to "熱門電影", 200 to "電視劇",
+    201 to "韓劇", 202 to "陸劇", 203 to "美劇", 204 to "日劇",
+    205 to "動漫", 206 to "綜藝", 207 to "台劇", 208 to "港劇",
 )
 
 @HiltViewModel
@@ -33,6 +36,8 @@ class BrowseViewModel @Inject constructor(
     private val vodRepository: VodRepository
 ) : ViewModel() {
 
+    private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYMAX"
+    private val sourceType = runCatching { SourceType.valueOf(sourceTypeName) }.getOrDefault(SourceType.GIMYMAX)
     private val typeId: Int = savedStateHandle.get<String>("typeId")?.toIntOrNull() ?: 2
 
     private val _uiState = MutableStateFlow(BrowseUiState(
@@ -52,11 +57,11 @@ class BrowseViewModel @Inject constructor(
                 else it.copy(isLoadingMore = true, error = null)
             }
             try {
-                val result = vodRepository.getVodList(SourceType.GIMYMAX, typeId, page)
-                val newItems = result.items.distinctBy { it.id }
+                val result = vodRepository.getVodList(sourceType, typeId, page)
+                val newItems = result.items.distinctBy { "${it.sourceType}_${it.id}" }
                 _uiState.update { state ->
                     val merged = if (isFirstPage) newItems
-                        else (state.items + newItems).distinctBy { it.id }
+                        else (state.items + newItems).distinctBy { "${it.sourceType}_${it.id}" }
                     state.copy(
                         isLoading = false,
                         isLoadingMore = false,

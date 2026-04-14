@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     onVodClick: (SourceType, Long) -> Unit,
     onSearchClick: () -> Unit,
-    onBrowseClick: (Int) -> Unit,
+    onBrowseClick: (SourceType, Int) -> Unit,
     onFavoritesClick: () -> Unit,
     onHistoryClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
@@ -72,7 +72,7 @@ fun HomeScreen(
                     // ── Continue watching ──
                     if (uiState.continueWatching.isNotEmpty()) {
                         item {
-                            ContentRow("繼續觀看", 0,
+                            ContentRow("繼續觀看", 0, SourceType.GIMYMAX,
                                 uiState.continueWatching.map { e ->
                                     Vod(e.vodId, e.sourceType, e.title, e.coverUrl, "", 0, "第${e.episodeNum}集")
                                 },
@@ -83,10 +83,10 @@ fun HomeScreen(
                     }
 
                     // ── Content rows ──
-                    items(uiState.rows) { row ->
-                        ContentRow(row.title, row.typeId, row.items,
+                    items(uiState.rows, key = { "${it.sourceType}_${it.typeId}" }) { row ->
+                        ContentRow(row.title, row.typeId, row.sourceType, row.items,
                             onItemClick = { onVodClick(it.sourceType, it.id) },
-                            onMoreClick = { onBrowseClick(row.typeId) }
+                            onMoreClick = { onBrowseClick(row.sourceType, row.typeId) }
                         )
                     }
                 }
@@ -151,8 +151,12 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val coroutineScope = rememberCoroutineScope()
 
-    // Auto-rotate
-    LaunchedEffect(idx) { delay(7000); idx = (idx + 1) % items.size }
+    // Auto-rotate (guard against empty list after recomposition)
+    LaunchedEffect(idx, items.size) {
+        if (items.isEmpty()) return@LaunchedEffect
+        delay(7000)
+        idx = (idx + 1) % items.size
+    }
 
     Box(
         Modifier
@@ -167,7 +171,7 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
 
         // ── Crossfade: image + text info only (button stays outside to keep focus) ──
         Crossfade(targetState = idx, animationSpec = tween(800), label = "banner") { currentIdx ->
-            val vod = items[currentIdx]
+            val vod = items.getOrNull(currentIdx % items.size) ?: return@Crossfade
             Box(Modifier.fillMaxSize()) {
                 // Cover image on right side, crop from 20% top
                 Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.62f)) {
@@ -273,20 +277,34 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
 // Content row
 // ═══════════════════════════════════════
 
+private val MovieffmBlue = Color(0xFF3B82F6)
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun ContentRow(title: String, typeId: Int, items: List<Vod>, onItemClick: (Vod) -> Unit, onMoreClick: () -> Unit) {
+private fun ContentRow(title: String, typeId: Int, rowSourceType: SourceType, items: List<Vod>, onItemClick: (Vod) -> Unit, onMoreClick: () -> Unit) {
+    val isMovieffm = rowSourceType == SourceType.MOVIEFFM
+    val accentColor = if (isMovieffm) MovieffmBlue else CinemaRed
+
     Column(Modifier.padding(top = 20.dp)) {
         Row(Modifier.padding(start = 48.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.width(3.dp).height(16.dp).clip(RoundedCornerShape(2.dp)).background(CinemaRed))
+            Box(Modifier.width(3.dp).height(16.dp).clip(RoundedCornerShape(2.dp)).background(accentColor))
             Spacer(Modifier.width(10.dp))
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CinemaTextPrimary, letterSpacing = 0.3.sp)
+            if (isMovieffm) {
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier.background(MovieffmBlue.copy(0.85f), RoundedCornerShape(3.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text("FFM", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
         LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             items(items, key = { "${it.sourceType}_${it.id}" }) { vod ->
                 VodCard(vod = vod, onClick = { onItemClick(vod) })
             }
-            // "More" card at the end of the row — easy to reach by scrolling right
+            // "More" card at the end of the row
             item(key = "more_$typeId") {
                 MoreCard(onClick = onMoreClick)
             }

@@ -23,12 +23,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
 import coil.compose.AsyncImage
 import com.gimy.tv.domain.model.EpisodeGroup
+import com.gimy.tv.domain.model.SourceType
+import com.gimy.tv.domain.model.Vod
+import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.theme.*
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun DetailScreen(
     onPlayClick: (sourceType: String, vodId: Long, sourceId: Int, episodeNum: Int) -> Unit,
+    onVodClick: (SourceType, Long) -> Unit = { _, _ -> },
     onBack: () -> Unit,
     viewModel: DetailViewModel = hiltViewModel()
 ) {
@@ -51,8 +55,10 @@ fun DetailScreen(
                 }
             }
             uiState.detail != null -> {
-                val d = uiState.detail!!
+                val d = uiState.detail ?: return
                 var srcIdx by remember { mutableIntStateOf(0) }
+                // Clamp srcIdx when episodes list changes (e.g. after enrichment)
+                val safeSrcIdx = if (d.episodes.isNotEmpty()) srcIdx.coerceIn(0, d.episodes.size - 1) else 0
 
                 // Background blur image
                 AsyncImage(
@@ -130,7 +136,7 @@ fun DetailScreen(
                                 Spacer(Modifier.height(8.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     items(d.episodes.size) { i ->
-                                        val g = d.episodes[i]; val sel = i == srcIdx
+                                        val g = d.episodes[i]; val sel = i == safeSrcIdx
                                         val label = if (i == 0) "${g.sourceName} ★" else g.sourceName
                                         var f by remember { mutableStateOf(false) }
                                         Button(
@@ -152,11 +158,19 @@ fun DetailScreen(
 
                     // ── Episodes ──
                     if (d.episodes.isNotEmpty()) {
-                        val grp = d.episodes.getOrNull(srcIdx) ?: d.episodes.first()
+                        val grp = d.episodes[safeSrcIdx]
                         item {
                             EpisodeGrid(grp, uiState.lastEpisode) { sId, ep ->
                                 onPlayClick(d.vod.sourceType.name, d.vod.id, sId, ep)
                             }
+                        }
+                    }
+
+                    // Related/recommended content
+                    if (d.relatedVods.isNotEmpty()) {
+                        item {
+                            Spacer(Modifier.height(24.dp))
+                            RelatedRow(d.relatedVods, onVodClick)
                         }
                     }
                 }
@@ -194,6 +208,21 @@ private fun ActionButton(label: String, active: Boolean, onClick: () -> Unit) {
         ),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 9.dp)
     ) { Text(label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun RelatedRow(relatedVods: List<Vod>, onVodClick: (SourceType, Long) -> Unit) {
+    Column(Modifier.padding(horizontal = 48.dp)) {
+        Text("相關推薦", color = CinemaTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(12.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            items(relatedVods.size, key = { "rel_${it}_${relatedVods[it].sourceType}_${relatedVods[it].id}" }) { idx ->
+                val vod = relatedVods[idx]
+                VodCard(vod = vod, onClick = { onVodClick(vod.sourceType, vod.id) })
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)

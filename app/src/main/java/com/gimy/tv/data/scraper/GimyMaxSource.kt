@@ -130,10 +130,37 @@ class GimyMaxSource @Inject constructor(
             if (idx >= 0) stabilityOrder.size - idx else -1
         })
 
+        // Parse related/recommended content from 熱門推薦 section
+        val relatedVods = parseRelatedVods(doc)
+
         return VodDetail(
             Vod(vodId, sourceType, title, cover, category, year, status),
-            director, actors, synopsis, sorted
+            director, actors, synopsis, sorted, relatedVods
         )
+    }
+
+    /**
+     * Parse related vods from the 熱播{Category} section (same-category content).
+     * Falls back to 熱門推薦 if no category-specific section found.
+     * <a class="video-pic" href="/vod/ID.html" title="TITLE" data-background="IMG">
+     */
+    private fun parseRelatedVods(doc: Document): List<Vod> {
+        // Prefer 熱播{X} (same-category), fallback to 熱門推薦
+        val container = doc.selectFirst(".box-title:has(h3:matches(^熱播))")?.parent()
+            ?: doc.selectFirst(".box-title:has(h3:contains(推薦))")?.parent()
+            ?: return emptyList()
+        val items = mutableListOf<Vod>()
+        for (card in container.select("a[class*=video-pic][data-background]")) {
+            val href = card.attr("href")
+            val id = Regex("/vod/(\\d+)\\.html").find(href)
+                ?.groupValues?.get(1)?.toLongOrNull() ?: continue
+            val cardTitle = card.attr("title").trim()
+            if (cardTitle.isBlank()) continue
+            val cardCover = resolveUrl(card.attr("data-background"))
+            val cardStatus = card.selectFirst("span.note")?.text()?.trim() ?: ""
+            items.add(Vod(id, sourceType, cardTitle, cardCover, "", 0, cardStatus))
+        }
+        return items
     }
 
     /**

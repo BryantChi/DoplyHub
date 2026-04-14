@@ -35,10 +35,10 @@ class PlayerViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYMAX"
-    val vodId: Long = savedStateHandle.get<String>("vodId")?.toLongOrNull() ?: 0L
+    val vodId: Long? = savedStateHandle.get<String>("vodId")?.toLongOrNull()
     private val initialSourceId: Int = savedStateHandle.get<String>("sourceId")?.toIntOrNull() ?: 0
     private val initialEpisodeNum: Int = savedStateHandle.get<String>("episodeNum")?.toIntOrNull() ?: 1
-    val sourceType = SourceType.valueOf(sourceTypeName)
+    val sourceType = runCatching { SourceType.valueOf(sourceTypeName) }.getOrDefault(SourceType.GIMYMAX)
 
     private val _uiState = MutableStateFlow(PlayerUiState(
         episodeNum = initialEpisodeNum,
@@ -55,8 +55,13 @@ class PlayerViewModel @Inject constructor(
     private fun loadPlayer() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = "正在載入影片資訊…") }
+            val id = vodId ?: run {
+                _uiState.update { it.copy(isLoading = false, error = "無效的影片 ID") }
+                return@launch
+            }
             try {
-                val detail = vodRepository.getVodDetail(sourceType, vodId)
+                // Load primary detail first for fast playback start
+                val detail = vodRepository.getVodDetail(sourceType, id)
                 vodDetail = detail
 
                 if (detail.episodes.isEmpty()) {
@@ -90,7 +95,7 @@ class PlayerViewModel @Inject constructor(
                 val playerData = vodRepository.getPlayerData(sourceType, episode.playUrl)
 
                 // Check resume position
-                val progress = watchHistoryRepository.getProgress(vodId, sourceType)
+                val progress = watchHistoryRepository.getProgress(id, sourceType)
                 val resumeMs = if (progress != null &&
                     progress.episodeNum == episode.number &&
                     progress.sourceId == sourceGroup.sourceId
@@ -109,6 +114,9 @@ class PlayerViewModel @Inject constructor(
                         totalEpisodes = sourceGroup.episodes.size
                     )
                 }
+
+                // Background: enrich with cross-source routes for fallback
+                enrichWithCrossSource()
             } catch (e: Exception) {
                 // If current source fails, try next one
                 val detail = vodDetail
@@ -156,12 +164,13 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun saveProgress(positionMs: Long, durationMs: Long) {
+        val id = vodId ?: return
         val state = _uiState.value
         if (positionMs <= 0) return
         viewModelScope.launch {
             watchHistoryRepository.saveProgress(
                 WatchHistoryEntry(
-                    vodId = vodId,
+                    vodId = id,
                     sourceType = sourceType,
                     title = state.vodTitle,
                     coverUrl = vodDetail?.vod?.coverUrl ?: "",
@@ -233,6 +242,19 @@ class PlayerViewModel @Inject constructor(
         val nextIdx = if (currentIdx >= 0 && currentIdx < detail.episodes.size - 1) currentIdx + 1 else 0
         if (nextIdx < detail.episodes.size) {
             switchSource(detail.episodes[nextIdx].sourceId)
+        }
+    }
+
+    private fun enrichWithCrossSource() {
+        viewModelScope.launch {
+            try {
+                val id = vodId ?: return@launch
+                val enriched = vodRepository.getEnrichedVodDetail(sourceType, id, cachedPrimary = vodDetail)
+                vodDetail = enriched
+                _uiState.update { it.copy(allSources = enriched.episodes) }
+            } catch (_: Exception) {
+                // Silent — primary routes already available
+            }
         }
     }
 }

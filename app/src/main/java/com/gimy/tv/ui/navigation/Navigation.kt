@@ -2,8 +2,8 @@ package com.gimy.tv.ui.navigation
 
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
-    data object Browse : Screen("browse/{typeId}") {
-        fun createRoute(typeId: Int) = "browse/$typeId"
+    data object Browse : Screen("browse/{sourceType}/{typeId}") {
+        fun createRoute(sourceType: String, typeId: Int) = "browse/$sourceType/$typeId"
     }
     data object Search : Screen("search")
     data object Detail : Screen("detail/{sourceType}/{vodId}") {

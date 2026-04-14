@@ -24,9 +24,14 @@ object NetworkModule {
 
         return OkHttpClient.Builder()
             .cache(cache)
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
             .followRedirects(true)
+            .dispatcher(okhttp3.Dispatcher().apply {
+                maxRequests = 10           // global max concurrent requests
+                maxRequestsPerHost = 4     // per-host limit to avoid throttling
+            })
+            .connectionPool(okhttp3.ConnectionPool(8, 3, TimeUnit.MINUTES))
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
                     .header("User-Agent", "Mozilla/5.0 (Linux; Android 13; TV) AppleWebKit/537.36")

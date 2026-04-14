@@ -46,6 +46,10 @@ fun PlayerScreen(
         }
     }
 
+    // Release ExoPlayer on lifecycle destroy as safety net
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    var playerReleased by remember { mutableStateOf(false) }
+
     // Optimized ExoPlayer with better audio and buffering
     val exoPlayer = remember {
         val loadControl = DefaultLoadControl.Builder()
@@ -57,7 +61,7 @@ fun PlayerScreen(
             )
             .build()
 
-        ExoPlayer.Builder(context)
+        ExoPlayer.Builder(context.applicationContext)
             .setLoadControl(loadControl)
             .build().apply {
                 playWhenReady = true
@@ -87,6 +91,9 @@ fun PlayerScreen(
     // PlayerView reference for showing/hiding controller
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
 
+    // Error retry limiter — prevent infinite prepare() loop
+    var errorRetryCount by remember { mutableIntStateOf(0) }
+
     // Info bar visibility with auto-hide counter
     var infoVisible by remember { mutableStateOf(true) }
     var infoTrigger by remember { mutableIntStateOf(0) }
@@ -110,6 +117,7 @@ fun PlayerScreen(
     // Load media
     LaunchedEffect(uiState.streamUrl) {
         val url = uiState.streamUrl ?: return@LaunchedEffect
+        errorRetryCount = 0
         exoPlayer.setMediaItem(MediaItem.fromUri(url))
         exoPlayer.prepare()
         if (uiState.resumePositionMs > 0) {
@@ -128,17 +136,35 @@ fun PlayerScreen(
                 }
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                // On error, retry prepare to recover audio
-                exoPlayer.prepare()
+                if (errorRetryCount < 3) {
+                    errorRetryCount++
+                    exoPlayer.prepare()
+                }
+                // After 3 retries, stop — avoid infinite loop on non-recoverable errors
             }
         }
         exoPlayer.addListener(listener)
         onDispose {
-            viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
-            exoPlayer.removeListener(listener)
-            loudnessEnhancer?.release()
-            exoPlayer.release()
+            if (!playerReleased) {
+                playerReleased = true
+                viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
+                exoPlayer.removeListener(listener)
+                loudnessEnhancer?.release()
+                exoPlayer.release()
+            }
         }
+    }
+
+    // Safety net: release on lifecycle destroy (covers fast navigation scenarios)
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_DESTROY && !playerReleased) {
+                playerReleased = true
+                exoPlayer.release()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {

@@ -69,3 +69,15 @@ interface SearchHistoryDao {
     @Query("DELETE FROM search_history")
     suspend fun deleteAll()
 }
+
+@Dao
+interface MovieffmSlugDao {
+    @Query("SELECT slug FROM movieffm_slugs WHERE vodId = :vodId LIMIT 1")
+    suspend fun getSlug(vodId: Long): String?
+
+    @Query("SELECT contentType FROM movieffm_slugs WHERE vodId = :vodId LIMIT 1")
+    suspend fun getContentType(vodId: Long): String?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(slugs: List<MovieffmSlugEntity>)
+}
