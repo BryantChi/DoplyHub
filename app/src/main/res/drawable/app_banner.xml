@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="640"
+    android:viewportHeight="360">
+
+    <!-- Background -->
+    <path android:fillColor="#0A0A14" android:pathData="M0,0h640v360h-640z" />
+
+    <!-- Red play triangle — large, left-center -->
+    <path android:fillColor="#E11D48"
+        android:pathData="M100,110 L100,250 L180,180 Z" />
+
+    <!-- G — red, bold -->
+    <path android:fillColor="#E11D48"
+        android:pathData="M220,120 L220,128 L260,128 L260,168 L248,168 L248,140 L232,140 L232,188 L272,188 L272,112 L220,112 Z" />
+
+    <!-- I — white -->
+    <path android:fillColor="#F0F0F5"
+        android:pathData="M284,112 L296,112 L296,188 L284,188 Z" />
+
+    <!-- M — white -->
+    <path android:fillColor="#F0F0F5"
+        android:pathData="M308,112 L324,112 L336,152 L348,112 L364,112 L364,188 L352,188 L352,140 L340,176 L332,176 L320,140 L320,188 L308,188 Z" />
+
+    <!-- Y — white -->
+    <path android:fillColor="#F0F0F5"
+        android:pathData="M376,112 L388,112 L400,148 L412,112 L424,112 L406,164 L406,188 L394,188 L394,164 Z" />
+
+    <!-- T — muted -->
+    <path android:fillColor="#8088A4"
+        android:pathData="M452,120 L452,112 L512,112 L512,120 L488,120 L488,188 L476,188 L476,120 Z" />
+
+    <!-- V — muted -->
+    <path android:fillColor="#8088A4"
+        android:pathData="M520,112 L532,112 L546,172 L560,112 L572,112 L552,188 L540,188 Z" />
+
+    <!-- Red accent line under GIMY -->
+    <path android:fillColor="#E11D48"
+        android:pathData="M220,200 L424,200 L424,206 L220,206 Z" />
+
+    <!-- Subtitle text: 劇迷影視 — represented as dots -->
+    <path android:fillColor="#8088A4"
+        android:pathData="M220,224 L232,224 L232,244 L220,244 Z
+                          M240,224 L252,224 L252,244 L240,244 Z
+                          M260,224 L272,224 L272,244 L260,244 Z
+                          M280,224 L292,224 L292,244 L280,244 Z" />
+</vector>
