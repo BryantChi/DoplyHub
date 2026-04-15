@@ -36,16 +36,19 @@ class MainActivity : ComponentActivity() {
         volumeControlStream = android.media.AudioManager.STREAM_MUSIC
         setContent {
             GimyTVTheme {
-                val navController = rememberNavController()
                 var showSplash by remember { mutableStateOf(true) }
+                // Defer NavHost to second frame so SplashOverlay renders first
+                var contentReady by remember { mutableStateOf(false) }
 
-                // Splash: 1.5s minimum — data loads in background during this time
                 LaunchedEffect(Unit) {
+                    contentReady = true
                     delay(1500L)
                     showSplash = false
                 }
 
                 Box(Modifier.fillMaxSize()) {
+                if (contentReady) {
+                val navController = rememberNavController()
                 NavHost(
                     navController = navController,
                     startDestination = Screen.Home.route,
@@ -152,6 +155,7 @@ class MainActivity : ComponentActivity() {
                             onBack = { navController.popBackStack() }
                         )
                     }
+                }
                 }
 
                 // Splash overlay on top

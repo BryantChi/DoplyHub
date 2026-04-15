@@ -132,7 +132,8 @@ class PlayerViewModel @Inject constructor(
                         return@launch
                     }
                 }
-                _uiState.update { it.copy(isLoading = false, error = "播放失敗: ${e.message}") }
+                val msg = if (e is java.io.IOException) "網路連線失敗，請檢查網路後重試" else "播放失敗: ${e.message}"
+                _uiState.update { it.copy(isLoading = false, error = msg) }
             }
         }
     }

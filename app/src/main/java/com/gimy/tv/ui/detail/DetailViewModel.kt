@@ -61,8 +61,10 @@ class DetailViewModel @Inject constructor(
                 } catch (_: Exception) {
                     // Enrichment failed silently — primary detail is already shown
                 }
+            } catch (e: java.io.IOException) {
+                _uiState.update { it.copy(isLoading = false, error = "網路連線失敗，請檢查網路後重試") }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = e.message) }
+                _uiState.update { it.copy(isLoading = false, error = "載入失敗: ${e.message}") }
             }
         }
     }

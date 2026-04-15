@@ -36,22 +36,10 @@ class VodRepositoryImpl @Inject constructor(
         SourceType.MOVIEFFM -> movieffmSource
     }
 
-    // ── Fallback: try primary source, fallback to movieffm on failure ──
-
-    private suspend fun <T> withFallback(
-        sourceType: SourceType,
-        block: suspend (SiteSource) -> T
-    ): T {
-        return try {
-            block(getSource(sourceType))
-        } catch (e: kotlin.coroutines.cancellation.CancellationException) {
-            throw e // Never swallow cancellation
-        } catch (e: Exception) {
-            if (sourceType != SourceType.MOVIEFFM) block(movieffmSource) else throw e
-        }
-    }
-
-    // ── Basic operations with fallback ──
+    // ── Basic operations ──
+    // vodId and typeId are source-specific — fallback to another source with the same
+    // ID is meaningless and causes "Unknown movieffm ID" errors. Only keyword-based
+    // operations (search) can safely fall back across sources.
 
     override suspend fun getCategories(sourceType: SourceType): List<Category> {
         return getSource(sourceType).fetchCategories()
@@ -60,11 +48,11 @@ class VodRepositoryImpl @Inject constructor(
     override suspend fun getVodList(
         sourceType: SourceType, typeId: Int, page: Int
     ): PaginatedResult<Vod> {
-        return withFallback(sourceType) { it.fetchVodList(typeId, page) }
+        return getSource(sourceType).fetchVodList(typeId, page)
     }
 
     override suspend fun getVodDetail(sourceType: SourceType, vodId: Long): VodDetail {
-        return withFallback(sourceType) { it.fetchVodDetail(vodId) }
+        return getSource(sourceType).fetchVodDetail(vodId)
     }
 
     override suspend fun getPlayerData(sourceType: SourceType, episodeUrl: String): PlayerData {
@@ -72,13 +60,20 @@ class VodRepositoryImpl @Inject constructor(
         if (episodeUrl.startsWith("http") && (episodeUrl.contains(".m3u8") || episodeUrl.contains("/video/"))) {
             return PlayerData(streamUrl = episodeUrl, encrypt = 0, from = "movieffm")
         }
-        return withFallback(sourceType) { it.fetchPlayerData(episodeUrl) }
+        return getSource(sourceType).fetchPlayerData(episodeUrl)
     }
 
     override suspend fun search(
         sourceType: SourceType, keyword: String, page: Int
     ): PaginatedResult<Vod> {
-        return withFallback(sourceType) { it.search(keyword, page) }
+        // Keywords are source-independent — safe to fall back
+        return try {
+            getSource(sourceType).search(keyword, page)
+        } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (sourceType != SourceType.MOVIEFFM) movieffmSource.search(keyword, page) else throw e
+        }
     }
 
     // ── Cross-source search ──
