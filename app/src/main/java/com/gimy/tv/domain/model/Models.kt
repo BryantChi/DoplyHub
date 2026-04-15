@@ -31,6 +31,7 @@ data class VodDetail(
     val actors: List<String>,
     val synopsis: String,
     val episodes: List<EpisodeGroup>,
+    val seriesVods: List<Vod> = emptyList(),
     val relatedVods: List<Vod> = emptyList()
 )
 

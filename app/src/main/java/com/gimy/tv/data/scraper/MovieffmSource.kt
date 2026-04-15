@@ -354,12 +354,13 @@ class MovieffmSource @Inject constructor(
         val html = doc.html()
         val episodeGroups = parseVideoUrls(html, sourceNames)
 
-        // Parse related/recommended content from #single_relacionados_b
+        // Parse series and related/recommended content
+        val seriesVods = parseSeriesVods(doc, relatedSlugs)
         val relatedVods = parseRelatedVods(doc, relatedSlugs)
 
         return VodDetail(
             Vod(vodId, sourceType, title, cover, category, year, status, rating),
-            director, actors, synopsis, episodeGroups, relatedVods
+            director, actors, synopsis, episodeGroups, seriesVods, relatedVods
         )
     }
 
@@ -466,6 +467,37 @@ class MovieffmSource @Inject constructor(
      */
     private fun parseRelatedVods(doc: Document, outSlugs: MutableList<MovieffmSlugEntity>): List<Vod> {
         val container = doc.selectFirst("#single_relacionados_b") ?: return emptyList()
+        val items = mutableListOf<Vod>()
+
+        for (article in container.select("article")) {
+            val link = article.selectFirst("a[href]") ?: continue
+            val href = link.attr("abs:href").ifBlank { link.attr("href") }
+            val match = Regex("/(movies|drama|tvshows)/([^/]+)/?$").find(href) ?: continue
+            val contentType = match.groupValues[1]
+            val slug = match.groupValues[2]
+
+            val img = article.selectFirst("img") ?: continue
+            val title = img.attr("alt").trim()
+            if (title.isBlank()) continue
+            val cover = img.attr("data-lazy-src").ifBlank { img.attr("src") }.let { resolveUrl(it) }
+
+            val vodId = registerSlug(slug, contentType)
+            items.add(Vod(vodId, sourceType, title, cover, "", 0, ""))
+            outSlugs.add(MovieffmSlugEntity(vodId, slug, contentType))
+        }
+        return items
+    }
+
+    /**
+     * Parse series vods from the series section on detail pages.
+     * Tries #single_relacionados_a, .sbox:has(h2:contains(series)), .sbox:has(h2:contains(Serie)).
+     * Uses the same article-parsing logic as parseRelatedVods.
+     */
+    private fun parseSeriesVods(doc: Document, outSlugs: MutableList<MovieffmSlugEntity>): List<Vod> {
+        val container = doc.selectFirst("#single_relacionados_a")
+            ?: doc.selectFirst(".sbox:has(h2:contains(series))")
+            ?: doc.selectFirst(".sbox:has(h2:contains(Serie))")
+            ?: return emptyList()
         val items = mutableListOf<Vod>()
 
         for (article in container.select("article")) {

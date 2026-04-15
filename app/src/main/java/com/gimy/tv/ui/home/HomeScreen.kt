@@ -16,9 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -33,8 +35,11 @@ import androidx.tv.material3.*
 import coil.compose.AsyncImage
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
+import com.gimy.tv.ui.components.GimyButton
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.ui.theme.LocalDimensions
+import com.gimy.tv.ui.theme.LocalIsTelevision
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -49,6 +54,8 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val dims = LocalDimensions.current
+    val isTV = LocalIsTelevision.current
 
     Box(
         Modifier
@@ -59,9 +66,11 @@ fun HomeScreen(
             uiState.isLoading -> LoadingOverlay()
             uiState.error != null -> ErrorOverlay(uiState.error ?: "") { viewModel.loadHome() }
             else -> {
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 48.dp)) {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = dims.screenHorizontalPadding)) {
                     // ── Top bar ──
-                    item { TopBar(onSearchClick, onFavoritesClick, onHistoryClick) }
+                    if (isTV) {
+                        item { TopBar(onSearchClick, onFavoritesClick, onHistoryClick) }
+                    }
 
                     // ── Hero banner ──
                     val heroItems = uiState.rows.firstOrNull()?.items?.take(6) ?: emptyList()
@@ -72,10 +81,13 @@ fun HomeScreen(
                     // ── Continue watching ──
                     if (uiState.continueWatching.isNotEmpty()) {
                         item {
-                            ContentRow("繼續觀看", 0, SourceType.GIMYMAX,
+                            val continueVods = remember(uiState.continueWatching) {
                                 uiState.continueWatching.map { e ->
                                     Vod(e.vodId, e.sourceType, e.title, e.coverUrl, "", 0, "第${e.episodeNum}集")
-                                },
+                                }
+                            }
+                            ContentRow("繼續觀看", 0, SourceType.GIMYMAX,
+                                continueVods,
                                 onItemClick = { onVodClick(it.sourceType, it.id) },
                                 onMoreClick = { onHistoryClick() }
                             )
@@ -102,8 +114,9 @@ fun HomeScreen(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun TopBar(onSearch: () -> Unit, onFav: () -> Unit, onHistory: () -> Unit) {
+    val dims = LocalDimensions.current
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 20.dp),
+        Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -146,6 +159,8 @@ private fun NavChip(label: String, onClick: () -> Unit) {
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
+    val dims = LocalDimensions.current
+    val isTV = LocalIsTelevision.current
     var idx by remember { mutableIntStateOf(0) }
 
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
@@ -161,10 +176,28 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 48.dp, vertical = 6.dp)
-            .height(340.dp)
+            .padding(horizontal = dims.screenHorizontalPadding, vertical = 6.dp)
+            .height(dims.heroBannerHeight)
             .clip(RoundedCornerShape(12.dp))
             .bringIntoViewRequester(bringIntoViewRequester)
+            .then(
+                if (!isTV && items.size > 1) {
+                    Modifier.pointerInput(items.size) {
+                        var totalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onDragEnd = {
+                                if (totalDrag > 80f) {
+                                    idx = if (idx > 0) idx - 1 else items.size - 1
+                                } else if (totalDrag < -80f) {
+                                    idx = (idx + 1) % items.size
+                                }
+                            },
+                            onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount }
+                        )
+                    }
+                } else Modifier
+            )
     ) {
         // ── Dark base background ──
         Box(Modifier.fillMaxSize().background(CinemaBase))
@@ -202,65 +235,86 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
                 Column(
                     Modifier
                         .align(Alignment.CenterStart)
-                        .padding(start = 48.dp, top = 32.dp, bottom = 80.dp)
+                        .padding(
+                            start = dims.screenHorizontalPadding,
+                            top = if (isTV) 32.dp else 16.dp,
+                            bottom = if (isTV) 80.dp else 32.dp
+                        )
                         .fillMaxHeight()
-                        .fillMaxWidth(0.38f),
+                        .fillMaxWidth(dims.heroBannerTextWidthFraction),
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Text("${currentIdx + 1} / ${items.size}", color = CinemaRed, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    Text("${currentIdx + 1} / ${items.size}", color = CinemaRed, fontSize = dims.heroBannerMetaSize, fontWeight = FontWeight.Bold,
                         modifier = Modifier.background(CinemaRed.copy(0.15f), RoundedCornerShape(3.dp)).padding(horizontal = 8.dp, vertical = 2.dp))
-                    Spacer(Modifier.height(8.dp))
-                    Text(vod.title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 32.sp)
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(if (isTV) 8.dp else 4.dp))
+                    Text(vod.title, color = Color.White,
+                        fontSize = dims.heroBannerTitleSize,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        lineHeight = dims.heroBannerTitleSize * 1.25f)
+                    Spacer(Modifier.height(if (isTV) 6.dp else 4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (vod.year > 0) {
-                            Text("${vod.year}", color = CinemaTextMuted, fontSize = 13.sp)
+                            Text("${vod.year}", color = CinemaTextMuted, fontSize = dims.heroBannerMetaSize)
                         }
                         if (vod.category.isNotBlank()) {
-                            Text(vod.category, color = CinemaTextMuted, fontSize = 13.sp)
+                            Text(vod.category, color = CinemaTextMuted, fontSize = dims.heroBannerMetaSize)
                         }
                         if (vod.status.isNotBlank()) {
-                            Text(vod.status, color = CinemaGold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(vod.status, color = CinemaGold, fontSize = dims.heroBannerMetaSize, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    // Phone: button inside text column to avoid overlap
+                    if (!isTV) {
+                        Spacer(Modifier.height(8.dp))
+                        androidx.compose.material3.Button(
+                            onClick = { items.getOrNull(currentIdx % items.size)?.let(onItemClick) },
+                            shape = RoundedCornerShape(6.dp),
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = CinemaRed, contentColor = Color.White),
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)
+                        ) {
+                            Text("▶  觀看詳情", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }
             }
         }
 
-        // ── Button: outside Crossfade so focus persists across transitions ──
-        var btnFocused by remember { mutableStateOf(false) }
-        Button(
-            onClick = { items.getOrNull(idx)?.let(onItemClick) },
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 96.dp, bottom = 44.dp)
-                .onFocusChanged {
-                    btnFocused = it.isFocused
-                    if (it.isFocused) coroutineScope.launch { bringIntoViewRequester.bringIntoView() }
-                }
-                .onPreviewKeyEvent { event ->
-                    if (event.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
-                        when (event.nativeKeyEvent.keyCode) {
-                            android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
-                                idx = if (idx > 0) idx - 1 else items.size - 1; true
+        // ── Button: outside Crossfade so focus persists across transitions (TV only) ──
+        if (isTV) {
+            var btnFocused by remember { mutableStateOf(false) }
+            Button(
+                onClick = { items.getOrNull(idx)?.let(onItemClick) },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = dims.screenHorizontalPadding * 2, bottom = 44.dp)
+                    .onFocusChanged {
+                        btnFocused = it.isFocused
+                        if (it.isFocused) coroutineScope.launch { bringIntoViewRequester.bringIntoView() }
+                    }
+                    .onPreviewKeyEvent { event ->
+                        if (event.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
+                            when (event.nativeKeyEvent.keyCode) {
+                                android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
+                                    idx = if (idx > 0) idx - 1 else items.size - 1; true
+                                }
+                                android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                                    idx = (idx + 1) % items.size; true
+                                }
+                                else -> false
                             }
-                            android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                idx = (idx + 1) % items.size; true
-                            }
-                            else -> false
-                        }
-                    } else false
-                },
-            shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
-            colors = ButtonDefaults.colors(containerColor = CinemaRed, focusedContainerColor = Color.White),
-            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 11.dp)
-        ) {
-            Text(
-                if (btnFocused) "◀  觀看詳情  ▶" else "▶  觀看詳情",
-                color = if (btnFocused) CinemaBlack else Color.White,
-                fontWeight = FontWeight.Bold, fontSize = 15.sp
-            )
+                        } else false
+                    },
+                shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
+                colors = ButtonDefaults.colors(containerColor = CinemaRed, focusedContainerColor = Color.White),
+                contentPadding = PaddingValues(horizontal = 28.dp, vertical = 11.dp)
+            ) {
+                Text(
+                    if (btnFocused) "◀  觀看詳情  ▶" else "▶  觀看詳情",
+                    color = if (btnFocused) CinemaBlack else Color.White,
+                    fontWeight = FontWeight.Bold, fontSize = 15.sp
+                )
+            }
         }
 
         // Progress dots (outside Crossfade so they don't fade)
@@ -282,11 +336,12 @@ private val MovieffmBlue = Color(0xFF3B82F6)
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ContentRow(title: String, typeId: Int, rowSourceType: SourceType, items: List<Vod>, onItemClick: (Vod) -> Unit, onMoreClick: () -> Unit) {
+    val dims = LocalDimensions.current
     val isMovieffm = rowSourceType == SourceType.MOVIEFFM
     val accentColor = if (isMovieffm) MovieffmBlue else CinemaRed
 
     Column(Modifier.padding(top = 20.dp)) {
-        Row(Modifier.padding(start = 48.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = dims.screenHorizontalPadding, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(3.dp).height(16.dp).clip(RoundedCornerShape(2.dp)).background(accentColor))
             Spacer(Modifier.width(10.dp))
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CinemaTextPrimary, letterSpacing = 0.3.sp)
@@ -300,7 +355,7 @@ private fun ContentRow(title: String, typeId: Int, rowSourceType: SourceType, it
                 }
             }
         }
-        LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = dims.screenHorizontalPadding), horizontalArrangement = Arrangement.spacedBy(dims.cardSpacing)) {
             items(items, key = { "${it.sourceType}_${it.id}" }) { vod ->
                 VodCard(vod = vod, onClick = { onItemClick(vod) })
             }
@@ -315,18 +370,11 @@ private fun ContentRow(title: String, typeId: Int, rowSourceType: SourceType, it
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun MoreCard(onClick: () -> Unit) {
+    val dims = LocalDimensions.current
+    val isTV = LocalIsTelevision.current
     var f by remember { mutableStateOf(false) }
-    Card(
-        onClick = onClick,
-        modifier = Modifier
-            .width(154.dp)
-            .height(248.dp)
-            .onFocusChanged { f = it.isFocused },
-        shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp)),
-        border = CardDefaults.border(focusedBorder = Border(BorderStroke(2.dp, CinemaRed), 8.dp)),
-        scale = CardDefaults.scale(focusedScale = 1f),
-        colors = CardDefaults.colors(containerColor = CinemaSurface)
-    ) {
+
+    @Composable fun MoreCardContent() {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("▶", fontSize = 28.sp, color = if (f) CinemaRed else CinemaTextMuted)
@@ -336,6 +384,24 @@ private fun MoreCard(onClick: () -> Unit) {
             }
         }
     }
+
+    if (isTV) {
+        Card(
+            onClick = onClick,
+            modifier = Modifier.width(dims.cardWidth).height(dims.cardHeight).onFocusChanged { f = it.isFocused },
+            shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp)),
+            border = CardDefaults.border(focusedBorder = Border(BorderStroke(2.dp, CinemaRed), 8.dp)),
+            scale = CardDefaults.scale(focusedScale = 1f),
+            colors = CardDefaults.colors(containerColor = CinemaSurface)
+        ) { MoreCardContent() }
+    } else {
+        androidx.compose.material3.Card(
+            onClick = onClick,
+            modifier = Modifier.width(dims.cardWidth).height(dims.cardHeight),
+            shape = RoundedCornerShape(8.dp),
+            colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = CinemaSurface),
+        ) { MoreCardContent() }
+    }
 }
 
 // ═══════════════════════════════════════
@@ -344,16 +410,16 @@ private fun MoreCard(onClick: () -> Unit) {
 
 @Composable
 private fun LoadingOverlay() {
+    val dims = LocalDimensions.current
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            GimyLoadingIndicator(48.dp)
+            GimyLoadingIndicator(dims.loadingIndicatorSize)
             Spacer(Modifier.height(18.dp))
             Text("正在載入…", color = CinemaTextMuted, fontSize = 14.sp)
         }
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ErrorOverlay(error: String, onRetry: () -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -362,7 +428,7 @@ private fun ErrorOverlay(error: String, onRetry: () -> Unit) {
             Spacer(Modifier.height(6.dp))
             Text(error, color = CinemaTextMuted, fontSize = 13.sp)
             Spacer(Modifier.height(20.dp))
-            Button(onClick = onRetry, colors = ButtonDefaults.colors(containerColor = CinemaRed)) {
+            GimyButton(onClick = onRetry, containerColor = CinemaRed) {
                 Text("重試", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }

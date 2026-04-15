@@ -17,6 +17,9 @@ interface VodRepository {
     suspend fun getPlayerData(sourceType: SourceType, episodeUrl: String): PlayerData
     suspend fun search(sourceType: SourceType, keyword: String, page: Int): PaginatedResult<Vod>
 
+    // Series search
+    suspend fun searchSeriesVods(vod: Vod): List<Vod>
+
     // Multi-source integration
     suspend fun searchAllSources(keyword: String, page: Int): PaginatedResult<Vod>
     suspend fun getEnrichedVodDetail(sourceType: SourceType, vodId: Long, cachedPrimary: VodDetail? = null): VodDetail

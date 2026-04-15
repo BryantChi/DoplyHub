@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.gimy.tv.ui.components.GimyButton
 import com.gimy.tv.ui.components.GimyLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +32,7 @@ fun BrowseScreen(
     onBack: () -> Unit,
     vm: BrowseViewModel = hiltViewModel()
 ) {
+    val dims = LocalDimensions.current
     val uiState by vm.uiState.collectAsState()
     val gridState = rememberLazyGridState()
 
@@ -46,17 +48,27 @@ fun BrowseScreen(
     Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))) {
         // Header
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 20.dp),
+            Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val isTV = LocalIsTelevision.current
             var bf by remember { mutableStateOf(false) }
-            Button(
-                onClick = onBack,
-                modifier = Modifier.onFocusChanged { bf = it.isFocused },
-                shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
-                colors = ButtonDefaults.colors(containerColor = CinemaSurface, focusedContainerColor = CinemaRed),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)
-            ) { Text("返回", color = Color.White, fontSize = 13.sp) }
+            if (isTV) {
+                Button(
+                    onClick = onBack,
+                    modifier = Modifier.onFocusChanged { bf = it.isFocused },
+                    shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
+                    colors = ButtonDefaults.colors(containerColor = CinemaSurface, focusedContainerColor = CinemaRed),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)
+                ) { Text("返回", color = Color.White, fontSize = 13.sp) }
+            } else {
+                androidx.compose.material3.Button(
+                    onClick = onBack,
+                    shape = RoundedCornerShape(6.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = CinemaSurface, contentColor = Color.White),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)
+                ) { Text("返回", color = Color.White, fontSize = 13.sp) }
+            }
 
             Spacer(Modifier.width(16.dp))
             Text(uiState.title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CinemaTextPrimary)
@@ -71,7 +83,7 @@ fun BrowseScreen(
             uiState.isLoading && uiState.items.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        GimyLoadingIndicator(48.dp)
+                        GimyLoadingIndicator(dims.loadingIndicatorSize)
                         Spacer(Modifier.height(12.dp))
                         Text("載入${uiState.title}…", color = CinemaTextMuted, fontSize = 14.sp)
                     }
@@ -84,7 +96,7 @@ fun BrowseScreen(
                         Spacer(Modifier.height(4.dp))
                         Text(uiState.error!!, color = CinemaTextMuted, fontSize = 13.sp)
                         Spacer(Modifier.height(16.dp))
-                        Button(onClick = { vm.loadPage(1) }, colors = ButtonDefaults.colors(containerColor = CinemaRed)) {
+                        GimyButton(onClick = { vm.loadPage(1) }, containerColor = CinemaRed) {
                             Text("重試", color = Color.White)
                         }
                     }
@@ -92,9 +104,9 @@ fun BrowseScreen(
             }
             else -> {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(166.dp),
+                    columns = GridCells.Adaptive(dims.gridMinCellWidth),
                     state = gridState,
-                    contentPadding = PaddingValues(horizontal = 48.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(horizontal = dims.screenHorizontalPadding, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
@@ -106,18 +118,11 @@ fun BrowseScreen(
                     // Bottom: loading indicator or "load more" button
                     if (uiState.hasMore) {
                         item {
-                            Box(Modifier.width(154.dp).height(248.dp), contentAlignment = Alignment.Center) {
+                            Box(Modifier.width(dims.cardWidth).height(dims.cardHeight), contentAlignment = Alignment.Center) {
                                 if (uiState.isLoadingMore) {
                                     GimyLoadingIndicator(28.dp)
                                 } else {
-                                    Card(
-                                        onClick = { vm.loadMore() },
-                                        shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp)),
-                                        border = CardDefaults.border(focusedBorder = Border(BorderStroke(2.dp, CinemaRed), 8.dp)),
-                                        scale = CardDefaults.scale(focusedScale = 1f),
-                                        colors = CardDefaults.colors(containerColor = CinemaSurface),
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
+                                    val loadMoreContent: @Composable () -> Unit = {
                                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Text("↓", fontSize = 24.sp, color = CinemaRed)
@@ -125,6 +130,23 @@ fun BrowseScreen(
                                                 Text("載入更多", fontSize = 13.sp, color = CinemaTextPrimary, fontWeight = FontWeight.Bold)
                                             }
                                         }
+                                    }
+                                    if (LocalIsTelevision.current) {
+                                        Card(
+                                            onClick = { vm.loadMore() },
+                                            shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                                            border = CardDefaults.border(focusedBorder = Border(BorderStroke(2.dp, CinemaRed), 8.dp)),
+                                            scale = CardDefaults.scale(focusedScale = 1f),
+                                            colors = CardDefaults.colors(containerColor = CinemaSurface),
+                                            modifier = Modifier.fillMaxSize()
+                                        ) { loadMoreContent() }
+                                    } else {
+                                        androidx.compose.material3.Card(
+                                            onClick = { vm.loadMore() },
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = CinemaSurface),
+                                            modifier = Modifier.fillMaxSize()
+                                        ) { loadMoreContent() }
                                     }
                                 }
                             }

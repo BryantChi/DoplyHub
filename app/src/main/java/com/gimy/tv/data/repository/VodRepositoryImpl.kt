@@ -130,6 +130,61 @@ class VodRepositoryImpl @Inject constructor(
             .trim()
     }
 
+    /** Extract the core series name by stripping subtitles, episode arcs, etc. */
+    private fun extractSeriesBase(title: String): String {
+        return normalizeTitle(title)
+            .replace(Regex("最終季.*"), "")
+            .replace(Regex("完結篇.*"), "")
+            .replace(Regex("特別篇.*"), "")
+            .replace(Regex("劇場版.*"), "")
+            .replace(Regex("外傳.*"), "")
+            .replace(Regex("ova.*"), "")
+            .replace(Regex("篇$"), "")
+            .replace(Regex("[.:：・\\-~～]+.*"), "") // strip after punctuation (subtitle separator)
+            .trim()
+    }
+
+    private fun isSameSeries(baseTitle: String, candidate: Vod, currentId: Long): Boolean {
+        if (candidate.id == currentId) return false
+        val candidateBase = extractSeriesBase(candidate.title)
+        if (candidateBase.isBlank()) return false
+        return baseTitle == candidateBase ||
+            (baseTitle.length >= 3 && candidateBase.contains(baseTitle)) ||
+            (candidateBase.length >= 3 && baseTitle.contains(candidateBase))
+    }
+
+    /** Search BOTH sources for same-series items in parallel */
+    override suspend fun searchSeriesVods(vod: Vod): List<Vod> {
+        val baseTitle = extractSeriesBase(vod.title)
+        if (baseTitle.isBlank() || baseTitle.length < 2) return emptyList()
+
+        return coroutineScope {
+            val primaryDeferred = async {
+                try {
+                    withTimeout(4000) {
+                        getSource(vod.sourceType).search(baseTitle, 1).items
+                    }
+                } catch (_: Exception) { emptyList() }
+            }
+            val secondaryDeferred = async {
+                try {
+                    withTimeout(4000) {
+                        val altSource = if (vod.sourceType == SourceType.MOVIEFFM) gimyMaxSource else movieffmSource
+                        altSource.search(baseTitle, 1).items
+                    }
+                } catch (_: Exception) { emptyList() }
+            }
+            val allResults = mergeSearchResults(primaryDeferred.await(), secondaryDeferred.await())
+            allResults.filter { isSameSeries(baseTitle, it, vod.id) }
+        }
+    }
+
+    private fun inferSeriesFromRelated(currentVod: Vod, relatedVods: List<Vod>): List<Vod> {
+        val baseTitle = extractSeriesBase(currentVod.title)
+        if (baseTitle.isBlank() || baseTitle.length < 2) return emptyList()
+        return relatedVods.filter { isSameSeries(baseTitle, it, currentVod.id) }
+    }
+
     // ── Enriched detail with cross-source episode groups ──
 
     override suspend fun getEnrichedVodDetail(sourceType: SourceType, vodId: Long, cachedPrimary: VodDetail?): VodDetail =
@@ -171,12 +226,25 @@ class VodRepositoryImpl @Inject constructor(
                 // Rank all groups by quality
                 val allGroups = rankEpisodeGroups(primaryDetail.episodes + secondaryGroups)
 
+                // Merge series vods from both sources (scraped only — search is done separately)
+                val mergedSeries = mergeSearchResults(
+                    primaryDetail.seriesVods, secondaryDetail.seriesVods
+                )
+
                 // Merge related vods from both sources (primary first, deduplicate)
                 val mergedRelated = mergeSearchResults(
                     primaryDetail.relatedVods, secondaryDetail.relatedVods
                 )
 
-                primaryDetail.copy(episodes = allGroups, relatedVods = mergedRelated)
+                // Remove series items from related to avoid duplication
+                val seriesIds = mergedSeries.map { it.id }.toSet()
+                val filteredRelated = mergedRelated.filter { it.id !in seriesIds }
+
+                primaryDetail.copy(
+                    episodes = allGroups,
+                    seriesVods = mergedSeries,
+                    relatedVods = filteredRelated
+                )
             } else {
                 primaryDetail
             }

@@ -24,7 +24,8 @@ data class PlayerUiState(
     val resumePositionMs: Long = 0L,
     val allSources: List<EpisodeGroup> = emptyList(),
     val totalEpisodes: Int = 0,
-    val error: String? = null
+    val error: String? = null,
+    val isFullscreen: Boolean = false,
 )
 
 @HiltViewModel
@@ -257,5 +258,13 @@ class PlayerViewModel @Inject constructor(
                 // Silent — primary routes already available
             }
         }
+    }
+
+    fun toggleFullscreen() {
+        _uiState.update { it.copy(isFullscreen = !it.isFullscreen) }
+    }
+
+    fun setFullscreen(fullscreen: Boolean) {
+        _uiState.update { it.copy(isFullscreen = fullscreen) }
     }
 }

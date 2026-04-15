@@ -1,5 +1,6 @@
 package com.gimy.tv.ui
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,6 +9,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
@@ -17,6 +21,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.ui.browse.BrowseScreen
+import com.gimy.tv.ui.components.AdaptiveScaffold
 import com.gimy.tv.ui.components.SplashOverlay
 import com.gimy.tv.ui.detail.DetailScreen
 import com.gimy.tv.ui.favorites.FavoritesScreen
@@ -25,17 +30,31 @@ import com.gimy.tv.ui.home.HomeScreen
 import com.gimy.tv.ui.navigation.Screen
 import com.gimy.tv.ui.player.PlayerScreen
 import com.gimy.tv.ui.search.SearchScreen
-import com.gimy.tv.ui.theme.GimyTVTheme
+import com.gimy.tv.ui.theme.*
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         volumeControlStream = android.media.AudioManager.STREAM_MUSIC
         setContent {
-            GimyTVTheme {
+            val windowSizeClass = calculateWindowSizeClass(this)
+            val isTelevision = remember {
+                packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+            }
+            val dimensions = remember(isTelevision, windowSizeClass.widthSizeClass) {
+                when {
+                    isTelevision -> TvDimensions
+                    windowSizeClass.widthSizeClass == WindowWidthSizeClass.Compact -> PhoneDimensions
+                    else -> TabletDimensions
+                }
+            }
+
+            GimyTheme(isTelevision = isTelevision) {
+                CompositionLocalProvider(LocalDimensions provides dimensions) {
                 var showSplash by remember { mutableStateOf(true) }
                 // Defer NavHost to second frame so SplashOverlay renders first
                 var contentReady by remember { mutableStateOf(false) }
@@ -49,6 +68,11 @@ class MainActivity : ComponentActivity() {
                 Box(Modifier.fillMaxSize()) {
                 if (contentReady) {
                 val navController = rememberNavController()
+                AdaptiveScaffold(
+                    widthSizeClass = windowSizeClass.widthSizeClass,
+                    isTelevision = isTelevision,
+                    navController = navController,
+                ) {
                 NavHost(
                     navController = navController,
                     startDestination = Screen.Home.route,
@@ -67,6 +91,16 @@ class MainActivity : ComponentActivity() {
                             },
                             onFavoritesClick = { navController.navigate(Screen.Favorites.route) },
                             onHistoryClick = { navController.navigate(Screen.History.route) }
+                        )
+                    }
+
+                    composable(Screen.Categories.route) {
+                        com.gimy.tv.ui.category.CategoryScreen(
+                            onCategoryClick = { sourceType, typeId ->
+                                navController.navigate(
+                                    Screen.Browse.createRoute(sourceType, typeId)
+                                )
+                            }
                         )
                     }
 
@@ -157,6 +191,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 }
+                }
 
                 // Splash overlay on top
                 AnimatedVisibility(
@@ -164,6 +199,7 @@ class MainActivity : ComponentActivity() {
                     exit = fadeOut(animationSpec = tween(300))
                 ) {
                     SplashOverlay()
+                }
                 }
                 }
             }

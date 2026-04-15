@@ -13,6 +13,7 @@ sealed class Screen(val route: String) {
         fun createRoute(sourceType: String, vodId: Long, sourceId: Int, episodeNum: Int) =
             "player/$sourceType/$vodId/$sourceId/$episodeNum"
     }
+    data object Categories : Screen("categories")
     data object Favorites : Screen("favorites")
     data object History : Screen("history")
 }
