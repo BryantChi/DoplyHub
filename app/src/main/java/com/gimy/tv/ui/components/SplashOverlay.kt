@@ -13,14 +13,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Text
+import androidx.compose.material3.Text
 import com.gimy.tv.R
 import com.gimy.tv.ui.theme.CinemaBlack
 import com.gimy.tv.ui.theme.CinemaRed
 import com.gimy.tv.ui.theme.CinemaTextMuted
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun SplashOverlay() {
     val iconAnim = remember { Animatable(0f) }

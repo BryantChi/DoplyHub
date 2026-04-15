@@ -116,7 +116,29 @@ class GimyTvSource @Inject constructor(
             val i = stabilityOrder.indexOfFirst { g.sourceName.contains(it) }; if (i >= 0) stabilityOrder.size - i else -1
         })
 
-        return VodDetail(Vod(vodId, sourceType, title, cover, category, year, status), director, actors, synopsis, sorted)
+        return VodDetail(Vod(vodId, sourceType, title, cover, category, year, status), director, actors, synopsis, sorted,
+            seriesVods = parseSeriesVods(doc))
+    }
+
+    /**
+     * Parse series vods from the 系列 section on detail pages.
+     * Uses .box-title:has(h3:contains(系列)) to locate the container.
+     */
+    private fun parseSeriesVods(doc: Document): List<Vod> {
+        val container = doc.selectFirst(".box-title:has(h3:contains(系列))")?.parent()
+            ?: return emptyList()
+        val items = mutableListOf<Vod>()
+        for (card in container.select("a[class*=video-pic][data-background]")) {
+            val href = card.attr("href")
+            val id = Regex("/vod/(\\d+)\\.html").find(href)
+                ?.groupValues?.get(1)?.toLongOrNull() ?: continue
+            val cardTitle = card.attr("title").trim()
+            if (cardTitle.isBlank()) continue
+            val cardCover = resolveUrl(card.attr("data-background"))
+            val cardStatus = card.selectFirst("span.note")?.text()?.trim() ?: ""
+            items.add(Vod(id, sourceType, cardTitle, cardCover, "", 0, cardStatus))
+        }
+        return items
     }
 
     private fun parsePlayerData(html: String): PlayerData {

@@ -37,12 +37,13 @@ class FavoritesViewModel @Inject constructor(fav: FavoriteRepository) : ViewMode
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun FavoritesScreen(onVodClick: (SourceType, Long) -> Unit, onBack: () -> Unit, vm: FavoritesViewModel = hiltViewModel()) {
+    val dims = LocalDimensions.current
     val favs by vm.favorites.collectAsState()
     Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))) {
         PageHeader("我的收藏", onBack)
         if (favs.isEmpty()) EmptyState("還沒有收藏的內容")
-        else LazyVerticalGrid(GridCells.Adaptive(154.dp), contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxSize()
+        else LazyVerticalGrid(GridCells.Adaptive(dims.cardWidth), contentPadding = PaddingValues(horizontal = dims.screenHorizontalPadding, vertical = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(dims.cardSpacing), verticalArrangement = Arrangement.spacedBy(dims.cardSpacing), modifier = Modifier.fillMaxSize()
         ) { items(favs, key = { "${it.sourceType}_${it.id}" }) { vod -> VodCard(vod, onClick = { onVodClick(vod.sourceType, vod.id) }) } }
     }
 }
@@ -50,13 +51,22 @@ fun FavoritesScreen(onVodClick: (SourceType, Long) -> Unit, onBack: () -> Unit, 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun PageHeader(title: String, onBack: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+    val dims = LocalDimensions.current
+    Row(Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding), verticalAlignment = Alignment.CenterVertically) {
         var f by remember { mutableStateOf(false) }
-        Button(onClick = onBack, modifier = Modifier.onFocusChanged { f = it.isFocused },
-            shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
-            colors = ButtonDefaults.colors(containerColor = CinemaSurface, focusedContainerColor = CinemaRed),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)
-        ) { Text("返回", color = Color.White, fontSize = 13.sp) }
+        if (LocalIsTelevision.current) {
+            Button(onClick = onBack, modifier = Modifier.onFocusChanged { f = it.isFocused },
+                shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
+                colors = ButtonDefaults.colors(containerColor = CinemaSurface, focusedContainerColor = CinemaRed),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)
+            ) { Text("返回", color = Color.White, fontSize = 13.sp) }
+        } else {
+            androidx.compose.material3.Button(onClick = onBack,
+                shape = RoundedCornerShape(6.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = CinemaSurface, contentColor = Color.White),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)
+            ) { Text("返回", color = Color.White, fontSize = 13.sp) }
+        }
         Spacer(Modifier.width(16.dp))
         Box(Modifier.width(3.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(CinemaRed))
         Spacer(Modifier.width(10.dp))

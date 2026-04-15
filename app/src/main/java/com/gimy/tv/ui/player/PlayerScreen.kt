@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.gimy.tv.ui.components.GimyButton
 import com.gimy.tv.ui.components.GimyLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,7 +27,9 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.*
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.ui.theme.LocalIsTelevision
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -36,6 +39,7 @@ fun PlayerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val isTV = LocalIsTelevision.current
 
     // Keep screen on during playback — prevent sleep/screensaver
     val activity = context as? android.app.Activity
@@ -102,10 +106,14 @@ fun PlayerScreen(
 
     // Auto-save progress
     LaunchedEffect(exoPlayer) {
-        while (true) {
+        while (isActive) {
             delay(10_000)
-            if (exoPlayer.isPlaying) {
-                viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
+            try {
+                if (exoPlayer.isPlaying) {
+                    viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
+                }
+            } catch (_: IllegalStateException) {
+                break
             }
         }
     }
@@ -149,40 +157,87 @@ fun PlayerScreen(
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        // ── Player ──
-        if (uiState.streamUrl != null && !uiState.isLoading) {
-            AndroidView(
-                factory = { ctx ->
-                    PlayerView(ctx).apply {
-                        player = exoPlayer
-                        useController = true
-                        controllerAutoShow = true
-                        controllerShowTimeoutMs = 5000
-                        setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
-                        // Let PlayerView handle ALL key events natively (D-pad seek, play/pause)
-                        setControllerVisibilityListener(
-                            PlayerView.ControllerVisibilityListener { vis ->
-                                // When controller shows, also briefly show info
-                                if (vis == android.view.View.VISIBLE) {
-                                    infoTrigger++
+        if (isTV) {
+            // === TV PLAYER ===
+            // ── Player ──
+            if (uiState.streamUrl != null && !uiState.isLoading) {
+                AndroidView(
+                    factory = { ctx ->
+                        PlayerView(ctx).apply {
+                            player = exoPlayer
+                            useController = true
+                            controllerAutoShow = true
+                            controllerShowTimeoutMs = 5000
+                            setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
+                            // Let PlayerView handle ALL key events natively (D-pad seek, play/pause)
+                            setControllerVisibilityListener(
+                                PlayerView.ControllerVisibilityListener { vis ->
+                                    // When controller shows, also briefly show info
+                                    if (vis == android.view.View.VISIBLE) {
+                                        infoTrigger++
+                                    }
+                                }
+                            )
+                            // Intercept only BACK key
+                            setOnKeyListener { _, keyCode, event ->
+                                if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
+                                    viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
+                                    onBack()
+                                    true
+                                } else {
+                                    false // Let PlayerView handle everything else
                                 }
                             }
-                        )
-                        // Intercept only BACK key
-                        setOnKeyListener { _, keyCode, event ->
-                            if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
-                                viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
-                                onBack()
-                                true
-                            } else {
-                                false // Let PlayerView handle everything else
-                            }
+                            playerView = this
                         }
-                        playerView = this
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // ── Info bar (auto-hide 3.5s) ──
+            AnimatedVisibility(
+                visible = infoVisible && uiState.streamUrl != null && !uiState.isLoading && uiState.error == null,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
+                Box(
+                    Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.7f))
+                        .padding(horizontal = 24.dp, vertical = 10.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                        Column {
+                            Text(uiState.vodTitle, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            Text(uiState.episodeTitle, color = CinemaTextMuted, fontSize = 12.sp)
+                        }
+                        Surface(
+                            colors = SurfaceDefaults.colors(containerColor = CinemaRed.copy(0.9f)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(uiState.sourceName, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+                        }
                     }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+                }
+            }
+        } else {
+            // === MOBILE PLAYER ===
+            if (uiState.streamUrl != null && !uiState.isLoading) {
+                EmbeddedPlayerView(
+                    player = exoPlayer,
+                    isFullscreen = true,
+                    onToggleFullscreen = { onBack() },
+                    onPrevEpisode = {
+                        if (uiState.episodeNum > 1) viewModel.switchEpisode(uiState.episodeNum - 1)
+                    },
+                    onNextEpisode = {
+                        if (uiState.episodeNum < uiState.totalEpisodes) viewModel.switchEpisode(uiState.episodeNum + 1)
+                    },
+                    hasPrevEpisode = uiState.episodeNum > 1,
+                    hasNextEpisode = uiState.episodeNum < uiState.totalEpisodes,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
 
         // ── Loading ──
@@ -209,38 +264,12 @@ fun PlayerScreen(
                     Text(uiState.error ?: "", color = CinemaRed, fontSize = 15.sp)
                     Spacer(Modifier.height(20.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = onBack, colors = ButtonDefaults.colors(containerColor = CinemaSurface)) { Text("返回", color = Color.White) }
+                        GimyButton(onClick = onBack, containerColor = CinemaSurface) { Text("返回", color = Color.White) }
                         if (uiState.allSources.size > 1) {
-                            Button(onClick = { viewModel.retryWithNextSource() },
-                                colors = ButtonDefaults.colors(containerColor = CinemaRed)
+                            GimyButton(onClick = { viewModel.retryWithNextSource() },
+                                containerColor = CinemaRed
                             ) { Text("切換線路重試", color = Color.White) }
                         }
-                    }
-                }
-            }
-        }
-
-        // ── Info bar (auto-hide 3.5s) ──
-        AnimatedVisibility(
-            visible = infoVisible && uiState.streamUrl != null && !uiState.isLoading && uiState.error == null,
-            enter = fadeIn() + slideInVertically(),
-            exit = fadeOut() + slideOutVertically()
-        ) {
-            Box(
-                Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.7f))
-                    .padding(horizontal = 24.dp, vertical = 10.dp)
-            ) {
-                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                    Column {
-                        Text(uiState.vodTitle, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                        Text(uiState.episodeTitle, color = CinemaTextMuted, fontSize = 12.sp)
-                    }
-                    Surface(
-                        colors = SurfaceDefaults.colors(containerColor = CinemaRed.copy(0.9f)),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(uiState.sourceName, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
                     }
                 }
             }

@@ -54,10 +54,36 @@ class DetailViewModel @Inject constructor(
                 val detail = vodRepository.getVodDetail(sourceType, id)
                 _uiState.update { it.copy(isLoading = false, detail = detail) }
 
+                // Phase 1.5: Search for series items (fast, independent)
+                launch {
+                    try {
+                        val seriesVods = vodRepository.searchSeriesVods(detail.vod)
+                        if (seriesVods.isNotEmpty()) {
+                            _uiState.update { state ->
+                                val current = state.detail ?: return@update state
+                                val seriesIds = seriesVods.map { it.id }.toSet()
+                                state.copy(detail = current.copy(
+                                    seriesVods = seriesVods,
+                                    relatedVods = current.relatedVods.filter { it.id !in seriesIds }
+                                ))
+                            }
+                        }
+                    } catch (_: Exception) { }
+                }
+
                 // Phase 2: Enrich with cross-source data in background (non-blocking)
                 try {
                     val enriched = vodRepository.getEnrichedVodDetail(sourceType, id, cachedPrimary = detail)
-                    _uiState.update { it.copy(detail = enriched) }
+                    _uiState.update { state ->
+                        // Preserve series from Phase 1.5 if enriched doesn't have any
+                        val currentSeries = state.detail?.seriesVods ?: emptyList()
+                        val finalSeries = if (enriched.seriesVods.isNotEmpty()) enriched.seriesVods else currentSeries
+                        val seriesIds = finalSeries.map { it.id }.toSet()
+                        state.copy(detail = enriched.copy(
+                            seriesVods = finalSeries,
+                            relatedVods = enriched.relatedVods.filter { it.id !in seriesIds }
+                        ))
+                    }
                 } catch (_: Exception) {
                     // Enrichment failed silently — primary detail is already shown
                 }

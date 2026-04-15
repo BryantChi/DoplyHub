@@ -43,6 +43,8 @@ fun SearchScreen(
     onBack: () -> Unit,
     viewModel: SearchViewModel = hiltViewModel()
 ) {
+    val dims = LocalDimensions.current
+    val isTV = LocalIsTelevision.current
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -62,7 +64,7 @@ fun SearchScreen(
         Modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
-            .padding(horizontal = 48.dp, vertical = 20.dp)
+            .padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding)
     ) {
         // ── Search bar ──
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -95,7 +97,7 @@ fun SearchScreen(
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .weight(1f)
-                    .height(52.dp)
+                    .height(if (isTV) 52.dp else 48.dp)
                     .focusRequester(inputFocusRequester)
             )
             if (uiState.query.isNotEmpty()) {
@@ -121,7 +123,7 @@ fun SearchScreen(
             uiState.isSearching -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        GimyLoadingIndicator(48.dp)
+                        GimyLoadingIndicator(dims.loadingIndicatorSize)
                         Spacer(Modifier.height(12.dp))
                         Text("搜尋「${uiState.query}」中…", color = CinemaTextMuted, fontSize = 14.sp)
                     }
@@ -142,11 +144,16 @@ fun SearchScreen(
                 val gridState = rememberLazyGridState()
 
                 // Auto load more when scrolling near bottom
-                LaunchedEffect(gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index) {
-                    val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
-                    val total = gridState.layoutInfo.totalItemsCount
-                    if (total > 0 && lastVisible >= total - 4) {
-                        viewModel.loadMore()
+                LaunchedEffect(gridState) {
+                    snapshotFlow {
+                        val info = gridState.layoutInfo
+                        val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+                        val total = info.totalItemsCount
+                        lastVisible to total
+                    }.collect { (lastVisible, total) ->
+                        if (total > 0 && lastVisible >= total - 4) {
+                            viewModel.loadMore()
+                        }
                     }
                 }
 
@@ -155,7 +162,7 @@ fun SearchScreen(
                         Text("找到 ${uiState.results.size} 個結果", color = CinemaTextMuted, fontSize = 12.sp,
                             modifier = Modifier.padding(bottom = 12.dp))
                         LazyVerticalGrid(
-                            columns = GridCells.Adaptive(166.dp),
+                            columns = GridCells.Adaptive(dims.gridMinCellWidth),
                             state = gridState,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -180,7 +187,7 @@ fun SearchScreen(
                             Modifier.fillMaxSize().padding(top = 120.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            GimyLoadingIndicator(48.dp)
+                            GimyLoadingIndicator(dims.loadingIndicatorSize)
                         }
                     }
                 }
@@ -229,18 +236,25 @@ fun SearchScreen(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun FocusableChip(label: String, primary: Boolean = false, onClick: () -> Unit) {
+    val isTV = LocalIsTelevision.current
     var f by remember { mutableStateOf(false) }
-    Button(
-        onClick = onClick,
-        modifier = Modifier.onFocusChanged { f = it.isFocused },
-        shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
-        colors = ButtonDefaults.colors(
-            containerColor = if (primary) CinemaRed else CinemaSurface,
-            focusedContainerColor = CinemaRed
-        ),
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
-    ) {
-        Text(label, color = if (f || primary) Color.White else CinemaTextMuted,
-            fontSize = 14.sp, fontWeight = if (primary) FontWeight.Bold else FontWeight.Medium)
+    val chipColor = if (primary) CinemaRed else CinemaSurface
+    val textColor = if (f || primary) Color.White else CinemaTextMuted
+    val textWeight = if (primary) FontWeight.Bold else FontWeight.Medium
+    if (isTV) {
+        Button(
+            onClick = onClick,
+            modifier = Modifier.onFocusChanged { f = it.isFocused },
+            shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
+            colors = ButtonDefaults.colors(containerColor = chipColor, focusedContainerColor = CinemaRed),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+        ) { Text(label, color = textColor, fontSize = 14.sp, fontWeight = textWeight) }
+    } else {
+        androidx.compose.material3.Button(
+            onClick = onClick,
+            shape = RoundedCornerShape(6.dp),
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = chipColor, contentColor = Color.White),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+        ) { Text(label, color = if (primary) Color.White else CinemaTextMuted, fontSize = 14.sp, fontWeight = textWeight) }
     }
 }

@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.gimy.tv"
-        minSdk = 23
+        minSdk = 28
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
@@ -98,6 +98,9 @@ dependencies {
 
     // Activity
     implementation(libs.activity.compose)
+
+    // Window Size Class
+    implementation(libs.material3.window.size)
 
     // WorkManager
     implementation(libs.work.runtime)
