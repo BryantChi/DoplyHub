@@ -70,6 +70,8 @@ fun HomeScreen(
                     // ── Top bar ──
                     if (isTV) {
                         item { TopBar(onSearchClick, onFavoritesClick, onHistoryClick) }
+                    } else {
+                        item { LogoBrand() }
                     }
 
                     // ── Hero banner ──
@@ -110,6 +112,21 @@ fun HomeScreen(
 // ═══════════════════════════════════════
 // Top navigation
 // ═══════════════════════════════════════
+
+@Composable
+private fun LogoBrand() {
+    val dims = LocalDimensions.current
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding, vertical = 12.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        Text("G", fontSize = 28.sp, fontWeight = FontWeight.Black, color = CinemaRed)
+        Text("IMY", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = CinemaTextPrimary, modifier = Modifier.offset(x = (-2).dp))
+        Spacer(Modifier.width(4.dp))
+        Text("TV", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CinemaTextMuted,
+            modifier = Modifier.offset(y = (-2).dp).background(CinemaRed.copy(0.15f), RoundedCornerShape(3.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
+    }
+}
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable

@@ -1,6 +1,8 @@
 package com.gimy.tv.ui.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
@@ -64,11 +66,12 @@ fun AdaptiveScaffold(
     when (widthSizeClass) {
         WindowWidthSizeClass.Compact -> {
             Column(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(1f)) { content() }
+                Box(Modifier.weight(1f).statusBarsPadding()) { content() }
                 if (showNavBar) {
                     NavigationBar(
                         containerColor = CinemaElevated,
                         contentColor = CinemaTextPrimary,
+                        modifier = Modifier.navigationBarsPadding(),
                     ) {
                         navItems.forEach { item ->
                             val selected = isNavItemSelected(currentRoute, item.route)
@@ -96,6 +99,7 @@ fun AdaptiveScaffold(
                     NavigationRail(
                         containerColor = CinemaElevated,
                         contentColor = CinemaTextPrimary,
+                        modifier = Modifier.statusBarsPadding(),
                     ) {
                         Spacer(Modifier.weight(1f))
                         navItems.forEach { item ->
@@ -117,7 +121,7 @@ fun AdaptiveScaffold(
                         Spacer(Modifier.weight(1f))
                     }
                 }
-                Box(Modifier.weight(1f)) { content() }
+                Box(Modifier.weight(1f).statusBarsPadding()) { content() }
             }
         }
     }

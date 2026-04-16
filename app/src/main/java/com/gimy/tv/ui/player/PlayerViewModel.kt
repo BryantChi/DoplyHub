@@ -169,6 +169,8 @@ class PlayerViewModel @Inject constructor(
         val id = vodId ?: return
         val state = _uiState.value
         if (positionMs <= 0) return
+        // Keep resumePositionMs in sync so rotation uses the latest value
+        _uiState.update { it.copy(resumePositionMs = positionMs) }
         viewModelScope.launch {
             watchHistoryRepository.saveProgress(
                 WatchHistoryEntry(

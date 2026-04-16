@@ -64,6 +64,7 @@ fun SearchScreen(
         Modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
+            .imePadding()
             .padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding)
     ) {
         // ── Search bar ──
@@ -97,7 +98,7 @@ fun SearchScreen(
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .weight(1f)
-                    .height(if (isTV) 52.dp else 48.dp)
+                    .height(if (isTV) 52.dp else 56.dp)
                     .focusRequester(inputFocusRequester)
             )
             if (uiState.query.isNotEmpty()) {

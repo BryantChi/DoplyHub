@@ -345,11 +345,14 @@ private fun EpisodeGrid(
 ) {
     val isTV = LocalIsTelevision.current
     val dims = LocalDimensions.current
-    Column(Modifier.padding(horizontal = dims.screenHorizontalPadding)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding)) {
         Text("選擇集數", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(10.dp))
         for (row in group.episodes.chunked(episodeColumns)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
                 for (ep in row) {
                     key(ep.number) {
                     val cur = lastEp != null && ep.number == lastEp
@@ -359,7 +362,7 @@ private fun EpisodeGrid(
                     if (isTV) {
                         Button(
                             onClick = { onEpClick(group.sourceId, ep.number) },
-                            modifier = Modifier.width(56.dp).onFocusChanged { f = it.isFocused },
+                            modifier = Modifier.weight(1f).onFocusChanged { f = it.isFocused },
                             shape = ButtonDefaults.shape(shape = RoundedCornerShape(4.dp)),
                             colors = ButtonDefaults.colors(containerColor = epColor, focusedContainerColor = CinemaRed),
                             contentPadding = PaddingValues(4.dp)
@@ -371,7 +374,7 @@ private fun EpisodeGrid(
                     } else {
                         androidx.compose.material3.Button(
                             onClick = { onEpClick(group.sourceId, ep.number) },
-                            modifier = Modifier.width(44.dp),
+                            modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(4.dp),
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = epColor, contentColor = Color.White),
                             contentPadding = PaddingValues(4.dp)
@@ -382,6 +385,11 @@ private fun EpisodeGrid(
                         }
                     }
                     } // key
+                }
+                // Fill remaining space when last row has fewer items
+                val remaining = episodeColumns - row.size
+                if (remaining > 0) {
+                    repeat(remaining) { Spacer(Modifier.weight(1f)) }
                 }
             }
             Spacer(Modifier.height(5.dp))
