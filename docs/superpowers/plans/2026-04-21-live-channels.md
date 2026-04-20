@@ -1,5 +1,12 @@
 # 直播頻道 Implementation Plan
 
+> **⚠️ 2026-04-21 擱置（SHELVED）** — Task 0 HLS probe 證實本 plan 前提不成立：
+> - 公視 `news.pts.org.tw/live` HTML 無 m3u8（JS SPA）
+> - 華視 `news.cts.com.tw/live` 只嵌 YouTube iframe
+> - 民視 `ftvnews.com.tw` 被 Cloudflare WAF 擋 403
+>
+> 台灣商業新聞台已全面遷移 YouTube Live。未來若要重啟，請重新 brainstorm 選擇新路線，**不要照此 plan 繼續做**。詳見 spec 「擱置原因」章節。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 新增「直播」分頁，提供公開官方 HLS 直播頻道（Phase 1：公視/華視/民視新聞 3 台），沿用現有 ExoPlayer 以 isLive 模式播放，收藏整合至現有 Favorites。

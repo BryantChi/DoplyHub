@@ -2,8 +2,25 @@
 
 - 日期：2026-04-21
 - 目標版本：v1.1.0
-- 狀態：Draft（待使用者確認）
+- 狀態：**⚠️ 2026-04-21 擱置（SHELVED）**
 - 實作方式：依現有 VOD 爬蟲架構擴充；以「公開官方 HLS 直播」為範圍
+
+## ⚠️ 擱置原因（2026-04-21）
+
+執行 `docs/superpowers/plans/2026-04-21-live-channels.md` Task 0（HLS probe）時發現：
+
+- **台灣商業新聞台已全面遷移至 YouTube Live**：TVBS、三立、東森、民視、中天、華視、台視、中視、年代、非凡、壹電視、新唐人 — 官網無直接 m3u8，不是 JS 動態載入就是 iframe 嵌 YouTube。
+- **本 spec 預設的 3 個 PoC 頻道全部失守**：公視 news.pts.org.tw/live 回 200 但 HTML 無 m3u8；華視 news.cts.com.tw/live 只有 `<iframe src="youtube.com/embed/...">`；民視 ftvnews.com.tw 被 Cloudflare WAF 擋 403。
+- **台灣僅公共/宗教類有官方 HLS**：Taiwan Plus、原住民族電視台、大愛電視、好消息、人間衛視、CGNTV — 無新聞類。
+- **替代路線評估**：
+  - A1 範圍改公益文化（乾淨但不涵蓋新聞）
+  - A2 YouTube iframe（WebView）— TV 遙控器體驗差
+  - A3 A1+A2 混合
+  - A4 NewPipeExtractor 整合 — 程式碼不複雜，但 GPL-3.0 感染整個 App、違反 YT ToS、每 3-6 個月需 bump library
+
+使用者選擇暫時放棄。未來若重啟此功能，**請先從 replacement 路線重新 brainstorm**，不要照原 spec 繼續做。
+
+Probe 詳細紀錄見本檔 commit 歷史與對應 plan。
 
 ## 1. 目標與範圍
 
