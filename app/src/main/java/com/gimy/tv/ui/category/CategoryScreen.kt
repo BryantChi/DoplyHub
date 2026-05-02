@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.gimy.tv.ui.components.GimyButton
+import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.theme.*
 
 data class CategoryItem(
@@ -65,7 +65,7 @@ fun CategoryScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             items(categories, key = { "${it.sourceType}_${it.typeId}" }) { cat ->
-                GimyButton(
+                DoplyButton(
                     onClick = { onCategoryClick(cat.sourceType, cat.typeId) },
                     shape = RoundedCornerShape(12.dp),
                     containerColor = CinemaElevated,

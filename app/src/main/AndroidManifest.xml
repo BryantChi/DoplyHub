@@ -12,13 +12,13 @@
         android:required="false" />
 
     <application
-        android:name=".GimyApp"
+        android:name=".DoplyApp"
         android:allowBackup="true"
         android:banner="@drawable/app_banner"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.GimyTV">
+        android:theme="@style/Theme.DoplyHub">
 
         <activity
             android:name=".ui.MainActivity"

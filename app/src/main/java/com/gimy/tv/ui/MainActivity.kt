@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            GimyTheme(isTelevision = isTelevision) {
+            DoplyTheme(isTelevision = isTelevision) {
                 CompositionLocalProvider(LocalDimensions provides dimensions) {
                 var showSplash by remember { mutableStateOf(true) }
                 // Defer NavHost to second frame so SplashOverlay renders first

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.GimyTV" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.DoplyHub" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:colorBackground">#1A1A2E</item>

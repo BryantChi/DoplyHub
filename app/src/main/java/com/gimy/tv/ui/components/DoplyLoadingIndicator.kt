@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.gimy.tv.R
 
 @Composable
-fun GimyLoadingIndicator(size: Dp = 48.dp) {
+fun DoplyLoadingIndicator(size: Dp = 48.dp) {
     val infiniteTransition = rememberInfiniteTransition(label = "loading")
 
     val scale by infiniteTransition.animateFloat(

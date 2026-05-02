@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.gimy.tv.ui.components.GimyLoadingIndicator
+import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.*
@@ -124,7 +124,7 @@ fun SearchScreen(
             uiState.isSearching -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        GimyLoadingIndicator(dims.loadingIndicatorSize)
+                        DoplyLoadingIndicator(dims.loadingIndicatorSize)
                         Spacer(Modifier.height(12.dp))
                         Text("搜尋「${uiState.query}」中…", color = CinemaTextMuted, fontSize = 14.sp)
                     }
@@ -188,7 +188,7 @@ fun SearchScreen(
                             Modifier.fillMaxSize().padding(top = 120.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            GimyLoadingIndicator(dims.loadingIndicatorSize)
+                            DoplyLoadingIndicator(dims.loadingIndicatorSize)
                         }
                     }
                 }

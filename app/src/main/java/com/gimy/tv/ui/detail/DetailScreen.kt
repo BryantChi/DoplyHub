@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.gimy.tv.ui.components.GimyLoadingIndicator
+import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +45,7 @@ fun DetailScreen(
         when {
             uiState.isLoading -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    GimyLoadingIndicator(dims.loadingIndicatorSize)
+                    DoplyLoadingIndicator(dims.loadingIndicatorSize)
                 }
             }
             uiState.error != null -> {

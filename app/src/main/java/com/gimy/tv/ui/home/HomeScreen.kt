@@ -9,7 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.gimy.tv.ui.components.GimyLoadingIndicator
+import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -35,7 +35,7 @@ import androidx.tv.material3.*
 import coil.compose.AsyncImage
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
-import com.gimy.tv.ui.components.GimyButton
+import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.theme.*
 import com.gimy.tv.ui.theme.LocalDimensions
@@ -120,10 +120,10 @@ private fun LogoBrand() {
         Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding, vertical = 12.dp),
         verticalAlignment = Alignment.Bottom
     ) {
-        Text("G", fontSize = 28.sp, fontWeight = FontWeight.Black, color = CinemaRed)
-        Text("IMY", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = CinemaTextPrimary, modifier = Modifier.offset(x = (-2).dp))
+        Text("D", fontSize = 28.sp, fontWeight = FontWeight.Black, color = CinemaRed)
+        Text("oply", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = CinemaTextPrimary, modifier = Modifier.offset(x = (-2).dp))
         Spacer(Modifier.width(4.dp))
-        Text("TV", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CinemaTextMuted,
+        Text("Hub", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CinemaTextMuted,
             modifier = Modifier.offset(y = (-2).dp).background(CinemaRed.copy(0.15f), RoundedCornerShape(3.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
     }
 }
@@ -139,10 +139,10 @@ private fun TopBar(onSearch: () -> Unit, onFav: () -> Unit, onHistory: () -> Uni
     ) {
         // Brand
         Row(verticalAlignment = Alignment.Bottom) {
-            Text("G", fontSize = 30.sp, fontWeight = FontWeight.Black, color = CinemaRed)
-            Text("IMY", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = CinemaTextPrimary, modifier = Modifier.offset(x = (-2).dp))
+            Text("D", fontSize = 30.sp, fontWeight = FontWeight.Black, color = CinemaRed)
+            Text("oply", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = CinemaTextPrimary, modifier = Modifier.offset(x = (-2).dp))
             Spacer(Modifier.width(4.dp))
-            Text("TV", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CinemaTextMuted,
+            Text("Hub", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CinemaTextMuted,
                 modifier = Modifier.offset(y = (-2).dp).background(CinemaRed.copy(0.15f), RoundedCornerShape(3.dp)).padding(horizontal = 6.dp, vertical = 1.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -430,7 +430,7 @@ private fun LoadingOverlay() {
     val dims = LocalDimensions.current
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            GimyLoadingIndicator(dims.loadingIndicatorSize)
+            DoplyLoadingIndicator(dims.loadingIndicatorSize)
             Spacer(Modifier.height(18.dp))
             Text("正在載入…", color = CinemaTextMuted, fontSize = 14.sp)
         }
@@ -445,7 +445,7 @@ private fun ErrorOverlay(error: String, onRetry: () -> Unit) {
             Spacer(Modifier.height(6.dp))
             Text(error, color = CinemaTextMuted, fontSize = 13.sp)
             Spacer(Modifier.height(20.dp))
-            GimyButton(onClick = onRetry, containerColor = CinemaRed) {
+            DoplyButton(onClick = onRetry, containerColor = CinemaRed) {
                 Text("重試", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }

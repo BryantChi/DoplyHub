@@ -5,8 +5,8 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.gimy.tv.ui.components.GimyButton
-import com.gimy.tv.ui.components.GimyLoadingIndicator
+import com.gimy.tv.ui.components.DoplyButton
+import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -244,7 +244,7 @@ fun PlayerScreen(
         AnimatedVisibility(uiState.isLoading, enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    GimyLoadingIndicator(48.dp)
+                    DoplyLoadingIndicator(48.dp)
                     Spacer(Modifier.height(20.dp))
                     Text(uiState.vodTitle.ifBlank { "載入中" }, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
@@ -264,9 +264,9 @@ fun PlayerScreen(
                     Text(uiState.error ?: "", color = CinemaRed, fontSize = 15.sp)
                     Spacer(Modifier.height(20.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        GimyButton(onClick = onBack, containerColor = CinemaSurface) { Text("返回", color = Color.White) }
+                        DoplyButton(onClick = onBack, containerColor = CinemaSurface) { Text("返回", color = Color.White) }
                         if (uiState.allSources.size > 1) {
-                            GimyButton(onClick = { viewModel.retryWithNextSource() },
+                            DoplyButton(onClick = { viewModel.retryWithNextSource() },
                                 containerColor = CinemaRed
                             ) { Text("切換線路重試", color = Color.White) }
                         }

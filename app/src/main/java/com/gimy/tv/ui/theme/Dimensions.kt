@@ -8,7 +8,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Immutable
-data class GimyDimensions(
+data class DoplyDimensions(
     val screenHorizontalPadding: Dp,
     val screenVerticalPadding: Dp,
     val cardWidth: Dp,
@@ -25,7 +25,7 @@ data class GimyDimensions(
     val loadingIndicatorSize: Dp,
 )
 
-val TvDimensions = GimyDimensions(
+val TvDimensions = DoplyDimensions(
     screenHorizontalPadding = 48.dp,
     screenVerticalPadding = 20.dp,
     cardWidth = 154.dp,
@@ -42,7 +42,7 @@ val TvDimensions = GimyDimensions(
     loadingIndicatorSize = 48.dp,
 )
 
-val TabletDimensions = GimyDimensions(
+val TabletDimensions = DoplyDimensions(
     screenHorizontalPadding = 32.dp,
     screenVerticalPadding = 18.dp,
     cardWidth = 150.dp,
@@ -59,7 +59,7 @@ val TabletDimensions = GimyDimensions(
     loadingIndicatorSize = 44.dp,
 )
 
-val PhoneDimensions = GimyDimensions(
+val PhoneDimensions = DoplyDimensions(
     screenHorizontalPadding = 16.dp,
     screenVerticalPadding = 12.dp,
     cardWidth = 110.dp,

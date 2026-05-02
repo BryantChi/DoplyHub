@@ -17,7 +17,7 @@ import com.gimy.tv.ui.theme.CinemaTextPrimary
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-fun GimyButton(
+fun DoplyButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -58,7 +58,7 @@ fun GimyButton(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-fun GimyOutlinedButton(
+fun DoplyOutlinedButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(6.dp),
@@ -87,7 +87,7 @@ fun GimyOutlinedButton(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-fun GimySurface(
+fun DoplySurface(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(0.dp),
     color: Color = CinemaCard,

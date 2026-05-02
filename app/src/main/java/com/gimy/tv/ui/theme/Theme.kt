@@ -13,8 +13,8 @@ val CinemaElevated    = Color(0xFF0F0F23)
 val CinemaCard        = Color(0xFF131320)
 val CinemaSurface     = Color(0xFF1A1A2E)
 val CinemaBorder      = Color(0xFF252545)
-val CinemaRed         = Color(0xFFE11D48)   // Primary accent — play/action
-val CinemaRedDim      = Color(0xFF9F1239)
+val CinemaRed         = Color(0xFFFF2D8D)   // Primary accent — play/action (Neon Pink)
+val CinemaRedDim      = Color(0xFFC71F6E)
 val CinemaIndigo      = Color(0xFF4338CA)   // Secondary
 val CinemaTextPrimary = Color(0xFFF0F0F5)
 val CinemaTextMuted   = Color(0xFF8088A4)
@@ -77,7 +77,7 @@ private val MobileLightColorScheme = androidx.compose.material3.lightColorScheme
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-fun GimyTheme(
+fun DoplyTheme(
     isTelevision: Boolean = true,
     darkTheme: Boolean = if (isTelevision) true else isSystemInDarkTheme(),
     content: @Composable () -> Unit
@@ -97,7 +97,3 @@ fun GimyTheme(
         }
     }
 }
-
-// Backward-compatible alias — existing code calling GimyTVTheme still works
-@Composable
-fun GimyTVTheme(content: @Composable () -> Unit) = GimyTheme(isTelevision = true, content = content)

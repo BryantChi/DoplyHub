@@ -8,8 +8,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.gimy.tv.ui.components.GimyButton
-import com.gimy.tv.ui.components.GimyLoadingIndicator
+import com.gimy.tv.ui.components.DoplyButton
+import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,7 +83,7 @@ fun BrowseScreen(
             uiState.isLoading && uiState.items.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        GimyLoadingIndicator(dims.loadingIndicatorSize)
+                        DoplyLoadingIndicator(dims.loadingIndicatorSize)
                         Spacer(Modifier.height(12.dp))
                         Text("載入${uiState.title}…", color = CinemaTextMuted, fontSize = 14.sp)
                     }
@@ -96,7 +96,7 @@ fun BrowseScreen(
                         Spacer(Modifier.height(4.dp))
                         Text(uiState.error!!, color = CinemaTextMuted, fontSize = 13.sp)
                         Spacer(Modifier.height(16.dp))
-                        GimyButton(onClick = { vm.loadPage(1) }, containerColor = CinemaRed) {
+                        DoplyButton(onClick = { vm.loadPage(1) }, containerColor = CinemaRed) {
                             Text("重試", color = Color.White)
                         }
                     }
@@ -120,7 +120,7 @@ fun BrowseScreen(
                         item {
                             Box(Modifier.width(dims.cardWidth).height(dims.cardHeight), contentAlignment = Alignment.Center) {
                                 if (uiState.isLoadingMore) {
-                                    GimyLoadingIndicator(28.dp)
+                                    DoplyLoadingIndicator(28.dp)
                                 } else {
                                     val loadMoreContent: @Composable () -> Unit = {
                                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

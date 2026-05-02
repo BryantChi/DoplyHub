@@ -44,7 +44,7 @@ fun SplashOverlay() {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                "GIMY TV",
+                "DOPLY HUB",
                 color = CinemaRed,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Black,
@@ -53,7 +53,7 @@ fun SplashOverlay() {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "你的私人影院",
+                "你的專屬追劇清單管家",
                 color = CinemaTextMuted,
                 fontSize = 14.sp,
                 modifier = Modifier.alpha(textAlpha.value)

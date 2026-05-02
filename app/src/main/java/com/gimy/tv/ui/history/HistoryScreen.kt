@@ -22,7 +22,7 @@ import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.domain.repository.WatchHistoryEntry
 import com.gimy.tv.domain.repository.WatchHistoryRepository
-import com.gimy.tv.ui.components.GimyButton
+import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.favorites.EmptyState
 import com.gimy.tv.ui.favorites.PageHeader
@@ -92,14 +92,14 @@ fun HistoryScreen(onVodClick: (SourceType, Long) -> Unit, onBack: () -> Unit, vm
                 title = { Text("刪除記錄", color = Color.White) },
                 text = { Text("確定要刪除「${entry.title}」的觀看記錄嗎？", color = CinemaTextMuted) },
                 confirmButton = {
-                    GimyButton(
+                    DoplyButton(
                         onClick = { if (armed) { vm.delete(entry); pendingDelete = null } },
                         containerColor = CinemaRed,
                         shape = RoundedCornerShape(6.dp)
                     ) { Text("刪除", color = Color.White) }
                 },
                 dismissButton = {
-                    GimyButton(
+                    DoplyButton(
                         onClick = { if (armed) pendingDelete = null },
                         containerColor = CinemaSurface,
                         shape = RoundedCornerShape(6.dp)
