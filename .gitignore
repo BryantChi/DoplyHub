@@ -18,3 +18,11 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Tooling / scratch
+.omc/
+
+# Reference images (design references, not assets)
+photo_*.jpg
+photo_*.jpeg
+photo_*.png
