@@ -1,8 +1,8 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════
-# GimyTV Release APK 標準產出流程
+# Doply Hub Release APK 標準產出流程
 # 用法: ./scripts/release.sh [版號]
-# 範例: ./scripts/release.sh 1.0.0
+# 範例: ./scripts/release.sh 2.0.1
 #       ./scripts/release.sh          (自動讀取 build.gradle.kts 版號)
 # ═══════════════════════════════════════════════════
 
@@ -27,7 +27,7 @@ GIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GIT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 
 echo "══════════════════════════════════════"
-echo "  GimyTV Release Build"
+echo "  Doply Hub Release Build"
 echo "  版本: v${VERSION_NAME} (${VERSION_CODE})"
 echo "  Git:  ${GIT_BRANCH}@${GIT_HASH}"
 echo "══════════════════════════════════════"
@@ -59,7 +59,7 @@ echo "✅ APK 建置成功: $APK_SIZE"
 RELEASE_DIR="mov_app/v${VERSION_NAME}"
 mkdir -p "$RELEASE_DIR"
 
-APK_FILENAME="GimyTV-v${VERSION_NAME}.apk"
+APK_FILENAME="DoplyHub-v${VERSION_NAME}.apk"
 cp "$APK_SOURCE" "$RELEASE_DIR/$APK_FILENAME"
 
 echo "▶ APK 複製至: $RELEASE_DIR/$APK_FILENAME"
@@ -68,7 +68,7 @@ echo "▶ APK 複製至: $RELEASE_DIR/$APK_FILENAME"
 VERSION_JSON="$RELEASE_DIR/version.json"
 cat > "$VERSION_JSON" << JSONEOF
 {
-  "app": "GimyTV",
+  "app": "Doply Hub",
   "packageName": "com.gimy.tv",
   "versionName": "${VERSION_NAME}",
   "versionCode": ${VERSION_CODE},

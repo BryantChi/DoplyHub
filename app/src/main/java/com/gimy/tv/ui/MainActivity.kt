@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
             val isTelevision = remember {
                 packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
             }
+            val isPhone = !isTelevision && windowSizeClass.widthSizeClass == WindowWidthSizeClass.Compact
             val dimensions = remember(isTelevision, windowSizeClass.widthSizeClass) {
                 when {
                     isTelevision -> TvDimensions
@@ -108,7 +109,8 @@ class MainActivity : ComponentActivity() {
                                 navController.navigate(Screen.Browse.createRoute(sourceType.name, typeId))
                             },
                             onFavoritesClick = { navController.navigate(Screen.Favorites.route) },
-                            onHistoryClick = { navController.navigate(Screen.History.route) }
+                            onHistoryClick = { navController.navigate(Screen.History.route) },
+                            isPhone = isPhone
                         )
                     }
 

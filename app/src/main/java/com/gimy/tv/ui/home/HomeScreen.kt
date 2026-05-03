@@ -36,6 +36,7 @@ import coil.compose.AsyncImage
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.ui.components.DoplyButton
+import com.gimy.tv.ui.components.ExitConfirmHandler
 import com.gimy.tv.ui.components.RefreshIconButton
 import com.gimy.tv.ui.components.RefreshLoadingBar
 import com.gimy.tv.ui.components.RefreshableContainer
@@ -54,11 +55,14 @@ fun HomeScreen(
     onBrowseClick: (SourceType, Int) -> Unit,
     onFavoritesClick: () -> Unit,
     onHistoryClick: () -> Unit,
+    isPhone: Boolean,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val dims = LocalDimensions.current
     val isTV = LocalIsTelevision.current
+
+    ExitConfirmHandler(isPhone = isPhone)
 
     Box(
         Modifier
