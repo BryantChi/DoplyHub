@@ -23,8 +23,8 @@ interface VodRepository {
     // Multi-source integration
     suspend fun searchAllSources(keyword: String, page: Int): PaginatedResult<Vod>
     suspend fun getEnrichedVodDetail(sourceType: SourceType, vodId: Long, cachedPrimary: VodDetail? = null): VodDetail
-    suspend fun getGimyHomeRows(): List<HomeRowData>
-    suspend fun getMovieffmHomeRows(): List<HomeRowData>
+    suspend fun getGimyHomeRows(forceRefresh: Boolean = false): List<HomeRowData>
+    suspend fun getMovieffmHomeRows(forceRefresh: Boolean = false): List<HomeRowData>
 }
 
 interface FavoriteRepository {

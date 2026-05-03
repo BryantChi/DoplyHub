@@ -10,6 +10,9 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
+import com.gimy.tv.ui.components.RefreshIconButton
+import com.gimy.tv.ui.components.RefreshLoadingBar
+import com.gimy.tv.ui.components.RefreshableContainer
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,7 +80,11 @@ fun BrowseScreen(
                 Spacer(Modifier.width(12.dp))
                 Text("第${uiState.currentPage}頁", fontSize = 13.sp, color = CinemaTextMuted)
             }
+
+            Spacer(Modifier.weight(1f))
+            RefreshIconButton(isRefreshing = uiState.isRefreshing, onClick = { vm.refresh() })
         }
+        RefreshLoadingBar(uiState.isRefreshing)
 
         when {
             uiState.isLoading && uiState.items.isEmpty() -> {
@@ -103,6 +110,10 @@ fun BrowseScreen(
                 }
             }
             else -> {
+                RefreshableContainer(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = { vm.refresh() },
+                ) {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(dims.gridMinCellWidth),
                     state = gridState,
@@ -152,6 +163,7 @@ fun BrowseScreen(
                             }
                         }
                     }
+                }
                 }
             }
         }

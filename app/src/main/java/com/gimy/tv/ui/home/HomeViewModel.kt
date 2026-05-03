@@ -21,6 +21,7 @@ data class HomeRow(
 
 data class HomeUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val rows: List<HomeRow> = emptyList(),
     val continueWatching: List<WatchHistoryEntry> = emptyList(),
     val error: String? = null
@@ -55,52 +56,78 @@ class HomeViewModel @Inject constructor(
     }
 
     fun loadHome() {
+        fetchHome(isRefresh = false)
+    }
+
+    fun refresh() {
+        if (_uiState.value.isRefreshing) return
+        fetchHome(isRefresh = true)
+    }
+
+    private fun fetchHome(isRefresh: Boolean) {
+        // Snapshot so we can preserve visible content if refresh produces nothing
+        val previousRows = _uiState.value.rows
+
         // Phase 1: Load gimymax (fast — show immediately)
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update {
+                if (isRefresh) it.copy(isRefreshing = true, error = null)
+                else it.copy(isLoading = true, error = null)
+            }
             try {
-                val gimyRows = vodRepository.getGimyHomeRows()
+                val gimyRows = vodRepository.getGimyHomeRows(forceRefresh = isRefresh)
                     .filter { it.items.isNotEmpty() }
                     .map { HomeRow(it.title, it.typeId, it.items, it.sourceType) }
 
                 if (gimyRows.isNotEmpty()) {
                     _uiState.update { it.copy(isLoading = false, rows = gimyRows) }
-                } else {
+                } else if (!isRefresh) {
                     // GimyMax returned nothing — keep loading, let Phase 2 try
                     _uiState.update { it.copy(rows = emptyList()) }
                 }
+                // On refresh: leave previous rows untouched until Phase 2 reports
             } catch (e: kotlin.coroutines.cancellation.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // Don't set isLoading=false yet — Phase 2 might still succeed
-                _uiState.update { it.copy(rows = emptyList()) }
+                if (!isRefresh) {
+                    // Don't set isLoading=false yet — Phase 2 might still succeed
+                    _uiState.update { it.copy(rows = emptyList()) }
+                }
+                // On refresh failure: keep previous rows visible
             }
         }
 
         // Phase 2: Load movieffm in background (append when ready)
         viewModelScope.launch {
             try {
-                val ffmRows = vodRepository.getMovieffmHomeRows()
+                val ffmRows = vodRepository.getMovieffmHomeRows(forceRefresh = isRefresh)
                     .filter { it.items.isNotEmpty() }
 
                 _uiState.update { state ->
                     if (ffmRows.isNotEmpty()) {
                         val merged = interleaveRows(state.rows, ffmRows)
-                        state.copy(isLoading = false, rows = merged)
+                        state.copy(isLoading = false, isRefreshing = false, rows = merged)
                     } else if (state.rows.isEmpty()) {
-                        state.copy(isLoading = false, error = "無法載入內容，請檢查網路連線")
+                        if (isRefresh && previousRows.isNotEmpty()) {
+                            state.copy(isLoading = false, isRefreshing = false, rows = previousRows)
+                        } else {
+                            state.copy(isLoading = false, isRefreshing = false, error = "無法載入內容，請檢查網路連線")
+                        }
                     } else {
-                        state.copy(isLoading = false)
+                        state.copy(isLoading = false, isRefreshing = false)
                     }
                 }
             } catch (e: kotlin.coroutines.cancellation.CancellationException) {
                 throw e
             } catch (_: Exception) {
                 _uiState.update { state ->
-                    if (state.rows.isEmpty() && state.isLoading) {
-                        state.copy(isLoading = false, error = "無法載入內容，請檢查網路連線")
-                    } else {
-                        state.copy(isLoading = false)
+                    when {
+                        isRefresh && state.rows.isEmpty() && previousRows.isNotEmpty() ->
+                            state.copy(isLoading = false, isRefreshing = false, rows = previousRows)
+                        state.rows.isEmpty() && state.isLoading ->
+                            state.copy(isLoading = false, isRefreshing = false, error = "無法載入內容，請檢查網路連線")
+                        else ->
+                            state.copy(isLoading = false, isRefreshing = false)
                     }
                 }
             }

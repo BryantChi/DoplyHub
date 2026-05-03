@@ -11,6 +11,7 @@ import com.gimy.tv.domain.repository.VodRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeout
+import okhttp3.OkHttpClient
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,7 +21,8 @@ class VodRepositoryImpl @Inject constructor(
     private val gimyMaxSource: GimyMaxSource,
     private val gimyTvSource: GimyTvSource,
     private val movieffmSource: MovieffmSource,
-    private val vodCacheDao: VodCacheDao
+    private val vodCacheDao: VodCacheDao,
+    private val okHttpClient: OkHttpClient,
 ) : VodRepository {
 
     // In-memory home row cache (survives Activity recreation since VodRepositoryImpl is @Singleton)
@@ -286,10 +288,17 @@ class VodRepositoryImpl @Inject constructor(
         205 to 4, 207 to 14, 208 to 15, 206 to 29
     )
 
-    override suspend fun getGimyHomeRows(): List<HomeRowData> {
-        // Return memory cache if fresh
-        gimyHomeCache?.let { cached ->
-            if (System.currentTimeMillis() - gimyHomeCacheTime < homeCacheTtlMs) return cached
+    override suspend fun getGimyHomeRows(forceRefresh: Boolean): List<HomeRowData> {
+        // Return memory cache if fresh, unless forceRefresh bypasses it
+        if (!forceRefresh) {
+            gimyHomeCache?.let { cached ->
+                if (System.currentTimeMillis() - gimyHomeCacheTime < homeCacheTtlMs) return cached
+            }
+        } else {
+            // Wipe OkHttp disk cache so refresh truly hits the network instead of 304-cached body
+            try {
+                okHttpClient.cache?.evictAll()
+            } catch (_: Exception) { }
         }
         val rows = coroutineScope {
             val categories = listOf(
@@ -316,10 +325,12 @@ class VodRepositoryImpl @Inject constructor(
         return rows
     }
 
-    override suspend fun getMovieffmHomeRows(): List<HomeRowData> {
-        // Return memory cache if fresh
-        movieffmHomeCache?.let { cached ->
-            if (System.currentTimeMillis() - movieffmHomeCacheTime < homeCacheTtlMs) return cached
+    override suspend fun getMovieffmHomeRows(forceRefresh: Boolean): List<HomeRowData> {
+        // Return memory cache if fresh, unless forceRefresh bypasses it
+        if (!forceRefresh) {
+            movieffmHomeCache?.let { cached ->
+                if (System.currentTimeMillis() - movieffmHomeCacheTime < homeCacheTtlMs) return cached
+            }
         }
         val rows = coroutineScope {
             val categories = listOf(

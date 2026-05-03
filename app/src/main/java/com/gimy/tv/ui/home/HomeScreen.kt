@@ -36,6 +36,9 @@ import coil.compose.AsyncImage
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.ui.components.DoplyButton
+import com.gimy.tv.ui.components.RefreshIconButton
+import com.gimy.tv.ui.components.RefreshLoadingBar
+import com.gimy.tv.ui.components.RefreshableContainer
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.theme.*
 import com.gimy.tv.ui.theme.LocalDimensions
@@ -66,13 +69,18 @@ fun HomeScreen(
             uiState.isLoading -> LoadingOverlay()
             uiState.error != null -> ErrorOverlay(uiState.error ?: "") { viewModel.loadHome() }
             else -> {
+                RefreshableContainer(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = { viewModel.refresh() },
+                ) {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = dims.screenHorizontalPadding)) {
                     // ── Top bar ──
                     if (isTV) {
-                        item { TopBar(onSearchClick, onFavoritesClick, onHistoryClick) }
+                        item { TopBar(onSearchClick, onFavoritesClick, onHistoryClick, uiState.isRefreshing) { viewModel.refresh() } }
                     } else {
                         item { LogoBrand() }
                     }
+                    item { RefreshLoadingBar(uiState.isRefreshing) }
 
                     // ── Hero banner ──
                     val heroItems = uiState.rows.firstOrNull()?.items?.take(6) ?: emptyList()
@@ -104,6 +112,7 @@ fun HomeScreen(
                         )
                     }
                 }
+                }
             }
         }
     }
@@ -130,7 +139,13 @@ private fun LogoBrand() {
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun TopBar(onSearch: () -> Unit, onFav: () -> Unit, onHistory: () -> Unit) {
+private fun TopBar(
+    onSearch: () -> Unit,
+    onFav: () -> Unit,
+    onHistory: () -> Unit,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+) {
     val dims = LocalDimensions.current
     Row(
         Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding),
@@ -145,10 +160,11 @@ private fun TopBar(onSearch: () -> Unit, onFav: () -> Unit, onHistory: () -> Uni
             Text("Hub", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CinemaTextMuted,
                 modifier = Modifier.offset(y = (-2).dp).background(CinemaRed.copy(0.15f), RoundedCornerShape(3.dp)).padding(horizontal = 6.dp, vertical = 1.dp))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             NavChip("搜尋", onSearch)
             NavChip("收藏", onFav)
             NavChip("歷史", onHistory)
+            RefreshIconButton(isRefreshing = isRefreshing, onClick = onRefresh)
         }
     }
 }

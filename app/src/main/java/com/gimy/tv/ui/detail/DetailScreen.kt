@@ -6,6 +6,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
+import com.gimy.tv.ui.components.RefreshIconButton
+import com.gimy.tv.ui.components.RefreshLoadingBar
+import com.gimy.tv.ui.components.RefreshableContainer
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +45,10 @@ fun DetailScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))) {
+        RefreshLoadingBar(
+            isRefreshing = uiState.isRefreshing,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
         when {
             uiState.isLoading -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -76,6 +83,10 @@ fun DetailScreen(
                     ))
                 }
 
+                RefreshableContainer(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = { viewModel.refresh() },
+                ) {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 48.dp)) {
                     // ── Header ──
                     item {
@@ -101,7 +112,8 @@ fun DetailScreen(
                                         onBack = onBack,
                                         onPlayClick = onPlayClick,
                                         onToggleFavorite = { viewModel.toggleFavorite() },
-                                        onDeleteHistory = { viewModel.deleteHistory() }
+                                        onDeleteHistory = { viewModel.deleteHistory() },
+                                        onRefresh = { viewModel.refresh() },
                                     )
                                 }
                             }
@@ -128,7 +140,8 @@ fun DetailScreen(
                                     onBack = onBack,
                                     onPlayClick = onPlayClick,
                                     onToggleFavorite = { viewModel.toggleFavorite() },
-                                    onDeleteHistory = { viewModel.deleteHistory() }
+                                    onDeleteHistory = { viewModel.deleteHistory() },
+                                    onRefresh = { viewModel.refresh() },
                                 )
                             }
                         }
@@ -200,6 +213,7 @@ fun DetailScreen(
                         }
                     }
                 }
+                }
             }
         }
     }
@@ -214,6 +228,7 @@ private fun DetailInfo(
     onPlayClick: (sourceType: String, vodId: Long, sourceId: Int, episodeNum: Int) -> Unit,
     onToggleFavorite: () -> Unit,
     onDeleteHistory: () -> Unit,
+    onRefresh: () -> Unit,
 ) {
     val isTV = LocalIsTelevision.current
     Text(d.vod.title, color = Color.White, fontSize = 26.sp,
@@ -231,12 +246,16 @@ private fun DetailInfo(
     if (d.actors.isNotEmpty()) MetaLine("主演", d.actors.take(5).joinToString(" / "))
 
     Spacer(Modifier.height(16.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         ActionButton("返回", false, onBack)
         ActionButton(
             if (uiState.isFavorite) "已收藏" else "收藏",
             uiState.isFavorite
         ) { onToggleFavorite() }
+        RefreshIconButton(isRefreshing = uiState.isRefreshing, onClick = onRefresh)
 
         val lastEp = uiState.lastEpisode
         if (lastEp != null && d.episodes.isNotEmpty()) {

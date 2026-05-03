@@ -11,6 +11,9 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
+import com.gimy.tv.ui.components.RefreshIconButton
+import com.gimy.tv.ui.components.RefreshLoadingBar
+import com.gimy.tv.ui.components.RefreshableContainer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.*
@@ -115,7 +118,14 @@ fun SearchScreen(
                 keyboardController?.hide()
                 focusManager.clearFocus()
             }
+            Spacer(Modifier.width(4.dp))
+            RefreshIconButton(
+                isRefreshing = uiState.isRefreshing,
+                onClick = { viewModel.refresh() },
+                enabled = uiState.query.isNotBlank() && uiState.hasSearched,
+            )
         }
+        RefreshLoadingBar(uiState.isRefreshing)
 
         Spacer(Modifier.height(20.dp))
 
@@ -158,7 +168,10 @@ fun SearchScreen(
                     }
                 }
 
-                Box(Modifier.fillMaxSize()) {
+                RefreshableContainer(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = { viewModel.refresh() },
+                ) {
                     Column(Modifier.fillMaxSize()) {
                         Text("找到 ${uiState.results.size} 個結果", color = CinemaTextMuted, fontSize = 12.sp,
                             modifier = Modifier.padding(bottom = 12.dp))

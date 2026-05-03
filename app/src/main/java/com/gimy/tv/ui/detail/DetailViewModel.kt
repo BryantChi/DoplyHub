@@ -14,6 +14,7 @@ import javax.inject.Inject
 
 data class DetailUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val detail: VodDetail? = null,
     val isFavorite: Boolean = false,
     val lastEpisode: Int? = null,
@@ -37,22 +38,33 @@ class DetailViewModel @Inject constructor(
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
 
     init {
-        loadDetail()
+        loadDetail(isRefresh = false)
         observeFavorite()
         loadWatchProgress()
     }
 
-    private fun loadDetail() {
+    fun refresh() {
+        if (vodId == null || _uiState.value.isRefreshing) return
+        loadDetail(isRefresh = true)
+    }
+
+    private fun loadDetail(isRefresh: Boolean) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update {
+                if (isRefresh) it.copy(isRefreshing = true, error = null)
+                else it.copy(isLoading = true, error = null)
+            }
             val id = vodId ?: run {
-                _uiState.update { it.copy(isLoading = false, error = "無效的影片 ID") }
+                _uiState.update {
+                    if (isRefresh) it.copy(isRefreshing = false, error = "無效的影片 ID")
+                    else it.copy(isLoading = false, error = "無效的影片 ID")
+                }
                 return@launch
             }
             try {
                 // Phase 1: Load primary source detail (fast — show immediately)
                 val detail = vodRepository.getVodDetail(sourceType, id)
-                _uiState.update { it.copy(isLoading = false, detail = detail) }
+                _uiState.update { it.copy(isLoading = false, isRefreshing = false, detail = detail) }
 
                 // Phase 1.5: Search for series items (fast, independent)
                 launch {
@@ -88,9 +100,16 @@ class DetailViewModel @Inject constructor(
                     // Enrichment failed silently — primary detail is already shown
                 }
             } catch (e: java.io.IOException) {
-                _uiState.update { it.copy(isLoading = false, error = "網路連線失敗，請檢查網路後重試") }
+                // On refresh: keep existing detail visible, drop the spinner silently
+                _uiState.update {
+                    if (isRefresh) it.copy(isRefreshing = false)
+                    else it.copy(isLoading = false, error = "網路連線失敗，請檢查網路後重試")
+                }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = "載入失敗: ${e.message}") }
+                _uiState.update {
+                    if (isRefresh) it.copy(isRefreshing = false)
+                    else it.copy(isLoading = false, error = "載入失敗: ${e.message}")
+                }
             }
         }
     }

@@ -14,6 +14,7 @@ import javax.inject.Inject
 data class BrowseUiState(
     val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,
+    val isRefreshing: Boolean = false,
     val items: List<Vod> = emptyList(),
     val currentPage: Int = 1,
     val hasMore: Boolean = true,
@@ -50,11 +51,23 @@ class BrowseViewModel @Inject constructor(
     }
 
     fun loadPage(page: Int) {
+        loadPageInternal(page, isRefresh = false)
+    }
+
+    fun refresh() {
+        if (_uiState.value.isRefreshing) return
+        loadPageInternal(1, isRefresh = true)
+    }
+
+    private fun loadPageInternal(page: Int, isRefresh: Boolean) {
         val isFirstPage = page == 1
         viewModelScope.launch {
             _uiState.update {
-                if (isFirstPage) it.copy(isLoading = true, error = null)
-                else it.copy(isLoadingMore = true, error = null)
+                when {
+                    isRefresh -> it.copy(isRefreshing = true, error = null)
+                    isFirstPage -> it.copy(isLoading = true, error = null)
+                    else -> it.copy(isLoadingMore = true, error = null)
+                }
             }
             try {
                 val result = vodRepository.getVodList(sourceType, typeId, page)
@@ -62,25 +75,30 @@ class BrowseViewModel @Inject constructor(
                 _uiState.update { state ->
                     val merged = if (isFirstPage) newItems
                         else (state.items + newItems).distinctBy { "${it.sourceType}_${it.id}" }
+                    // Refresh keeps previous items visible if backend returned nothing
+                    val finalItems = if (isRefresh && newItems.isEmpty()) state.items else merged
                     state.copy(
                         isLoading = false,
                         isLoadingMore = false,
-                        items = merged,
-                        currentPage = page,
-                        // If we got items, assume there could be more
-                        hasMore = newItems.isNotEmpty()
+                        isRefreshing = false,
+                        items = finalItems,
+                        currentPage = if (isRefresh && newItems.isEmpty()) state.currentPage else page,
+                        hasMore = newItems.isNotEmpty() || (isRefresh && state.items.isNotEmpty())
                     )
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, isLoadingMore = false, error = e.message) }
+                _uiState.update {
+                    if (isRefresh) it.copy(isRefreshing = false, error = e.message)
+                    else it.copy(isLoading = false, isLoadingMore = false, error = e.message)
+                }
             }
         }
     }
 
     fun loadMore() {
         val state = _uiState.value
-        if (!state.isLoading && !state.isLoadingMore && state.hasMore) {
-            loadPage(state.currentPage + 1)
+        if (!state.isLoading && !state.isLoadingMore && !state.isRefreshing && state.hasMore) {
+            loadPageInternal(state.currentPage + 1, isRefresh = false)
         }
     }
 }
