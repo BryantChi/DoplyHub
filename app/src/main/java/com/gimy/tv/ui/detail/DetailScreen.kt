@@ -246,9 +246,9 @@ private fun DetailInfo(
     if (d.actors.isNotEmpty()) MetaLine("主演", d.actors.take(5).joinToString(" / "))
 
     Spacer(Modifier.height(16.dp))
-    Row(
+    FlowRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ActionButton("返回", false, onBack)
         ActionButton(
