@@ -1,0 +1,21 @@
+{
+  "app": "GimyTV",
+  "packageName": "com.gimy.tv",
+  "versionName": "1.0.8",
+  "versionCode": 1,
+  "buildDate": "2026-05-03 11:33:08",
+  "buildTimestamp": "20260503_113308",
+  "git": {
+    "branch": "dev",
+    "commit": "f99d841"
+  },
+  "apk": {
+    "filename": "GimyTV-v1.0.8.apk",
+    "size": "8.3M",
+    "sizeBytes": 8701775,
+    "md5": "5efb89e5d36a757c91a0cf4dd116a0aa"
+  },
+  "minSdk": 28,
+  "targetSdk": 35,
+  "supportedDevices": ["phone", "tablet", "tv"]
+}
