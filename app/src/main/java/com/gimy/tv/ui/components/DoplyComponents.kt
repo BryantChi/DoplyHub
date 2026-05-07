@@ -33,6 +33,7 @@ fun DoplyButton(
         // tv.material3.Button defaults focusedContainerColor to white — combined with
         // white text from contentColor it becomes invisible on focus. Pin focused state
         // to brand red + white text to match the rest of the App's TV controls.
+        // Add a white 2dp focus border so red-on-red focus state is still visible.
         androidx.tv.material3.Button(
             onClick = onClick,
             modifier = modifier,
@@ -43,6 +44,12 @@ fun DoplyButton(
                 contentColor = contentColor,
                 focusedContainerColor = focusedContainerColor,
                 focusedContentColor = focusedContentColor,
+            ),
+            border = androidx.tv.material3.ButtonDefaults.border(
+                focusedBorder = androidx.tv.material3.Border(
+                    border = BorderStroke(2.dp, Color.White),
+                    shape = shape,
+                ),
             ),
             contentPadding = contentPadding,
             content = content,
