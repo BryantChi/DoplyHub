@@ -33,12 +33,21 @@ object NetworkModule {
             })
             .connectionPool(okhttp3.ConnectionPool(8, 3, TimeUnit.MINUTES))
             .addInterceptor { chain ->
-                val request = chain.request().newBuilder()
-                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 13; TV) AppleWebKit/537.36")
-                    .header("Accept", "text/html,application/xhtml+xml")
-                    .header("Accept-Language", "zh-TW,zh;q=0.9")
-                    .build()
-                chain.proceed(request)
+                // Only set defaults when caller hasn't supplied them. Without this guard, the
+                // interceptor overrides per-call headers — e.g. GitHub API expects
+                // application/vnd.github+json and rejects text/html with HTTP 415.
+                val original = chain.request()
+                val builder = original.newBuilder()
+                if (original.header("User-Agent") == null) {
+                    builder.header("User-Agent", "Mozilla/5.0 (Linux; Android 13; TV) AppleWebKit/537.36")
+                }
+                if (original.header("Accept") == null) {
+                    builder.header("Accept", "text/html,application/xhtml+xml")
+                }
+                if (original.header("Accept-Language") == null) {
+                    builder.header("Accept-Language", "zh-TW,zh;q=0.9")
+                }
+                chain.proceed(builder.build())
             }
             .build()
     }
