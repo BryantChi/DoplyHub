@@ -10,5 +10,10 @@
     "movieffm": [
       "https://www.movieffm.net"
     ]
+  },
+  "update": {
+    "min_supported_version": "1.0.0",
+    "release_repo": "BryantChi/DoplyHub",
+    "force_update_message": "您的版本過舊，已不再支援。請更新後繼續使用。"
   }
 }

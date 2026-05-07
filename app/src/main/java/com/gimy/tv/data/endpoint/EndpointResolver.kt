@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.gimy.tv.data.update.SemVer
+import com.gimy.tv.data.update.UpdateConfig
 import com.gimy.tv.domain.model.SourceType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -78,9 +80,13 @@ class EndpointResolver @Inject constructor(
     private var lastRefreshAt: Long = 0L
     @Volatile
     private var cacheLoaded: Boolean = false
+    @Volatile
+    private var updateConfig: UpdateConfig = UpdateConfig.DEFAULT
 
     fun getBaseUrl(sourceType: SourceType): String =
         resolved[sourceType] ?: DEFAULTS[sourceType]!!.first()
+
+    fun getUpdateConfig(): UpdateConfig = updateConfig
 
     /** Loads cached resolved URLs, then refreshes if 24h-stale. Called once from DoplyApp.onCreate. */
     suspend fun warmUp() {
@@ -146,6 +152,20 @@ class EndpointResolver @Inject constructor(
 
     private fun parseConfig(json: String): Map<SourceType, List<String>>? = runCatching {
         val root = JSONObject(json)
+
+        // Side effect: also extract update block (if present), update volatile updateConfig.
+        // Kept in same parser to avoid a second HTTP fetch — same JSON serves both concerns.
+        root.optJSONObject("update")?.let { upd ->
+            updateConfig = UpdateConfig(
+                minSupportedVersion = SemVer.parse(upd.optString("min_supported_version"))
+                    ?: UpdateConfig.DEFAULT.minSupportedVersion,
+                releaseRepo = upd.optString("release_repo")
+                    .takeIf { it.isNotBlank() } ?: UpdateConfig.DEFAULT.releaseRepo,
+                forceUpdateMessage = upd.optString("force_update_message")
+                    .takeIf { it.isNotBlank() } ?: UpdateConfig.DEFAULT.forceUpdateMessage,
+            )
+        }
+
         val endpoints = root.optJSONObject("endpoints") ?: return@runCatching null
         val keyMap = mapOf(
             "gimymax" to SourceType.GIMYMAX,

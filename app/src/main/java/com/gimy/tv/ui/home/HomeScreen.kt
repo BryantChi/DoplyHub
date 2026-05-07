@@ -55,6 +55,7 @@ fun HomeScreen(
     onBrowseClick: (SourceType, Int) -> Unit,
     onFavoritesClick: () -> Unit,
     onHistoryClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     isPhone: Boolean,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -80,7 +81,7 @@ fun HomeScreen(
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = dims.screenHorizontalPadding)) {
                     // ── Top bar ──
                     if (isTV) {
-                        item { TopBar(onSearchClick, onFavoritesClick, onHistoryClick, uiState.isRefreshing) { viewModel.refresh() } }
+                        item { TopBar(onSearchClick, onFavoritesClick, onHistoryClick, onSettingsClick, uiState.isRefreshing) { viewModel.refresh() } }
                     } else {
                         item { LogoBrand() }
                     }
@@ -147,6 +148,7 @@ private fun TopBar(
     onSearch: () -> Unit,
     onFav: () -> Unit,
     onHistory: () -> Unit,
+    onSettings: () -> Unit,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
 ) {
@@ -168,6 +170,7 @@ private fun TopBar(
             NavChip("搜尋", onSearch)
             NavChip("收藏", onFav)
             NavChip("歷史", onHistory)
+            NavChip("設定", onSettings)
             RefreshIconButton(isRefreshing = isRefreshing, onClick = onRefresh)
         }
     }

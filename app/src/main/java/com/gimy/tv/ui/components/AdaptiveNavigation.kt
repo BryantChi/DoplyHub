@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -40,6 +41,7 @@ val navItems = listOf(
     NavItem(Screen.Categories.route, "分類", Icons.Default.VideoLibrary),
     NavItem(Screen.Favorites.route, "收藏", Icons.Default.Favorite),
     NavItem(Screen.History.route, "紀錄", Icons.Default.History),
+    NavItem(Screen.Settings.route, "設定", Icons.Default.Settings),
 )
 
 @Composable
@@ -60,7 +62,7 @@ fun AdaptiveScaffold(
     // Hide nav bar on detail/player screens
     val showNavBar = currentRoute in listOf(
         Screen.Home.route, Screen.Search.route, Screen.Categories.route,
-        Screen.Favorites.route, Screen.History.route
+        Screen.Favorites.route, Screen.History.route, Screen.Settings.route
     ) || currentRoute?.startsWith("browse/") == true
 
     when (widthSizeClass) {

@@ -34,7 +34,9 @@ import com.gimy.tv.ui.home.HomeScreen
 import com.gimy.tv.ui.navigation.Screen
 import com.gimy.tv.ui.player.PlayerScreen
 import com.gimy.tv.ui.search.SearchScreen
+import com.gimy.tv.ui.settings.SettingsScreen
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.ui.update.UpdateOverlay
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 
@@ -110,6 +112,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onFavoritesClick = { navController.navigate(Screen.Favorites.route) },
                             onHistoryClick = { navController.navigate(Screen.History.route) },
+                            onSettingsClick = { navController.navigate(Screen.Settings.route) },
                             isPhone = isPhone
                         )
                     }
@@ -209,6 +212,10 @@ class MainActivity : ComponentActivity() {
                             onBack = { navController.popBackStack() }
                         )
                     }
+
+                    composable(Screen.Settings.route) {
+                        SettingsScreen(onBack = { navController.popBackStack() })
+                    }
                 }
                 }
                 }
@@ -220,6 +227,9 @@ class MainActivity : ComponentActivity() {
                 ) {
                     SplashOverlay()
                 }
+
+                // App-update dialog (cold-start check + flow). Above NavHost, below splash.
+                if (contentReady && !showSplash) UpdateOverlay()
                 }
                 }
             }

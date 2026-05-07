@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Adds Let's Encrypt's ISRG Root X1/X2 as trust anchors on top of the system store.
+
+    Why: some Android devices (older TV firmware, certain emulator images) don't ship ISRG Root X1.
+    Let's Encrypt-signed sites (e.g. gimy01.tv) then fail SSL chain validation.
+    This file ships the roots inside the APK so the App can connect regardless of system trust state.
+
+    System CAs are still trusted as well — this is additive, not replacement.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/isrg_root_x1" />
+            <certificates src="@raw/isrg_root_x2" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
