@@ -26,3 +26,6 @@ Thumbs.db
 photo_*.jpg
 photo_*.jpeg
 photo_*.png
+
+# Release signing — credentials only stored locally + iCloud backup
+keystore.properties
