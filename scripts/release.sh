@@ -6,8 +6,11 @@
 #       ./scripts/release.sh                 (自動讀取 build.gradle.kts 版號)
 #       ./scripts/release.sh 2.0.3 --no-publish    (只 build，不上 GitHub Release)
 #       ./scripts/release.sh --notes-file=CHANGELOG.md
+#       ./scripts/release.sh --no-git              (不自動 commit/push)
+#       ./scripts/release.sh --no-push             (commit 但不 push)
 #
-# 流程：build APK → 本地 archive (mov_app/) → 上 GitHub Release（gh CLI）
+# 流程：build APK → 本地 archive (mov_app/) → 上 GitHub Release →
+#       git add + commit + push（versionCode 變動 + mov_app/ 全部進 dev）
 # 上 GitHub Release 後，舊版 App 會在下次冷啟動或下拉刷新時偵測並提示更新。
 # ═══════════════════════════════════════════════════
 
@@ -18,6 +21,8 @@ cd "$PROJECT_ROOT"
 
 # ── 解析 flags ──
 PUBLISH_GH=true
+DO_GIT=true
+GIT_PUSH=true
 NOTES_FILE=""
 NOTES_INLINE=""
 GH_REPO="BryantChi/DoplyHub"
@@ -26,6 +31,8 @@ POSITIONAL=()
 for arg in "$@"; do
     case "$arg" in
         --no-publish) PUBLISH_GH=false ;;
+        --no-git) DO_GIT=false ;;
+        --no-push) GIT_PUSH=false ;;
         --notes-file=*) NOTES_FILE="${arg#*=}" ;;
         --notes=*) NOTES_INLINE="${arg#*=}" ;;
         --repo=*) GH_REPO="${arg#*=}" ;;
@@ -180,7 +187,34 @@ if $PUBLISH_GH; then
     fi
 fi
 
-# ── 8. 完成 ──
+# ── 8. git add + commit + push (optional) ──
+GIT_PUSHED=false
+if $DO_GIT; then
+    echo ""
+    # Stage version bump (if any) + mov_app archive. Limited paths so we never
+    # accidentally pull in unrelated working-tree changes.
+    git add app/build.gradle.kts mov_app/ 2>/dev/null || true
+
+    if git diff --cached --quiet; then
+        echo "▶ 沒有 staged 變動，跳過 commit"
+    else
+        COMMIT_MSG="發版 v${VERSION_NAME}"
+        echo "▶ git commit: $COMMIT_MSG"
+        git commit -m "$COMMIT_MSG"
+        if $GIT_PUSH; then
+            CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "")
+            if [ -n "$CURRENT_BRANCH" ]; then
+                echo "▶ git push origin $CURRENT_BRANCH"
+                git push origin "$CURRENT_BRANCH"
+                GIT_PUSHED=true
+            else
+                echo "⚠ 偵測不到當前分支，跳過 push"
+            fi
+        fi
+    fi
+fi
+
+# ── 9. 完成 ──
 echo ""
 echo "══════════════════════════════════════"
 echo "  ✅ Release 完成!"
@@ -191,7 +225,5 @@ echo "  大小:  $APK_SIZE"
 echo "  MD5:   $APK_MD5"
 echo "  JSON:  $VERSION_JSON"
 [ -n "$GH_RELEASE_URL" ] && echo "  GH:    $GH_RELEASE_URL"
-echo ""
-echo "  下一步:"
-echo "  git add mov_app/ && git commit -m \"發版 v${VERSION_NAME}\""
+$GIT_PUSHED && echo "  Git:   已 push 到 origin/$(git branch --show-current)"
 echo "══════════════════════════════════════"
