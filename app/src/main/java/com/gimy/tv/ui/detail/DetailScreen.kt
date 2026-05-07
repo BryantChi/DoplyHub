@@ -60,7 +60,16 @@ fun DetailScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(uiState.error ?: "", color = CinemaTextMuted, fontSize = 14.sp)
                         Spacer(Modifier.height(16.dp))
-                        ActionButton("返回", false, onBack)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            ActionButton("返回", false, onBack)
+                            ActionButton("重試", false) { viewModel.refresh() }
+                            if (uiState.lastEpisode != null) {
+                                ActionButton("刪除記錄", false) { viewModel.deleteHistory() }
+                            }
+                        }
                     }
                 }
             }
