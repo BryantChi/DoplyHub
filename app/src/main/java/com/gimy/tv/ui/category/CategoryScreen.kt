@@ -25,17 +25,17 @@ data class CategoryItem(
 )
 
 private val categories = listOf(
-    CategoryItem("GIMYMAX", 2, "電視劇", "📺"),
-    CategoryItem("GIMYMAX", 1, "電影", "🎬"),
-    CategoryItem("GIMYMAX", 4, "動漫", "🎌"),
-    CategoryItem("GIMYMAX", 29, "綜藝", "🎤"),
-    CategoryItem("GIMYMAX", 20, "韓劇", "🇰🇷"),
-    CategoryItem("GIMYMAX", 13, "陸劇", "🇨🇳"),
-    CategoryItem("GIMYMAX", 16, "美劇", "🇺🇸"),
-    CategoryItem("GIMYMAX", 21, "日劇", "🇯🇵"),
-    CategoryItem("GIMYMAX", 14, "台劇", "🇹🇼"),
-    CategoryItem("GIMYMAX", 15, "港劇", "🇭🇰"),
-    CategoryItem("GIMYMAX", 3, "紀錄片", "🎥"),
+    CategoryItem("GIMYTV", 2, "電視劇", "📺"),
+    CategoryItem("GIMYTV", 1, "電影", "🎬"),
+    CategoryItem("GIMYTV", 4, "動漫", "🎌"),
+    CategoryItem("GIMYTV", 29, "綜藝", "🎤"),
+    CategoryItem("GIMYTV", 20, "韓劇", "🇰🇷"),
+    CategoryItem("GIMYTV", 13, "陸劇", "🇨🇳"),
+    CategoryItem("GIMYTV", 16, "美劇", "🇺🇸"),
+    CategoryItem("GIMYTV", 21, "日劇", "🇯🇵"),
+    CategoryItem("GIMYTV", 14, "台劇", "🇹🇼"),
+    CategoryItem("GIMYTV", 15, "港劇", "🇭🇰"),
+    CategoryItem("GIMYTV", 3, "紀錄片", "🎥"),
 )
 
 @Composable

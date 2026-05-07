@@ -101,7 +101,7 @@ fun HomeScreen(
                                     Vod(e.vodId, e.sourceType, e.title, e.coverUrl, "", 0, "第${e.episodeNum}集")
                                 }
                             }
-                            ContentRow("繼續觀看", 0, SourceType.GIMYMAX,
+                            ContentRow("繼續觀看", 0, SourceType.GIMYTV,
                                 continueVods,
                                 onItemClick = { onVodClick(it.sourceType, it.id) },
                                 onMoreClick = { onHistoryClick() }

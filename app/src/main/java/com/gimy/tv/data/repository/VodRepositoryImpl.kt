@@ -86,7 +86,7 @@ class VodRepositoryImpl @Inject constructor(
         coroutineScope {
             val gimyDeferred = async {
                 try {
-                    withTimeout(8000) { gimyMaxSource.search(keyword, page) }
+                    withTimeout(8000) { gimyTvSource.search(keyword, page) }
                 } catch (_: Exception) {
                     PaginatedResult(emptyList(), page, 0, false)
                 }
@@ -173,7 +173,7 @@ class VodRepositoryImpl @Inject constructor(
             val secondaryDeferred = async {
                 try {
                     withTimeout(4000) {
-                        val altSource = if (vod.sourceType == SourceType.MOVIEFFM) gimyMaxSource else movieffmSource
+                        val altSource = if (vod.sourceType == SourceType.MOVIEFFM) gimyTvSource else movieffmSource
                         altSource.search(baseTitle, 1).items
                     }
                 } catch (_: Exception) { emptyList() }
@@ -200,7 +200,7 @@ class VodRepositoryImpl @Inject constructor(
             val secondaryDeferred = async {
                 try {
                     withTimeout(8000) {
-                        val altSource = if (sourceType == SourceType.MOVIEFFM) gimyMaxSource else movieffmSource
+                        val altSource = if (sourceType == SourceType.MOVIEFFM) gimyTvSource else movieffmSource
                         val searchResult = altSource.search(primaryDetail.vod.title, 1)
 
                         // Find best title match
@@ -261,7 +261,7 @@ class VodRepositoryImpl @Inject constructor(
      * Priority: gimymax top stable > movieffm direct m3u8 > gimymax secondary > unknown
      */
     private fun rankEpisodeGroups(groups: List<EpisodeGroup>): List<EpisodeGroup> {
-        val gimyTopSources = listOf("無盡", "順暢", "極速", "高清")
+        val gimyTopSources = listOf("順暢", "無盡", "極速", "高清")
         val gimySecondary = listOf("騰訊", "藍光", "4K", "優質", "非凡")
 
         return groups.sortedWith(compareBy { group ->
@@ -308,14 +308,14 @@ class VodRepositoryImpl @Inject constructor(
             val categories = listOf(
                 20 to "韓劇", 13 to "陸劇", 16 to "美劇", 21 to "日劇",
                 1 to "電影", 4 to "動漫", 14 to "台劇", 15 to "港劇",
-                29 to "綜藝", 30 to "紀錄片"
+                29 to "綜藝", 3 to "紀錄片"
             )
             categories.map { (typeId, name) ->
                 async {
                     try {
                         withTimeout(8000) {
-                            val result = gimyMaxSource.fetchVodList(typeId, 1)
-                            HomeRowData(name, SourceType.GIMYMAX, typeId, result.items.take(15))
+                            val result = gimyTvSource.fetchVodList(typeId, 1)
+                            HomeRowData(name, SourceType.GIMYTV, typeId, result.items.take(15))
                         }
                     } catch (_: Exception) { null }
                 }

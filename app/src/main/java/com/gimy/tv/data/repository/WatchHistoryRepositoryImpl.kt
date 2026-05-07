@@ -53,7 +53,7 @@ class WatchHistoryRepositoryImpl @Inject constructor(
 
     private fun WatchHistoryEntity.toEntry() = WatchHistoryEntry(
         vodId = vodId,
-        sourceType = runCatching { SourceType.valueOf(sourceType) }.getOrDefault(SourceType.GIMYMAX),
+        sourceType = runCatching { SourceType.valueOf(sourceType) }.getOrDefault(SourceType.GIMYTV),
         title = title,
         coverUrl = coverUrl,
         episodeNum = episodeNum,

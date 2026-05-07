@@ -18,7 +18,7 @@ class GimyTvSource @Inject constructor(
 
     override val sourceType = SourceType.GIMYTV
     override val baseUrl: String get() = endpointResolver.getBaseUrl(sourceType)
-    private val stabilityOrder = listOf("無盡", "順暢", "極速", "高清", "騰訊", "藍光", "4K", "優質", "非凡")
+    private val stabilityOrder = listOf("順暢", "無盡", "極速", "高清", "騰訊", "藍光", "4K", "優質", "非凡")
 
     override suspend fun fetchCategories(): List<Category> = listOf(
         Category(2, "電視劇", sourceType), Category(1, "電影", sourceType),

@@ -37,8 +37,8 @@ class BrowseViewModel @Inject constructor(
     private val vodRepository: VodRepository
 ) : ViewModel() {
 
-    private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYMAX"
-    private val sourceType = runCatching { SourceType.valueOf(sourceTypeName) }.getOrDefault(SourceType.GIMYMAX)
+    private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYTV"
+    private val sourceType = runCatching { SourceType.valueOf(sourceTypeName) }.getOrDefault(SourceType.GIMYTV)
     private val typeId: Int = savedStateHandle.get<String>("typeId")?.toIntOrNull() ?: 2
 
     private val _uiState = MutableStateFlow(BrowseUiState(

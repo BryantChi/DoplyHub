@@ -16,7 +16,7 @@ data class HomeRow(
     val title: String,
     val typeId: Int,
     val items: List<Vod>,
-    val sourceType: SourceType = SourceType.GIMYMAX
+    val sourceType: SourceType = SourceType.GIMYTV
 )
 
 data class HomeUiState(
@@ -82,7 +82,7 @@ class HomeViewModel @Inject constructor(
                 if (gimyRows.isNotEmpty()) {
                     _uiState.update { it.copy(isLoading = false, rows = gimyRows) }
                 } else if (!isRefresh) {
-                    // GimyMax returned nothing — keep loading, let Phase 2 try
+                    // Phase 1 returned nothing — keep loading, let Phase 2 try
                     _uiState.update { it.copy(rows = emptyList()) }
                 }
                 // On refresh: leave previous rows untouched until Phase 2 reports

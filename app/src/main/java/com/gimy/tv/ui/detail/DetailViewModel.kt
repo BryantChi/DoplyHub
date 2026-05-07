@@ -30,9 +30,9 @@ class DetailViewModel @Inject constructor(
     private val watchHistoryRepository: WatchHistoryRepository
 ) : ViewModel() {
 
-    private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYMAX"
+    private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYTV"
     private val vodId: Long? = savedStateHandle.get<String>("vodId")?.toLongOrNull()
-    private val sourceType = runCatching { SourceType.valueOf(sourceTypeName) }.getOrDefault(SourceType.GIMYMAX)
+    private val sourceType = runCatching { SourceType.valueOf(sourceTypeName) }.getOrDefault(SourceType.GIMYTV)
 
     private val _uiState = MutableStateFlow(DetailUiState())
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()

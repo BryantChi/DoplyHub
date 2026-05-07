@@ -35,11 +35,11 @@ class PlayerViewModel @Inject constructor(
     private val watchHistoryRepository: WatchHistoryRepository
 ) : ViewModel() {
 
-    private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYMAX"
+    private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYTV"
     val vodId: Long? = savedStateHandle.get<String>("vodId")?.toLongOrNull()
     private val initialSourceId: Int = savedStateHandle.get<String>("sourceId")?.toIntOrNull() ?: 0
     private val initialEpisodeNum: Int = savedStateHandle.get<String>("episodeNum")?.toIntOrNull() ?: 1
-    val sourceType = runCatching { SourceType.valueOf(sourceTypeName) }.getOrDefault(SourceType.GIMYMAX)
+    val sourceType = runCatching { SourceType.valueOf(sourceTypeName) }.getOrDefault(SourceType.GIMYTV)
 
     private val _uiState = MutableStateFlow(PlayerUiState(
         episodeNum = initialEpisodeNum,
