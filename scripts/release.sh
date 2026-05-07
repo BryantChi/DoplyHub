@@ -1,9 +1,14 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════
 # Doply Hub Release APK 標準產出流程
-# 用法: ./scripts/release.sh [版號]
-# 範例: ./scripts/release.sh 2.0.1
-#       ./scripts/release.sh          (自動讀取 build.gradle.kts 版號)
+# 用法: ./scripts/release.sh [版號] [flags]
+# 範例: ./scripts/release.sh 2.0.3
+#       ./scripts/release.sh                 (自動讀取 build.gradle.kts 版號)
+#       ./scripts/release.sh 2.0.3 --no-publish    (只 build，不上 GitHub Release)
+#       ./scripts/release.sh --notes-file=CHANGELOG.md
+#
+# 流程：build APK → 本地 archive (mov_app/) → 上 GitHub Release（gh CLI）
+# 上 GitHub Release 後，舊版 App 會在下次冷啟動或下拉刷新時偵測並提示更新。
 # ═══════════════════════════════════════════════════
 
 set -euo pipefail
@@ -11,11 +16,30 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
+# ── 解析 flags ──
+PUBLISH_GH=true
+NOTES_FILE=""
+NOTES_INLINE=""
+GH_REPO="BryantChi/DoplyHub"
+GH_TARGET_BRANCH="dev"
+POSITIONAL=()
+for arg in "$@"; do
+    case "$arg" in
+        --no-publish) PUBLISH_GH=false ;;
+        --notes-file=*) NOTES_FILE="${arg#*=}" ;;
+        --notes=*) NOTES_INLINE="${arg#*=}" ;;
+        --repo=*) GH_REPO="${arg#*=}" ;;
+        --target=*) GH_TARGET_BRANCH="${arg#*=}" ;;
+        --*) echo "❌ 未知 flag: $arg"; exit 1 ;;
+        *) POSITIONAL+=("$arg") ;;
+    esac
+done
+
 # ── 1. 取得版號資訊 ──
 GRADLE_FILE="app/build.gradle.kts"
 
-if [ -n "${1:-}" ]; then
-    VERSION_NAME="$1"
+if [ -n "${POSITIONAL[0]:-}" ]; then
+    VERSION_NAME="${POSITIONAL[0]}"
 else
     VERSION_NAME=$(grep 'versionName' "$GRADLE_FILE" | head -1 | sed 's/.*"\(.*\)".*/\1/')
 fi
@@ -105,7 +129,58 @@ JSONEOF
 
 echo "▶ 最新版指標更新: $LATEST_JSON"
 
-# ── 7. 完成 ──
+# ── 7. 發 GitHub Release (給線上更新流程) ──
+GH_RELEASE_URL=""
+if $PUBLISH_GH; then
+    if ! command -v gh >/dev/null 2>&1; then
+        echo "⚠ gh CLI 未安裝，跳過 GitHub Release。執行 'brew install gh && gh auth login' 後再用 --no-publish=false 重跑"
+    elif ! gh auth status >/dev/null 2>&1; then
+        echo "⚠ gh 未登入，跳過 GitHub Release。執行 'gh auth login' 後重跑"
+    else
+        TAG="v${VERSION_NAME}"
+
+        # Compose release notes
+        TMP_NOTES=$(mktemp)
+        trap 'rm -f "$TMP_NOTES"' EXIT
+        if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ]; then
+            cp "$NOTES_FILE" "$TMP_NOTES"
+        elif [ -n "$NOTES_INLINE" ]; then
+            printf '%s\n' "$NOTES_INLINE" > "$TMP_NOTES"
+        else
+            # Auto: changelog from previous tag → HEAD
+            LAST_TAG=$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1 || true)
+            {
+                echo "## 變更紀錄"
+                echo ""
+                if [ -n "$LAST_TAG" ]; then
+                    git log --oneline "${LAST_TAG}..HEAD" --pretty=format:'- %s' || echo "- v${VERSION_NAME}"
+                else
+                    git log --oneline -10 --pretty=format:'- %s'
+                fi
+                echo ""
+                echo ""
+                echo "📥 [DoplyHub-v${VERSION_NAME}.apk](https://github.com/${GH_REPO}/releases/download/${TAG}/${APK_FILENAME})"
+            } > "$TMP_NOTES"
+        fi
+
+        echo ""
+        echo "▶ 發 GitHub Release: $TAG → $GH_REPO"
+        if gh release view "$TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "  release 已存在 → 上傳/覆蓋 asset (--clobber)"
+            gh release upload "$TAG" "$RELEASE_DIR/$APK_FILENAME" --repo "$GH_REPO" --clobber
+        else
+            gh release create "$TAG" "$RELEASE_DIR/$APK_FILENAME" \
+                --repo "$GH_REPO" \
+                --target "$GH_TARGET_BRANCH" \
+                --title "v${VERSION_NAME}" \
+                --notes-file "$TMP_NOTES"
+        fi
+        GH_RELEASE_URL="https://github.com/${GH_REPO}/releases/tag/${TAG}"
+        echo "  → $GH_RELEASE_URL"
+    fi
+fi
+
+# ── 8. 完成 ──
 echo ""
 echo "══════════════════════════════════════"
 echo "  ✅ Release 完成!"
@@ -115,6 +190,7 @@ echo "  APK:   $RELEASE_DIR/$APK_FILENAME"
 echo "  大小:  $APK_SIZE"
 echo "  MD5:   $APK_MD5"
 echo "  JSON:  $VERSION_JSON"
+[ -n "$GH_RELEASE_URL" ] && echo "  GH:    $GH_RELEASE_URL"
 echo ""
 echo "  下一步:"
 echo "  git add mov_app/ && git commit -m \"發版 v${VERSION_NAME}\""
