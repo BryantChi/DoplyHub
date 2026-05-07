@@ -122,6 +122,12 @@ private fun AvailableDialog(
                     Spacer(Modifier.height(10.dp))
                 }
                 Text(
+                    "若安裝畫面顯示「應用程式未安裝」或「套件衝突」，請先解除安裝舊版再重試。",
+                    color = CinemaTextMuted,
+                    fontSize = 11.sp,
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
                     state.info.changelog,
                     color = CinemaTextPrimary.copy(0.85f),
                     fontSize = 13.sp,
