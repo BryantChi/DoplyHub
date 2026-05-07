@@ -1,5 +1,6 @@
 package com.gimy.tv.data.scraper
 
+import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.domain.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,11 +13,12 @@ import org.jsoup.nodes.Element
 import javax.inject.Inject
 
 class GimyMaxSource @Inject constructor(
-    private val client: OkHttpClient
+    private val client: OkHttpClient,
+    private val endpointResolver: EndpointResolver,
 ) : SiteSource {
 
     override val sourceType = SourceType.GIMYMAX
-    override val baseUrl = "https://gimymax.com"
+    override val baseUrl: String get() = endpointResolver.getBaseUrl(sourceType)
 
     // Stability ranking: first = most stable (user-confirmed preference)
     private val stabilityOrder = listOf("無盡", "順暢", "極速", "高清", "騰訊", "藍光", "4K", "優質", "非凡")

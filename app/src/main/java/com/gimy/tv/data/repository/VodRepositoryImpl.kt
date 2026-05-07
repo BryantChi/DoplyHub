@@ -1,5 +1,6 @@
 package com.gimy.tv.data.repository
 
+import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.data.local.dao.VodCacheDao
 import com.gimy.tv.data.scraper.GimyMaxSource
 import com.gimy.tv.data.scraper.GimyTvSource
@@ -23,6 +24,7 @@ class VodRepositoryImpl @Inject constructor(
     private val movieffmSource: MovieffmSource,
     private val vodCacheDao: VodCacheDao,
     private val okHttpClient: OkHttpClient,
+    private val endpointResolver: EndpointResolver,
 ) : VodRepository {
 
     // In-memory home row cache (survives Activity recreation since VodRepositoryImpl is @Singleton)
@@ -299,6 +301,8 @@ class VodRepositoryImpl @Inject constructor(
             try {
                 okHttpClient.cache?.evictAll()
             } catch (_: Exception) { }
+            // Also re-resolve mirror endpoints in background — picks up new domains on next request
+            endpointResolver.forceRefreshAsync()
         }
         val rows = coroutineScope {
             val categories = listOf(
@@ -331,6 +335,8 @@ class VodRepositoryImpl @Inject constructor(
             movieffmHomeCache?.let { cached ->
                 if (System.currentTimeMillis() - movieffmHomeCacheTime < homeCacheTtlMs) return cached
             }
+        } else {
+            endpointResolver.forceRefreshAsync()
         }
         val rows = coroutineScope {
             val categories = listOf(

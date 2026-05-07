@@ -1,5 +1,6 @@
 package com.gimy.tv.data.scraper
 
+import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.domain.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -11,11 +12,12 @@ import org.jsoup.nodes.Document
 import javax.inject.Inject
 
 class GimyTvSource @Inject constructor(
-    private val client: OkHttpClient
+    private val client: OkHttpClient,
+    private val endpointResolver: EndpointResolver,
 ) : SiteSource {
 
     override val sourceType = SourceType.GIMYTV
-    override val baseUrl = "https://gimytv.ai"
+    override val baseUrl: String get() = endpointResolver.getBaseUrl(sourceType)
     private val stabilityOrder = listOf("無盡", "順暢", "極速", "高清", "騰訊", "藍光", "4K", "優質", "非凡")
 
     override suspend fun fetchCategories(): List<Category> = listOf(

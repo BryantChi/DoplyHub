@@ -1,5 +1,6 @@
 package com.gimy.tv.data.scraper
 
+import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.data.local.dao.MovieffmSlugDao
 import com.gimy.tv.data.local.entity.MovieffmSlugEntity
 import com.gimy.tv.domain.model.*
@@ -16,11 +17,12 @@ import javax.inject.Inject
 
 class MovieffmSource @Inject constructor(
     private val client: OkHttpClient,
-    private val slugDao: MovieffmSlugDao
+    private val slugDao: MovieffmSlugDao,
+    private val endpointResolver: EndpointResolver,
 ) : SiteSource {
 
     override val sourceType = SourceType.MOVIEFFM
-    override val baseUrl = "https://www.movieffm.net"
+    override val baseUrl: String get() = endpointResolver.getBaseUrl(sourceType)
 
     // Bidirectional slug <-> ID mapping (in-memory cache, backed by Room)
     private val slugToId = ConcurrentHashMap<String, Long>()

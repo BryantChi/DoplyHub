@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "endpoints": {
+    "gimymax": [
+      "https://gimy01.tv"
+    ],
+    "gimytv": [
+      "https://gimytv.ai"
+    ],
+    "movieffm": [
+      "https://www.movieffm.net"
+    ]
+  }
+}
