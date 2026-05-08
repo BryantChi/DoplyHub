@@ -64,6 +64,9 @@ class AdultPlusViewModel @Inject constructor(
 
     /** Curated row list. Each row fans out to one source. The order intentionally
      *  alternates jable / xnxx so the user sees variety scrolling vertically. */
+    /** Curated row list. 5278 forums sometimes return Discuz「提示信息」(maintenance /
+     *  temporary block) — we still surface them so the row reappears once the site recovers,
+     *  but fetch() catches the empty result and reports "站方維護中，稍後重試". */
     val rows: List<AdultPlusRow> = listOf(
         AdultPlusRow("🔥 Jable 熱門", SourceType.JABLE_TV, "hot"),
         AdultPlusRow("📈 XNXX 本週最佳", SourceType.XNXX, "best/this_week"),
@@ -72,6 +75,11 @@ class AdultPlusViewModel @Inject constructor(
         AdultPlusRow("💬 5278 成人線上", SourceType.FORUM5278, "forum:23"),
         AdultPlusRow("💬 5278 線上性感影片", SourceType.FORUM5278, "forum:42"),
     )
+
+    /** Pull-to-refresh visual state. Without this, RefreshableContainer always sees
+     *  isRefreshing=false and the spinner never appears, making refresh look broken. */
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     private val rowCache = mutableMapOf<String, MutableStateFlow<AdultPlusRowState>>()
 
@@ -91,13 +99,16 @@ class AdultPlusViewModel @Inject constructor(
     }
 
     fun refreshAll() {
-        rowCache.forEach { (_, flow) ->
-            val key = flow  // capture
-            // Find the row associated with this flow by scanning rows
-        }
-        // Simpler: re-fetch each known row
-        rows.forEach { row ->
-            rowCache[cacheKey(row)]?.let { fetch(row, it) }
+        _isRefreshing.value = true
+        viewModelScope.launch {
+            // Re-fetch each row that's been touched. fetch() launches its own coroutine
+            // so this loop returns immediately; we use a separate coroutine to flip
+            // isRefreshing back off after a short delay so the spinner is visible.
+            rows.forEach { row ->
+                rowCache[cacheKey(row)]?.let { fetch(row, it) }
+            }
+            kotlinx.coroutines.delay(800)
+            _isRefreshing.value = false
         }
     }
 
@@ -120,13 +131,22 @@ class AdultPlusViewModel @Inject constructor(
                         }
                         else -> emptyList()
                     }
-                    flow.value = AdultPlusRowState(items = items, loading = false, error = null)
+                    // 5278 occasionally returns 0 items because the whole forum is in
+                    // maintenance mode (Discuz "提示信息" wall). Surface a friendlier
+                    // message so users know to retry later instead of thinking the App is broken.
+                    if (items.isEmpty() && row.sourceType == SourceType.FORUM5278) {
+                        flow.value = AdultPlusRowState(items = emptyList(), loading = false,
+                            error = "站方維護中，稍後再試")
+                    } else {
+                        flow.value = AdultPlusRowState(items = items, loading = false, error = null)
+                    }
                 }
             } catch (_: TimeoutCancellationException) {
                 flow.value = AdultPlusRowState(items = emptyList(), loading = false, error = "載入超時")
             } catch (e: Exception) {
-                flow.value = AdultPlusRowState(items = emptyList(), loading = false,
-                    error = e.message?.takeIf { it.isNotBlank() } ?: "載入失敗")
+                val msg = if (row.sourceType == SourceType.FORUM5278) "站方維護中，稍後再試"
+                else e.message?.takeIf { it.isNotBlank() } ?: "載入失敗"
+                flow.value = AdultPlusRowState(items = emptyList(), loading = false, error = msg)
             }
         }
     }

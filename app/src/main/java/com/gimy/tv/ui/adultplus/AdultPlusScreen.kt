@@ -47,8 +47,9 @@ fun AdultPlusScreen(
     ) {
         PageHeader("進階", onBack)
 
+        val isRefreshing by vm.isRefreshing.collectAsState()
         RefreshableContainer(
-            isRefreshing = false,
+            isRefreshing = isRefreshing,
             onRefresh = { vm.refreshAll() },
             enabled = isAtTop,
         ) {
