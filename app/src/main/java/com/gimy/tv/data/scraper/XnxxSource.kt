@@ -6,9 +6,13 @@ import com.gimy.tv.domain.model.Vod
 import okhttp3.OkHttpClient
 import org.jsoup.nodes.Document
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * XNXX.com — international tube site with surprisingly broad Asian content in best/.
+ * `@Singleton` is mandatory: slug↔stableId cache is instance state shared between
+ * AdultPlusViewModel (writer) and VodRepositoryImpl (reader). Different instances
+ * would silently break detail resolution.
  *
  * URL forms:
  *   List   /best/this_week, /best/today, /best/this_month, /tags/{tag}, /search/{kw}
@@ -21,6 +25,7 @@ import javax.inject.Inject
  * Note: home page (/) returns ad-only HTML for mobile UA. /best/this_week works on both
  * desktop and mobile UA, so we route all rows through /best/N and /tags/N paths.
  */
+@Singleton
 class XnxxSource @Inject constructor(
     client: OkHttpClient,
     endpointResolver: EndpointResolver,

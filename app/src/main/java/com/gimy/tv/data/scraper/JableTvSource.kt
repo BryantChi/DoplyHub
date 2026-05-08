@@ -6,6 +6,7 @@ import com.gimy.tv.domain.model.Vod
 import okhttp3.OkHttpClient
 import org.jsoup.nodes.Document
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Jable.tv — JAV aggregator.
@@ -17,7 +18,12 @@ import javax.inject.Inject
  *
  * Detail page m3u8: var hlsUrl = 'https://...mushroomtrack.com/hls/{TOKEN}/{TS}/.../...m3u8'
  * Token is IP-bound + Unix timestamp (~1 day TTL); ExoPlayer on the same NAT IP can play.
+ *
+ * `@Singleton` is mandatory — the slug↔stableId cache is instance state. Without it,
+ * AdultPlusViewModel and VodRepositoryImpl get different instances; cache populated by
+ * the list page is invisible when DetailScreen later tries to resolve the slug.
  */
+@Singleton
 class JableTvSource @Inject constructor(
     client: OkHttpClient,
     endpointResolver: EndpointResolver,

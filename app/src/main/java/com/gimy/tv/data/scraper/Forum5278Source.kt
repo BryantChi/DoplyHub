@@ -9,6 +9,7 @@ import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * 5278.cc — Discuz BBS forum aggregator.
@@ -23,6 +24,7 @@ import javax.inject.Inject
  *
  * Unlike jable/xnxx, here the vodId IS the thread number (always digits) — no slug cache needed.
  */
+@Singleton
 class Forum5278Source @Inject constructor(
     private val client: OkHttpClient,
     private val endpointResolver: EndpointResolver,
