@@ -15,8 +15,17 @@ class WatchHistoryRepositoryImpl @Inject constructor(
     private val dao: WatchHistoryDao
 ) : WatchHistoryRepository {
 
+    /** Sources whose entire content is treated as adult — auto-tag isAdult on save. */
+    private val adultOnlySources = setOf(SourceType.JABLE_TV, SourceType.XNXX, SourceType.FORUM5278)
+
     override fun getRecentHistory(limit: Int): Flow<List<WatchHistoryEntry>> {
         return dao.getRecent(limit).map { entities ->
+            entities.map { it.toEntry() }
+        }
+    }
+
+    override fun getRecentAdultHistory(limit: Int): Flow<List<WatchHistoryEntry>> {
+        return dao.getRecentAdult(limit).map { entities ->
             entities.map { it.toEntry() }
         }
     }
@@ -38,7 +47,8 @@ class WatchHistoryRepositoryImpl @Inject constructor(
                 episodeTitle = entry.episodeTitle,
                 sourceId = entry.sourceId,
                 positionMs = entry.positionMs,
-                durationMs = entry.durationMs
+                durationMs = entry.durationMs,
+                isAdult = entry.sourceType in adultOnlySources,
             )
         )
     }
@@ -49,6 +59,10 @@ class WatchHistoryRepositoryImpl @Inject constructor(
 
     override suspend fun clearHistory() {
         dao.deleteAll()
+    }
+
+    override suspend fun clearAdultHistory() {
+        dao.deleteAllAdult()
     }
 
     private fun WatchHistoryEntity.toEntry() = WatchHistoryEntry(

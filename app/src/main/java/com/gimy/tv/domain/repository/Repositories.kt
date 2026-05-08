@@ -28,18 +28,25 @@ interface VodRepository {
 }
 
 interface FavoriteRepository {
+    /** Main favorites list — never includes adult records (JABLE_TV / XNXX / FORUM5278). */
     fun getFavorites(): Flow<List<Vod>>
+    /** Adult-only favorites list — surfaced inside the 18+ zone only. */
+    fun getAdultFavorites(): Flow<List<Vod>>
     fun isFavorite(vodId: Long, sourceType: SourceType): Flow<Boolean>
     suspend fun addFavorite(vod: Vod)
     suspend fun removeFavorite(vodId: Long, sourceType: SourceType)
 }
 
 interface WatchHistoryRepository {
+    /** Main recent list — never includes adult records. */
     fun getRecentHistory(limit: Int = 20): Flow<List<WatchHistoryEntry>>
+    /** Adult-only recent list — surfaced inside the 18+ zone only. */
+    fun getRecentAdultHistory(limit: Int = 50): Flow<List<WatchHistoryEntry>>
     suspend fun getProgress(vodId: Long, sourceType: SourceType): WatchHistoryEntry?
     suspend fun saveProgress(entry: WatchHistoryEntry)
     suspend fun deleteEntry(vodId: Long, sourceType: SourceType)
     suspend fun clearHistory()
+    suspend fun clearAdultHistory()
 }
 
 data class WatchHistoryEntry(

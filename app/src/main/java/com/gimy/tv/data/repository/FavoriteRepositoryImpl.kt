@@ -15,8 +15,17 @@ class FavoriteRepositoryImpl @Inject constructor(
     private val dao: FavoriteDao
 ) : FavoriteRepository {
 
+    /** Sources whose entire content is treated as adult — used to auto-tag isAdult on insert. */
+    private val adultOnlySources = setOf(SourceType.JABLE_TV, SourceType.XNXX, SourceType.FORUM5278)
+
     override fun getFavorites(): Flow<List<Vod>> {
         return dao.getAll().map { entities ->
+            entities.map { it.toVod() }
+        }
+    }
+
+    override fun getAdultFavorites(): Flow<List<Vod>> {
+        return dao.getAllAdult().map { entities ->
             entities.map { it.toVod() }
         }
     }
@@ -34,7 +43,8 @@ class FavoriteRepositoryImpl @Inject constructor(
                 coverUrl = vod.coverUrl,
                 category = vod.category,
                 year = vod.year,
-                status = vod.status
+                status = vod.status,
+                isAdult = vod.sourceType in adultOnlySources,
             )
         )
     }

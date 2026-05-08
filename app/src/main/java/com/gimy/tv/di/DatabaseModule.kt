@@ -29,6 +29,15 @@ object DatabaseModule {
         }
     }
 
+    /** v2.3.0 — segregate adult records from the main history/favorites flow.
+     *  Existing rows default to isAdult = 0 (false). */
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `favorites` ADD COLUMN `isAdult` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `watch_history` ADD COLUMN `isAdult` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): GimyDatabase {
@@ -36,7 +45,7 @@ object DatabaseModule {
             context,
             GimyDatabase::class.java,
             "gimy_tv.db"
-        ).addMigrations(MIGRATION_1_2)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
          .fallbackToDestructiveMigration()
          .build()
     }

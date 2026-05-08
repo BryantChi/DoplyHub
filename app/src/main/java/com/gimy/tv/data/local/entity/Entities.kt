@@ -13,7 +13,9 @@ data class FavoriteEntity(
     val category: String,
     val year: Int,
     val status: String,
-    val addedAt: Long = System.currentTimeMillis()
+    val addedAt: Long = System.currentTimeMillis(),
+    /** v2.3.0+ : split adult records from main flow. Migrated rows default to false. */
+    val isAdult: Boolean = false,
 )
 
 @Entity(tableName = "watch_history")
@@ -28,7 +30,9 @@ data class WatchHistoryEntity(
     val sourceId: Int,
     val positionMs: Long,
     val durationMs: Long,
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    /** v2.3.0+ : split adult records from main flow. Migrated rows default to false. */
+    val isAdult: Boolean = false,
 )
 
 @Entity(tableName = "vod_cache")

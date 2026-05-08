@@ -52,11 +52,32 @@ fun AdultPlusScreen(
             onRefresh = { vm.refreshAll() },
             enabled = isAtTop,
         ) {
+            val history by vm.adultHistory.collectAsState()
+            val favorites by vm.adultFavorites.collectAsState()
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = dims.screenHorizontalPadding),
             ) {
+                if (history.isNotEmpty()) {
+                    item(key = "adult_history_row") {
+                        AdultStaticRow(
+                            title = "📜 我的觀看歷史",
+                            items = history,
+                            onItemClick = { vod -> onVodClick(vod.sourceType, vod.id) },
+                        )
+                    }
+                }
+                if (favorites.isNotEmpty()) {
+                    item(key = "adult_favorites_row") {
+                        AdultStaticRow(
+                            title = "⭐ 我的收藏",
+                            items = favorites,
+                            onItemClick = { vod -> onVodClick(vod.sourceType, vod.id) },
+                        )
+                    }
+                }
                 items(vm.rows, key = { "${it.sourceType.name}_${it.key}" }) { row ->
                     AdultPlusRowSection(
                         row = row,
@@ -133,6 +154,45 @@ private fun AdultPlusRowSection(
                         VodCard(vod = vod, onClick = { onItemClick(vod) })
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Lightweight static row used for "我的歷史 / 我的收藏" — no ViewModel state, just
+ *  a fixed Vod list. Same visual as AdultPlusRowSection but without loading/error logic. */
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun AdultStaticRow(
+    title: String,
+    items: List<com.gimy.tv.domain.model.Vod>,
+    onItemClick: (com.gimy.tv.domain.model.Vod) -> Unit,
+) {
+    val dims = LocalDimensions.current
+    Column(Modifier.padding(top = 20.dp)) {
+        Row(
+            Modifier.padding(start = dims.screenHorizontalPadding, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .width(3.dp).height(16.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(CinemaRed),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                title,
+                fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                color = CinemaTextPrimary, letterSpacing = 0.3.sp,
+            )
+        }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = dims.screenHorizontalPadding),
+            horizontalArrangement = Arrangement.spacedBy(dims.cardSpacing),
+        ) {
+            items(items, key = { "${it.sourceType}_${it.id}" }) { vod ->
+                VodCard(vod = vod, onClick = { onItemClick(vod) })
             }
         }
     }

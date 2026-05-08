@@ -7,11 +7,17 @@ import com.gimy.tv.data.scraper.JableTvSource
 import com.gimy.tv.data.scraper.XnxxSource
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
+import com.gimy.tv.domain.repository.FavoriteRepository
+import com.gimy.tv.domain.repository.WatchHistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
@@ -35,7 +41,26 @@ class AdultPlusViewModel @Inject constructor(
     private val jableSource: JableTvSource,
     private val xnxxSource: XnxxSource,
     private val forum5278Source: Forum5278Source,
+    watchHistoryRepository: WatchHistoryRepository,
+    favoriteRepository: FavoriteRepository,
 ) : ViewModel() {
+
+    /** Adult-only watch history surfaced inside AdultPlusScreen. Mapped to Vod
+     *  for UI reuse with VodCard. Episode-number suffix doubles as the status badge. */
+    val adultHistory: StateFlow<List<Vod>> = watchHistoryRepository.getRecentAdultHistory(20)
+        .map { entries ->
+            entries.map { e ->
+                Vod(
+                    id = e.vodId, sourceType = e.sourceType, title = e.title,
+                    coverUrl = e.coverUrl, category = "", year = 0,
+                    status = "第${e.episodeNum}集",
+                )
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val adultFavorites: StateFlow<List<Vod>> = favoriteRepository.getAdultFavorites()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Curated row list. Each row fans out to one source. The order intentionally
      *  alternates jable / xnxx so the user sees variety scrolling vertically. */

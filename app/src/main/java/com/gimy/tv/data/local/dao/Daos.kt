@@ -6,8 +6,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FavoriteDao {
-    @Query("SELECT * FROM favorites ORDER BY addedAt DESC")
+    @Query("SELECT * FROM favorites WHERE isAdult = 0 ORDER BY addedAt DESC")
     fun getAll(): Flow<List<FavoriteEntity>>
+
+    /** Adult-only listing — surfaced inside the 18+ zone, never on the main FavoritesScreen. */
+    @Query("SELECT * FROM favorites WHERE isAdult = 1 ORDER BY addedAt DESC")
+    fun getAllAdult(): Flow<List<FavoriteEntity>>
 
     @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE vodId = :vodId AND sourceType = :sourceType)")
     fun isFavorite(vodId: Long, sourceType: String): Flow<Boolean>
@@ -21,11 +25,18 @@ interface FavoriteDao {
 
 @Dao
 interface WatchHistoryDao {
-    @Query("SELECT * FROM watch_history ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM watch_history WHERE isAdult = 0 ORDER BY updatedAt DESC")
     fun getAll(): Flow<List<WatchHistoryEntity>>
 
-    @Query("SELECT * FROM watch_history ORDER BY updatedAt DESC LIMIT :limit")
+    @Query("SELECT * FROM watch_history WHERE isAdult = 0 ORDER BY updatedAt DESC LIMIT :limit")
     fun getRecent(limit: Int): Flow<List<WatchHistoryEntity>>
+
+    /** Adult-only history — surfaced inside the 18+ zone only. */
+    @Query("SELECT * FROM watch_history WHERE isAdult = 1 ORDER BY updatedAt DESC")
+    fun getAllAdult(): Flow<List<WatchHistoryEntity>>
+
+    @Query("SELECT * FROM watch_history WHERE isAdult = 1 ORDER BY updatedAt DESC LIMIT :limit")
+    fun getRecentAdult(limit: Int): Flow<List<WatchHistoryEntity>>
 
     @Query("SELECT * FROM watch_history WHERE vodId = :vodId AND sourceType = :sourceType LIMIT 1")
     suspend fun getByVod(vodId: Long, sourceType: String): WatchHistoryEntity?
@@ -41,6 +52,9 @@ interface WatchHistoryDao {
 
     @Query("DELETE FROM watch_history")
     suspend fun deleteAll()
+
+    @Query("DELETE FROM watch_history WHERE isAdult = 1")
+    suspend fun deleteAllAdult()
 }
 
 @Dao
