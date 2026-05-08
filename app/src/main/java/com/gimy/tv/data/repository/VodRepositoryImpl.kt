@@ -44,6 +44,52 @@ class VodRepositoryImpl @Inject constructor(
     @Volatile private var movieffmHomeCacheTime: Long = 0L
     private val homeCacheTtlMs = 5 * 60 * 1000L // 5 minutes
 
+    // Search/detail caches: 60s TTL; LRU-evicted by capacity. Memory-only — they exist to
+    // dedupe rapid repeat queries (e.g. switching source chips on the search page) so we
+    // don't fan out 8 sources for a question we just answered.
+    private val searchCacheTtlMs = 60 * 1000L
+    private val searchCacheCapacity = 10
+    private val detailCacheTtlMs = 60 * 1000L
+    private val detailCacheCapacity = 20
+
+    private data class SearchCacheEntry(val result: PaginatedResult<Vod>, val timestamp: Long)
+    private data class DetailCacheEntry(val detail: VodDetail, val timestamp: Long)
+
+    private val searchCache: LinkedHashMap<String, SearchCacheEntry> =
+        LinkedHashMap(searchCacheCapacity, 0.75f, /* accessOrder = */ true)
+    private val detailCache: LinkedHashMap<String, DetailCacheEntry> =
+        LinkedHashMap(detailCacheCapacity, 0.75f, true)
+
+    private fun searchCacheGet(key: String): PaginatedResult<Vod>? = synchronized(searchCache) {
+        val entry = searchCache[key] ?: return null
+        if (System.currentTimeMillis() - entry.timestamp > searchCacheTtlMs) {
+            searchCache.remove(key); return null
+        }
+        entry.result
+    }
+
+    private fun searchCachePut(key: String, result: PaginatedResult<Vod>) = synchronized(searchCache) {
+        searchCache[key] = SearchCacheEntry(result, System.currentTimeMillis())
+        while (searchCache.size > searchCacheCapacity) {
+            val it = searchCache.entries.iterator(); it.next(); it.remove()
+        }
+    }
+
+    private fun detailCacheGet(key: String): VodDetail? = synchronized(detailCache) {
+        val entry = detailCache[key] ?: return null
+        if (System.currentTimeMillis() - entry.timestamp > detailCacheTtlMs) {
+            detailCache.remove(key); return null
+        }
+        entry.detail
+    }
+
+    private fun detailCachePut(key: String, detail: VodDetail) = synchronized(detailCache) {
+        detailCache[key] = DetailCacheEntry(detail, System.currentTimeMillis())
+        while (detailCache.size > detailCacheCapacity) {
+            val it = detailCache.entries.iterator(); it.next(); it.remove()
+        }
+    }
+
     private fun getSource(sourceType: SourceType): SiteSource = when (sourceType) {
         SourceType.GIMYMAX -> gimyMaxSource
         SourceType.GIMYTV -> gimyTvSource
@@ -97,35 +143,54 @@ class VodRepositoryImpl @Inject constructor(
 
     // ── Cross-source search ──
 
-    override suspend fun searchAllSources(keyword: String, page: Int): PaginatedResult<Vod> =
-        coroutineScope {
-            val gimyDeferred = async {
-                try {
-                    withTimeout(8000) { gimyTvSource.search(keyword, page) }
-                } catch (_: Exception) {
-                    PaginatedResult(emptyList(), page, 0, false)
+    /** Search across all 8 sources in parallel. Order = display priority (stability/popularity).
+     *  Each source has its own 5s timeout — slow/failing sources don't block fast ones. */
+    private val searchOrder: List<SiteSource> get() = listOf(
+        gimyTvSource, gimyMaxSource, imapleTvSource, gimyTwSource,
+        eynyTvSource, momovodSource, kubo123Source, movieffmSource,
+    )
+
+    /** Best-effort adult-content filter for non-18+ paths.
+     *  Phase 4 will upgrade this to a precise per-source typeId match (Vod model needs typeId field).
+     *  Until then, fall back to category/title string heuristics — covers the common cases
+     *  (倫理片 / 情色 / 成人) without needing the scrapers to expose typeId. */
+    private fun looksAdult(vod: Vod): Boolean {
+        val cat = vod.category
+        val title = vod.title
+        return cat.contains("倫理") || cat.contains("情色") || cat.contains("成人") ||
+            title.contains("成人") || title.contains("18+")
+    }
+
+    override suspend fun searchAllSources(keyword: String, page: Int): PaginatedResult<Vod> {
+        val cacheKey = "$keyword|$page"
+        searchCacheGet(cacheKey)?.let { return it }
+
+        val result = coroutineScope {
+            val deferreds = searchOrder.map { src ->
+                async {
+                    try {
+                        withTimeout(5_000) { src.search(keyword, page) }
+                    } catch (_: Exception) {
+                        PaginatedResult(emptyList<Vod>(), page, 0, false)
+                    }
                 }
             }
-            val ffmDeferred = async {
-                try {
-                    withTimeout(8000) { movieffmSource.search(keyword, page) }
-                } catch (_: Exception) {
-                    PaginatedResult(emptyList(), page, 0, false)
-                }
-            }
+            val results = deferreds.map { it.await() }
 
-            val gimyResult = gimyDeferred.await()
-            val ffmResult = ffmDeferred.await()
-
-            val merged = mergeSearchResults(gimyResult.items, ffmResult.items)
+            // Merge in priority order, dedupe across sources, drop adult content
+            var merged = emptyList<Vod>()
+            for (r in results) merged = mergeSearchResults(merged, r.items.filterNot { looksAdult(it) })
 
             PaginatedResult(
                 items = merged,
                 currentPage = page,
-                totalPages = maxOf(gimyResult.totalPages, ffmResult.totalPages),
-                hasMore = gimyResult.hasMore || ffmResult.hasMore
+                totalPages = results.maxOfOrNull { it.totalPages } ?: 0,
+                hasMore = results.any { it.hasMore },
             )
         }
+        searchCachePut(cacheKey, result)
+        return result
+    }
 
     private fun mergeSearchResults(primary: List<Vod>, secondary: List<Vod>): List<Vod> {
         val result = primary.toMutableList()
@@ -172,29 +237,23 @@ class VodRepositoryImpl @Inject constructor(
             (candidateBase.length >= 3 && baseTitle.contains(candidateBase))
     }
 
-    /** Search BOTH sources for same-series items in parallel */
+    /** Search ALL 8 sources in parallel for same-series items. Each source has its own 4s timeout. */
     override suspend fun searchSeriesVods(vod: Vod): List<Vod> {
         val baseTitle = extractSeriesBase(vod.title)
         if (baseTitle.isBlank() || baseTitle.length < 2) return emptyList()
 
         return coroutineScope {
-            val primaryDeferred = async {
-                try {
-                    withTimeout(4000) {
-                        getSource(vod.sourceType).search(baseTitle, 1).items
-                    }
-                } catch (_: Exception) { emptyList() }
+            val deferreds = searchOrder.map { src ->
+                async {
+                    try {
+                        withTimeout(4_000) { src.search(baseTitle, 1).items }
+                    } catch (_: Exception) { emptyList<Vod>() }
+                }
             }
-            val secondaryDeferred = async {
-                try {
-                    withTimeout(4000) {
-                        val altSource = if (vod.sourceType == SourceType.MOVIEFFM) gimyTvSource else movieffmSource
-                        altSource.search(baseTitle, 1).items
-                    }
-                } catch (_: Exception) { emptyList() }
-            }
-            val allResults = mergeSearchResults(primaryDeferred.await(), secondaryDeferred.await())
-            allResults.filter { isSameSeries(baseTitle, it, vod.id) }
+            // Merge results in priority order, drop adult content
+            var all = emptyList<Vod>()
+            for (d in deferreds) all = mergeSearchResults(all, d.await().filterNot { looksAdult(it) })
+            all.filter { isSameSeries(baseTitle, it, vod.id) }
         }
     }
 
@@ -206,92 +265,109 @@ class VodRepositoryImpl @Inject constructor(
 
     // ── Enriched detail with cross-source episode groups ──
 
-    override suspend fun getEnrichedVodDetail(sourceType: SourceType, vodId: Long, cachedPrimary: VodDetail?): VodDetail =
-        coroutineScope {
-            // Reuse cached primary if provided, otherwise fetch
+    override suspend fun getEnrichedVodDetail(sourceType: SourceType, vodId: Long, cachedPrimary: VodDetail?): VodDetail {
+        val cacheKey = "${sourceType.name}|$vodId"
+        // Cache hit returns the fully-enriched (8-source merged) detail — skips re-querying 7 sources.
+        // Caller's `cachedPrimary` is only the primary-source detail, so prefer our richer cache.
+        detailCacheGet(cacheKey)?.let { return it }
+
+        return coroutineScope {
+            // Reuse caller-provided primary if present, otherwise fetch
             val primaryDetail = cachedPrimary ?: getSource(sourceType).fetchVodDetail(vodId)
+            val primaryTitle = primaryDetail.vod.title
+            val primaryYear = primaryDetail.vod.year
+            val normalizedPrimary = normalizeTitle(primaryTitle)
 
-            // Secondary source: best-effort, search by title
-            val secondaryDeferred = async {
-                try {
-                    withTimeout(8000) {
-                        val altSource = if (sourceType == SourceType.MOVIEFFM) gimyTvSource else movieffmSource
-                        val searchResult = altSource.search(primaryDetail.vod.title, 1)
-
-                        // Find best title match
-                        val match = searchResult.items.firstOrNull {
-                            normalizeTitle(it.title) == normalizeTitle(primaryDetail.vod.title)
-                        } ?: return@withTimeout null
-
-                        altSource.fetchVodDetail(match.id)
-                    }
-                } catch (_: Exception) {
-                    null
+            // Query the other 7 sources in parallel for same title (+ year if available).
+            // Each source has its own 5s timeout — slow/failing sources don't block the rest.
+            val otherSources = searchOrder.filter { it.sourceType != sourceType }
+            val matchedDetails = otherSources.map { src ->
+                async {
+                    try {
+                        withTimeout(5_000) {
+                            val results = src.search(primaryTitle, 1).items
+                            val match = results.firstOrNull {
+                                !looksAdult(it) &&
+                                    normalizeTitle(it.title) == normalizedPrimary &&
+                                    (primaryYear == 0 || it.year == 0 || it.year == primaryYear)
+                            } ?: return@withTimeout null
+                            src.fetchVodDetail(match.id)
+                        }
+                    } catch (_: Exception) { null }
                 }
+            }.mapNotNull { it.await() }
+
+            if (matchedDetails.isEmpty()) {
+                detailCachePut(cacheKey, primaryDetail)
+                return@coroutineScope primaryDetail
             }
 
-            val secondaryDetail = secondaryDeferred.await()
-
-            if (secondaryDetail != null) {
-                // Merge episode groups: primary first, then secondary with source prefix
-                val altSourceName = secondaryDetail.vod.sourceType.displayName
-                val secondaryGroups = secondaryDetail.episodes.map { group ->
+            // Merge episode groups: primary first, then each matched secondary with source prefix
+            val secondaryGroups = matchedDetails.flatMap { detail ->
+                val displayName = detail.vod.sourceType.displayName
+                detail.episodes.map { group ->
                     group.copy(
-                        sourceName = "[$altSourceName] ${group.sourceName}",
-                        sourceId = -(group.sourceId + 1000)
+                        sourceName = "[$displayName] ${group.sourceName}",
+                        sourceId = -(detail.vod.sourceType.ordinal * 100 + group.sourceId + 1)
                     )
                 }
-
-                // Rank all groups by quality
-                val allGroups = rankEpisodeGroups(primaryDetail.episodes + secondaryGroups)
-
-                // Merge series vods from both sources (scraped only — search is done separately)
-                val mergedSeries = mergeSearchResults(
-                    primaryDetail.seriesVods, secondaryDetail.seriesVods
-                )
-
-                // Merge related vods from both sources (primary first, deduplicate)
-                val mergedRelated = mergeSearchResults(
-                    primaryDetail.relatedVods, secondaryDetail.relatedVods
-                )
-
-                // Remove series items from related to avoid duplication
-                val seriesIds = mergedSeries.map { it.id }.toSet()
-                val filteredRelated = mergedRelated.filter { it.id !in seriesIds }
-
-                primaryDetail.copy(
-                    episodes = allGroups,
-                    seriesVods = mergedSeries,
-                    relatedVods = filteredRelated
-                )
-            } else {
-                primaryDetail
             }
+            val allGroups = rankEpisodeGroups(primaryDetail.episodes + secondaryGroups)
+
+            // Merge series + related from all sources (priority order, dedupe by title, drop adult)
+            var mergedSeries = primaryDetail.seriesVods.filterNot { looksAdult(it) }
+            var mergedRelated = primaryDetail.relatedVods.filterNot { looksAdult(it) }
+            for (d in matchedDetails) {
+                mergedSeries = mergeSearchResults(mergedSeries, d.seriesVods.filterNot { looksAdult(it) })
+                mergedRelated = mergeSearchResults(mergedRelated, d.relatedVods.filterNot { looksAdult(it) })
+            }
+            // Remove series items from related to avoid duplication
+            val seriesIds = mergedSeries.map { it.id }.toSet()
+            val filteredRelated = mergedRelated.filter { it.id !in seriesIds }
+
+            primaryDetail.copy(
+                episodes = allGroups,
+                seriesVods = mergedSeries,
+                relatedVods = filteredRelated,
+            ).also { detailCachePut(cacheKey, it) }
         }
+    }
 
     // ── Quality-based episode group ranking ──
 
     /**
-     * Rank episode groups by quality/stability.
-     * Priority: gimymax top stable > movieffm direct m3u8 > gimymax secondary > unknown
+     * Rank episode groups by quality/stability across all 8 sources.
+     *
+     * Tiers (lower = preferred):
+     *   1A. GimyMax/GimyTv top stable (順暢/無盡/極速/高清, no 雲 suffix) — historically most reliable
+     *   1B. New MacCMS site lines (卧龍雲/索尼雲/...) — m3u8 direct, no encryption
+     *   2.  Movieffm direct sources
+     *   3.  GimyMax/GimyTv secondary (騰訊/藍光/4K/優質/非凡)
+     *   4.  Unknown
+     *
+     * The `!name.contains("雲")` guard prevents 「無盡雲」from matching gimyTop's「無盡」tag.
      */
     private fun rankEpisodeGroups(groups: List<EpisodeGroup>): List<EpisodeGroup> {
         val gimyTopSources = listOf("順暢", "無盡", "極速", "高清")
+        val newSiteTopSources = listOf("卧龍雲", "索尼雲", "無盡雲", "閃電雲", "極速雲", "優質雲")
         val gimySecondary = listOf("騰訊", "藍光", "4K", "優質", "非凡")
 
         return groups.sortedWith(compareBy { group ->
             val name = group.sourceName
             when {
-                // Tier 1: gimymax top stable sources (0-3)
-                gimyTopSources.any { name.contains(it) } ->
+                // Tier 1A: GimyMax/GimyTv top stable (0-3)
+                !name.contains("雲") && gimyTopSources.any { name.contains(it) } ->
                     gimyTopSources.indexOfFirst { name.contains(it) }
-                // Tier 2: movieffm direct sources (10-19)
+                // Tier 1B: new MacCMS site lines (4-9)
+                newSiteTopSources.any { name.contains(it) } ->
+                    4 + newSiteTopSources.indexOfFirst { name.contains(it) }
+                // Tier 2: Movieffm direct (15-24)
                 name.contains("MovieFFM") || (group.sourceId >= 1000 && group.sourceId > 0) ->
-                    10 + (group.sourceId % 10)
-                // Tier 3: gimymax secondary sources (20-28)
-                gimySecondary.any { name.contains(it) } ->
-                    20 + gimySecondary.indexOfFirst { name.contains(it) }
-                // Tier 4: unknown (99)
+                    15 + (group.sourceId % 10)
+                // Tier 3: GimyMax/GimyTv secondary (25-29)
+                !name.contains("雲") && gimySecondary.any { name.contains(it) } ->
+                    25 + gimySecondary.indexOfFirst { name.contains(it) }
+                // Tier 4: unknown
                 else -> 99
             }
         })
