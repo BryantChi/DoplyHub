@@ -75,19 +75,29 @@ class XnxxSource @Inject constructor(
                 title in setOf("Video", "視頻", "视频", "影片", "加載中", "Loading"))
                 continue
 
-            // Cover. Two-strategy lookup — XNXX templates vary slightly by locale:
-            //   1) data-video JSON attribute on .thumb-block carries sfwThumbUrl (most reliable)
-            //   2) <img data-src=...> on the thumb anchor (used when JSON is absent)
+            // Cover. Browser-equivalent strategy (verified against real listing HTML):
+            //   1) <img data-src=…/xn_NN_t.jpg> — what JS swaps in for src=blank.gif at runtime
+            //   2) <img data-sfwthumb> — fallback explicit attr if data-src missing
+            //   3) data-video JSON sfwThumbUrl (xv_5_t.jpg, an SFW icon variant)
+            // sfwThumbUrl was previously preferred but is the SFW preview, not the
+            // listing thumb — switching to data-src restores the actual cover image.
             val cover = run {
+                block.selectFirst("img")?.let { img ->
+                    val candidates = listOf(
+                        img.attr("data-src"),
+                        img.attr("data-sfwthumb"),
+                        img.attr("data-original"),
+                        img.attr("src"),
+                    )
+                    val pick = candidates.firstOrNull { it.isNotBlank() && !it.contains("blank.gif") }
+                    if (!pick.isNullOrBlank()) return@run pick
+                }
                 val dataVideo = block.attr("data-video")
                 if (dataVideo.isNotBlank()) {
                     val m = Regex("\"sfwThumbUrl\"\\s*:\\s*\"([^\"]+)\"").find(dataVideo)
                     if (m != null) return@run m.groupValues[1].replace("\\/", "/")
                 }
-                block.selectFirst("img")?.let { img ->
-                    listOf(img.attr("data-src"), img.attr("data-original"), img.attr("src"))
-                        .firstOrNull { it.isNotBlank() && !it.contains("blank.gif") }
-                }.orEmpty()
+                ""
             }
 
             val id = stableId(key)
