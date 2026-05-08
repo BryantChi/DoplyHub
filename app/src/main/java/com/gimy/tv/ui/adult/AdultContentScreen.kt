@@ -91,6 +91,21 @@ fun AdultContentScreen(
             }
             val rowState by vm.rowFor(current).collectAsState()
 
+            // Infinite scroll: when within 4 items of the bottom and we know there's more, fetch next page.
+            // Re-keyed on `current.key` so switching tabs doesn't cross-trigger the previous tab's loadMore.
+            LaunchedEffect(gridState, current.key) {
+                snapshotFlow {
+                    val info = gridState.layoutInfo
+                    val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+                    val total = info.totalItemsCount
+                    lastVisible to total
+                }.collect { (lastVisible, total) ->
+                    if (total > 0 && lastVisible >= total - 4) {
+                        vm.loadMore(current)
+                    }
+                }
+            }
+
             RefreshableContainer(
                 isRefreshing = rowState.loading && rowState.items.isNotEmpty(),
                 onRefresh = { vm.refreshTab(current) },
@@ -130,20 +145,34 @@ fun AdultContentScreen(
                         }
                     }
                     else -> {
-                        LazyVerticalGrid(
-                            columns = GridCells.Adaptive(dims.gridMinCellWidth),
-                            state = gridState,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            contentPadding = PaddingValues(
-                                start = dims.screenHorizontalPadding,
-                                end = dims.screenHorizontalPadding,
-                                bottom = 24.dp,
-                            ),
-                            modifier = Modifier.fillMaxSize(),
-                        ) {
-                            items(rowState.items, key = { "${it.sourceType}_${it.id}" }) { vod ->
-                                VodCard(vod, onClick = { onVodClick(vod.sourceType, vod.id) })
+                        Column(Modifier.fillMaxSize()) {
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(dims.gridMinCellWidth),
+                                state = gridState,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                contentPadding = PaddingValues(
+                                    start = dims.screenHorizontalPadding,
+                                    end = dims.screenHorizontalPadding,
+                                    bottom = 8.dp,
+                                ),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                items(rowState.items, key = { "${it.sourceType}_${it.id}" }) { vod ->
+                                    VodCard(vod, onClick = { onVodClick(vod.sourceType, vod.id) })
+                                }
+                            }
+                            // Bottom: loading-more spinner OR "all shown" indicator
+                            when {
+                                rowState.loadingMore -> Box(
+                                    Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) { DoplyLoadingIndicator(28.dp) }
+                                !rowState.hasMore -> Box(
+                                    Modifier.fillMaxWidth().padding(vertical = 14.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) { Text("已顯示全部 ${rowState.items.size} 部",
+                                    color = CinemaTextMuted.copy(0.6f), fontSize = 12.sp) }
                             }
                         }
                     }
