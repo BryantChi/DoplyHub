@@ -18,26 +18,38 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gimy.tv.data.update.UpdateState
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.DoplyButton
+import com.gimy.tv.ui.components.PinInputDialog
 import com.gimy.tv.ui.favorites.PageHeader
 import com.gimy.tv.ui.theme.*
 import com.gimy.tv.ui.update.UpdateViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
     vm: UpdateViewModel = hiltViewModel(),
     settingsVm: SettingsViewModel = hiltViewModel(),
+    adultVm: AdultContentViewModel = hiltViewModel(),
 ) {
     val dims = LocalDimensions.current
     val ctx = LocalContext.current
     val state by vm.state.collectAsState()
     val versionName = remember { currentVersionName(ctx) }
     val enabledSources by settingsVm.enabledSources.collectAsState()
+    val adultEnabled by adultVm.enabled.collectAsState()
+    val pinRequired by adultVm.pinRequired.collectAsState()
+    val pinHash by adultVm.pinHash.collectAsState()
+    var showSetPinDialog by remember { mutableStateOf(false) }
+    var showResetConfirm by remember { mutableStateOf(false) }
+    var pinSetupStep by remember { mutableStateOf(0) }       // 0 = entering, 1 = confirming
+    var firstPin by remember { mutableStateOf("") }
+    var pinErrorMsg by remember { mutableStateOf<String?>(null) }
 
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
@@ -103,6 +115,133 @@ fun SettingsScreen(
                             },
                         )
                     }
+                }
+            }
+
+            item {
+                SettingSection(title = "成人內容") {
+                    Text(
+                        "啟用後可在「分類瀏覽」存取 18+ 區。建議搭配 PIN 鎖避免家人誤觸。",
+                        color = CinemaTextMuted, fontSize = 12.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    SourceToggleRow(
+                        label = "顯示成人內容",
+                        enabled = adultEnabled,
+                        isPrimary = false,
+                        onToggle = { adultVm.setEnabled(it) },
+                    )
+                    if (adultEnabled) {
+                        SourceToggleRow(
+                            label = "啟用 PIN 鎖",
+                            enabled = pinRequired && pinHash != null,
+                            isPrimary = false,
+                            onToggle = { newValue ->
+                                if (newValue) {
+                                    if (pinHash == null) {
+                                        // Need to set a PIN first; opening the dialog will save+enable on completion
+                                        firstPin = ""
+                                        pinSetupStep = 0
+                                        pinErrorMsg = null
+                                        showSetPinDialog = true
+                                    } else {
+                                        adultVm.setPinRequired(true)
+                                    }
+                                } else {
+                                    adultVm.setPinRequired(false)
+                                    adultVm.clearPin()
+                                }
+                            },
+                        )
+                        if (pinHash != null) {
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                DoplyButton(
+                                    onClick = {
+                                        firstPin = ""
+                                        pinSetupStep = 0
+                                        pinErrorMsg = null
+                                        showSetPinDialog = true
+                                    },
+                                    containerColor = CinemaSurface,
+                                    shape = RoundedCornerShape(6.dp),
+                                ) { Text("變更 PIN", color = CinemaTextPrimary, fontSize = 12.sp) }
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        DoplyButton(
+                            onClick = { showResetConfirm = true },
+                            containerColor = CinemaSurface,
+                            shape = RoundedCornerShape(6.dp),
+                        ) { Text("重置成人內容設定", color = CinemaRed, fontSize = 12.sp) }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showSetPinDialog) {
+        PinInputDialog(
+            title = if (pinSetupStep == 0) "設定 PIN" else "確認 PIN",
+            subtitle = if (pinSetupStep == 0) "請輸入 4 位數字" else "再次輸入相同的 4 位數字",
+            failureMessage = pinErrorMsg,
+            onPinComplete = { input ->
+                if (pinSetupStep == 0) {
+                    firstPin = input
+                    pinSetupStep = 1
+                    pinErrorMsg = null
+                } else {
+                    if (input == firstPin) {
+                        adultVm.savePin(input)
+                        adultVm.setPinRequired(true)
+                        showSetPinDialog = false
+                        firstPin = ""
+                        pinSetupStep = 0
+                        pinErrorMsg = null
+                    } else {
+                        pinErrorMsg = "兩次輸入不一致，請從頭再來"
+                        firstPin = ""
+                        pinSetupStep = 0
+                    }
+                }
+            },
+            onDismiss = {
+                showSetPinDialog = false
+                firstPin = ""
+                pinSetupStep = 0
+                pinErrorMsg = null
+            },
+        )
+    }
+
+    if (showResetConfirm) {
+        Dialog(onDismissRequest = { showResetConfirm = false }) {
+            Column(
+                Modifier
+                    .background(CinemaCard, RoundedCornerShape(12.dp))
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("重置成人內容設定？", color = CinemaTextPrimary, fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(10.dp))
+                Text("會清空 PIN 與所有成人內容偏好，恢復為預設關閉狀態。",
+                    color = CinemaTextMuted, fontSize = 12.sp)
+                Spacer(Modifier.height(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DoplyButton(
+                        onClick = { showResetConfirm = false },
+                        containerColor = CinemaSurface,
+                        shape = RoundedCornerShape(6.dp),
+                    ) { Text("取消", color = CinemaTextPrimary, fontSize = 13.sp) }
+                    DoplyButton(
+                        onClick = {
+                            adultVm.resetAll()
+                            showResetConfirm = false
+                        },
+                        containerColor = CinemaRed,
+                        shape = RoundedCornerShape(6.dp),
+                    ) { Text("確認重置", color = Color.White, fontSize = 13.sp) }
                 }
             }
         }

@@ -123,7 +123,19 @@ class MainActivity : ComponentActivity() {
                                 navController.navigate(
                                     Screen.Browse.createRoute(sourceType, typeId)
                                 )
-                            }
+                            },
+                            onAdultZoneClick = { navController.navigate(Screen.AdultZone.route) },
+                        )
+                    }
+
+                    composable(Screen.AdultZone.route) {
+                        com.gimy.tv.ui.adult.AdultContentScreen(
+                            onVodClick = { sourceType, vodId ->
+                                navController.navigate(
+                                    Screen.Detail.createRoute(sourceType.name, vodId)
+                                )
+                            },
+                            onBack = { navController.popBackStack() },
                         )
                     }
 
