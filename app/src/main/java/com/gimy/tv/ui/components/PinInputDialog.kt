@@ -110,8 +110,15 @@ fun PinInputDialog(
                                             "⌫" -> if (pin.isNotEmpty()) pin = pin.dropLast(1)
                                             else -> if (pin.length < 4) {
                                                 val next = pin + label
-                                                pin = next
-                                                if (next.length == 4) onPinComplete(next)
+                                                if (next.length == 4) {
+                                                    // Reset internal state BEFORE notifying caller — otherwise
+                                                    // a multi-step flow (set PIN → confirm PIN) starts step 2
+                                                    // with pin already at 4 chars, blocking new input.
+                                                    pin = ""
+                                                    onPinComplete(next)
+                                                } else {
+                                                    pin = next
+                                                }
                                             }
                                         }
                                     },
