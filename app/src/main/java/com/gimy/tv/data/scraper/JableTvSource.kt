@@ -40,6 +40,19 @@ class JableTvSource @Inject constructor(
         return if (page <= 1) "$baseUrl$baseUrlPath" else "$baseUrl$baseUrlPath?from=$page"
     }
 
+    /**
+     * Jable's Bootstrap pagination doesn't render a `下一頁/Next/rel=next` anchor —
+     * it lists numeric page-links plus a "最後 »" jump. Each `.page-link` carries
+     * `data-parameters="sort_by:…;from:N"`; the largest N is the last page.
+     */
+    override fun parseMaxPage(doc: Document): Int? {
+        val fromRegex = Regex("from:(\\d+)")
+        val max = doc.select(".pagination a.page-link[data-parameters]")
+            .mapNotNull { fromRegex.find(it.attr("data-parameters"))?.groupValues?.get(1)?.toIntOrNull() }
+            .maxOrNull()
+        return max?.takeIf { it > 0 }
+    }
+
     override fun parseListCards(doc: Document): List<Vod> {
         // Jable cards split title and cover across TWO anchors per video:
         //   1. thumb anchor — wraps <img> + <span class="label">2:17:00</span>

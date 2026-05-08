@@ -83,12 +83,21 @@ abstract class EmbeddedHlsSource(
     override suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod> =
         PaginatedResult(emptyList(), page, 0, false)
 
+    /**
+     * Subclasses may override to compute the maximum page number from a list-page
+     * Document (e.g. Jable's Bootstrap pagination uses `.page-link[data-parameters="…from:N"]`).
+     * Returning a positive value short-circuits the generic next-link selector below.
+     */
+    protected open fun parseMaxPage(doc: Document): Int? = null
+
     /** Path-based list fetch — AdultPlusScreen calls this directly with row-specific paths. */
     suspend fun fetchVodListByPath(path: String, page: Int): PaginatedResult<Vod> =
         withContext(Dispatchers.IO) {
             val doc = fetchDocument(buildListUrlForPath(path, page))
             val items = parseListCards(doc)
-            val hasNext = doc.select("a:contains(下一頁), a:contains(Next), a.next, a[rel=next]").isNotEmpty()
+            val maxPage = parseMaxPage(doc)
+            val hasNext = if (maxPage != null) maxPage > page
+                else doc.select("a:contains(下一頁), a:contains(Next), a.next, a[rel=next]").isNotEmpty()
             PaginatedResult(items, page, if (hasNext) page + 1 else page, hasNext)
         }
 
