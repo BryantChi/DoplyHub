@@ -110,6 +110,7 @@ class MainActivity : ComponentActivity() {
                             onBrowseClick = { sourceType, typeId ->
                                 navController.navigate(Screen.Browse.createRoute(sourceType.name, typeId))
                             },
+                            onCategoriesClick = { navController.navigate(Screen.Categories.route) },
                             onFavoritesClick = { navController.navigate(Screen.Favorites.route) },
                             onHistoryClick = { navController.navigate(Screen.History.route) },
                             onSettingsClick = { navController.navigate(Screen.Settings.route) },

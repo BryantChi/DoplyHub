@@ -171,8 +171,17 @@ fun AdultContentScreen(
                                 !rowState.hasMore -> Box(
                                     Modifier.fillMaxWidth().padding(vertical = 14.dp),
                                     contentAlignment = Alignment.Center,
-                                ) { Text("已顯示全部 ${rowState.items.size} 部",
-                                    color = CinemaTextMuted.copy(0.6f), fontSize = 12.sp) }
+                                ) {
+                                    // gimy.tw 39 (露骨) is a known dead-end: server returns the
+                                    // same first page for every paginated URL pattern. We tell the
+                                    // user the site itself is the bottleneck, not the App.
+                                    val text = if (current.sourceType == SourceType.GIMY_TW && current.typeId == 39) {
+                                        "已顯示全部 ${rowState.items.size} 部（此分類站方資料有限）"
+                                    } else {
+                                        "已顯示全部 ${rowState.items.size} 部"
+                                    }
+                                    Text(text, color = CinemaTextMuted.copy(0.6f), fontSize = 12.sp)
+                                }
                             }
                         }
                     }

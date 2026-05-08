@@ -57,6 +57,7 @@ fun HomeScreen(
     onVodClick: (SourceType, Long) -> Unit,
     onSearchClick: () -> Unit,
     onBrowseClick: (SourceType, Int) -> Unit,
+    onCategoriesClick: () -> Unit,
     onFavoritesClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -95,7 +96,7 @@ fun HomeScreen(
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = dims.screenHorizontalPadding)) {
                     // ── Top bar ──
                     if (isTV) {
-                        item { TopBar(onSearchClick, onFavoritesClick, onHistoryClick, onSettingsClick, uiState.isRefreshing) { viewModel.refresh() } }
+                        item { TopBar(onSearchClick, onCategoriesClick, onFavoritesClick, onHistoryClick, onSettingsClick, uiState.isRefreshing) { viewModel.refresh() } }
                     } else {
                         item { LogoBrand() }
                     }
@@ -179,6 +180,7 @@ private fun LogoBrand() {
 @Composable
 private fun TopBar(
     onSearch: () -> Unit,
+    onCategories: () -> Unit,
     onFav: () -> Unit,
     onHistory: () -> Unit,
     onSettings: () -> Unit,
@@ -201,6 +203,7 @@ private fun TopBar(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             NavChip("搜尋", onSearch)
+            NavChip("分類", onCategories)
             NavChip("收藏", onFav)
             NavChip("歷史", onHistory)
             NavChip("設定", onSettings)
