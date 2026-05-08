@@ -13,9 +13,7 @@ class MomovodSource @Inject constructor(
     override val sourceType = SourceType.MOMOVOD
     override val detailUrlPath = "/vod"
     override val playUrlPath = "/play"
-
-    override fun buildListUrl(typeId: Int, page: Int): String =
-        "$baseUrl/show/$typeId--------$page---.html"
+    override val listUrlPath = "/type"   // momovod uses /type/{id}.html, not /vodtype/
 
     /** Path-based search: /search/{keyword}.html (verified 200 OK) */
     override fun buildSearchUrl(keyword: String, page: Int): String =

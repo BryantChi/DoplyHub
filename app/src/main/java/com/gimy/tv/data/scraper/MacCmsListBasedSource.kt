@@ -35,12 +35,20 @@ abstract class MacCmsListBasedSource(
     /** Play URL path: "/vodplay" (gimy.tw/eynytv/imaple) or "/play" (momovod/123kubo). */
     abstract val playUrlPath: String
 
+    /** List page URL prefix. "/vodtype" works on gimy.tw/eynytv/imaple, "/type" on momovod/123kubo.
+     *  We previously used MacCMS V10 vodshow format ("/vodshow/{id}--------{page}---.html"),
+     *  but that format silently strips the typeId on EynyTV / Gimy.tw / momovod / 123kubo —
+     *  every category row served unrelated "最新-推薦" content. The static path form is the
+     *  one all five sites consistently honor. */
+    protected open val listUrlPath: String = "/vodtype"
+
     /** Per-source typeId table. Default falls back to enum extension. */
     open val categoryMap: SiteCategoryMap get() = sourceType.categoryMap
 
-    /** List page URL. Default: MacCMS V10 vodshow format. */
+    /** List page URL: "{listUrlPath}/{typeId}.html" for page 1, "...-{page}.html" beyond. */
     protected open fun buildListUrl(typeId: Int, page: Int): String =
-        "$baseUrl/vodshow/$typeId--------$page---.html"
+        if (page <= 1) "$baseUrl$listUrlPath/$typeId.html"
+        else "$baseUrl$listUrlPath/$typeId-$page.html"
 
     /** Search URL. Default: form GET style with wd query param. */
     protected open fun buildSearchUrl(keyword: String, page: Int): String {
