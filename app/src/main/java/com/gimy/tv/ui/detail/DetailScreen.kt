@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import com.gimy.tv.ui.components.RefreshIconButton
@@ -29,6 +31,7 @@ import com.gimy.tv.domain.model.EpisodeGroup
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.domain.model.VodDetail
+import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.theme.*
 
@@ -76,8 +79,22 @@ fun DetailScreen(
             uiState.detail != null -> {
                 val d = uiState.detail ?: return
                 var srcIdx by remember { mutableIntStateOf(0) }
-                // Clamp srcIdx when episodes list changes (e.g. after enrichment)
-                val safeSrcIdx = if (d.episodes.isNotEmpty()) srcIdx.coerceIn(0, d.episodes.size - 1) else 0
+
+                // Cross-source filter (Phase 3.3): user can narrow episodes to a single source.
+                // Source labels are parsed from the [Prefix] in EpisodeGroup.sourceName that
+                // VodRepositoryImpl.getEnrichedVodDetail injects for secondary sources.
+                val primaryDisplayName = d.vod.sourceType.displayName
+                val sourceLabels = remember(d.episodes, primaryDisplayName) {
+                    d.episodes.map { extractGroupSource(it.sourceName, primaryDisplayName) }.distinct()
+                }
+                var selectedSourceLabel by remember(d.vod.id) { mutableStateOf<String?>(null) }
+                val filteredEpisodes = remember(d.episodes, selectedSourceLabel, primaryDisplayName) {
+                    if (selectedSourceLabel == null) d.episodes
+                    else d.episodes.filter { extractGroupSource(it.sourceName, primaryDisplayName) == selectedSourceLabel }
+                }
+                // Reset srcIdx when filter switches (so we don't point to a now-invisible group)
+                LaunchedEffect(selectedSourceLabel) { srcIdx = 0 }
+                val safeSrcIdx = if (filteredEpisodes.isNotEmpty()) srcIdx.coerceIn(0, filteredEpisodes.size - 1) else 0
 
                 // Background blur image with overlay gradient (single layer to reduce overdraw)
                 Box(Modifier.fillMaxWidth().height(if (isTV) 400.dp else 250.dp)) {
@@ -92,11 +109,18 @@ fun DetailScreen(
                     ))
                 }
 
+                val detailListState = rememberLazyListState()
+                val detailIsAtTop by remember {
+                    derivedStateOf {
+                        detailListState.firstVisibleItemIndex == 0 && detailListState.firstVisibleItemScrollOffset == 0
+                    }
+                }
                 RefreshableContainer(
                     isRefreshing = uiState.isRefreshing,
                     onRefresh = { viewModel.refresh() },
+                    enabled = detailIsAtTop,
                 ) {
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 48.dp)) {
+                LazyColumn(state = detailListState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 48.dp)) {
                     // ── Header ──
                     item {
                         if (isTV) {
@@ -156,15 +180,43 @@ fun DetailScreen(
                         }
                     }
 
+                    // ── Source filter (Phase 3.3) ──
+                    if (sourceLabels.size > 1) {
+                        item {
+                            Column(Modifier.padding(horizontal = dims.screenHorizontalPadding)) {
+                                Text("選擇來源", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Spacer(Modifier.height(8.dp))
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    item(key = "src_chip_all") {
+                                        DetailSourceChip(
+                                            label = "全部 ${d.episodes.size}",
+                                            selected = selectedSourceLabel == null,
+                                            onClick = { selectedSourceLabel = null },
+                                        )
+                                    }
+                                    items(sourceLabels, key = { "src_chip_$it" }) { lbl ->
+                                        val count = d.episodes.count { extractGroupSource(it.sourceName, primaryDisplayName) == lbl }
+                                        DetailSourceChip(
+                                            label = "$lbl $count",
+                                            selected = selectedSourceLabel == lbl,
+                                            onClick = { selectedSourceLabel = if (selectedSourceLabel == lbl) null else lbl },
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                        }
+                    }
+
                     // ── Source tabs ──
-                    if (d.episodes.size > 1) {
+                    if (filteredEpisodes.size > 1) {
                         item {
                             Column(Modifier.padding(horizontal = dims.screenHorizontalPadding)) {
                                 Text("播放線路", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.height(8.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    items(d.episodes.size) { i ->
-                                        val g = d.episodes[i]; val sel = i == safeSrcIdx
+                                    items(filteredEpisodes.size) { i ->
+                                        val g = filteredEpisodes[i]; val sel = i == safeSrcIdx
                                         val label = if (i == 0) "${g.sourceName} ★" else g.sourceName
                                         var f by remember { mutableStateOf(false) }
                                         if (isTV) {
@@ -197,8 +249,8 @@ fun DetailScreen(
                     }
 
                     // ── Episodes ──
-                    if (d.episodes.isNotEmpty()) {
-                        val grp = d.episodes[safeSrcIdx]
+                    if (filteredEpisodes.isNotEmpty()) {
+                        val grp = filteredEpisodes[safeSrcIdx]
                         item {
                             EpisodeGrid(grp, uiState.lastEpisode, dims.episodeColumns) { sId, ep ->
                                 onPlayClick(d.vod.sourceType.name, d.vod.id, sId, ep)
@@ -422,5 +474,49 @@ private fun EpisodeGrid(
             }
             Spacer(Modifier.height(5.dp))
         }
+    }
+}
+
+// ═══════════════════════════════════════
+// Cross-source filter (Phase 3.3)
+// ═══════════════════════════════════════
+
+/** Extract the owner source label from EpisodeGroup.sourceName.
+ *  Cross-source groups carry a "[SourceDisplayName] " prefix injected by
+ *  VodRepositoryImpl.getEnrichedVodDetail. Primary groups have no prefix —
+ *  for those we return the primary's own displayName so the chip can target them. */
+private fun extractGroupSource(sourceName: String, primaryDisplayName: String): String {
+    val match = Regex("^\\[([^\\]]+)\\]").find(sourceName)
+    return match?.groupValues?.get(1) ?: primaryDisplayName
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun DetailSourceChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val isTV = LocalIsTelevision.current
+    var f by remember { mutableStateOf(false) }
+    val container = when {
+        selected -> CinemaRed
+        f -> CinemaRed.copy(0.5f)
+        else -> CinemaSurface
+    }
+    if (isTV) {
+        Button(
+            onClick = onClick,
+            modifier = Modifier.onFocusChanged { f = it.isFocused },
+            shape = ButtonDefaults.shape(shape = RoundedCornerShape(20.dp)),
+            colors = ButtonDefaults.colors(containerColor = container, focusedContainerColor = CinemaRed),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+        ) { Text(label, color = Color.White, fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) }
+    } else {
+        androidx.compose.material3.Button(
+            onClick = onClick,
+            shape = RoundedCornerShape(20.dp),
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                containerColor = container, contentColor = Color.White),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+        ) { Text(label, color = Color.White, fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) }
     }
 }

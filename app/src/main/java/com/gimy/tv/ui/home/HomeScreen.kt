@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import androidx.compose.runtime.*
@@ -34,7 +35,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
 import coil.compose.AsyncImage
 import com.gimy.tv.domain.model.SourceType
+import com.gimy.tv.domain.model.StandardCategory
 import com.gimy.tv.domain.model.Vod
+import com.gimy.tv.domain.model.categoryMap
+import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.ExitConfirmHandler
 import com.gimy.tv.ui.components.RefreshIconButton
@@ -60,8 +64,17 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val enabledSources by viewModel.enabledSources.collectAsState()
     val dims = LocalDimensions.current
     val isTV = LocalIsTelevision.current
+    val listState = rememberLazyListState()
+    // Pull-to-refresh only enabled when the list is at the very top — avoids accidental
+    // refreshes triggered while scrolling within long content.
+    val isAtTop by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+        }
+    }
 
     ExitConfirmHandler(isPhone = isPhone)
 
@@ -77,8 +90,9 @@ fun HomeScreen(
                 RefreshableContainer(
                     isRefreshing = uiState.isRefreshing,
                     onRefresh = { viewModel.refresh() },
+                    enabled = isAtTop,
                 ) {
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = dims.screenHorizontalPadding)) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = dims.screenHorizontalPadding)) {
                     // ── Top bar ──
                     if (isTV) {
                         item { TopBar(onSearchClick, onFavoritesClick, onHistoryClick, onSettingsClick, uiState.isRefreshing) { viewModel.refresh() } }
@@ -115,6 +129,25 @@ fun HomeScreen(
                             onItemClick = { onVodClick(it.sourceType, it.id) },
                             onMoreClick = { onBrowseClick(row.sourceType, row.typeId) }
                         )
+                    }
+
+                    // ── More Sources (lazy-loaded; filtered by user-enabled set) ──
+                    val activeMoreSources = MORE_SOURCES.filter { it.first in enabledSources }
+                    if (activeMoreSources.isNotEmpty()) {
+                        item(key = "more_sources_header") { MoreSourcesHeader() }
+                    }
+                    items(activeMoreSources, key = { "more_${it.first.name}_${it.second.name}" }) { (source, cat) ->
+                        val typeId = source.categoryMap.typeIdFor(cat)
+                        if (typeId > 0) {
+                            MoreSourceRow(
+                                sourceType = source,
+                                typeId = typeId,
+                                title = "${source.displayName} · ${categoryDisplayName(cat)}",
+                                onItemClick = { onVodClick(it.sourceType, it.id) },
+                                onMoreClick = { onBrowseClick(source, typeId) },
+                                viewModel = viewModel,
+                            )
+                        }
                     }
                 }
                 }
@@ -458,6 +491,74 @@ private fun LoadingOverlay() {
             Text("正在載入…", color = CinemaTextMuted, fontSize = 14.sp)
         }
     }
+}
+
+// ═══════════════════════════════════════
+// More Sources (lazy-loaded MacCMS sites)
+// ═══════════════════════════════════════
+
+/** Configuration: which (source, category) combinations to surface as bonus rows.
+ *  Picks differentiated content per source: imaple's anime depth, momovod's chinese drama
+ *  pool, etc. Each row only fetches when LazyColumn composes it (= when user scrolls into view). */
+private val MORE_SOURCES: List<Pair<SourceType, StandardCategory>> = listOf(
+    SourceType.IMAPLE_TV to StandardCategory.ANIME,
+    SourceType.MOMOVOD to StandardCategory.CHINESE,
+    SourceType.KUBO123 to StandardCategory.KOREAN,
+    SourceType.GIMY_TW to StandardCategory.CHINESE,
+    SourceType.EYNY_TV to StandardCategory.MOVIE,
+)
+
+private fun categoryDisplayName(c: StandardCategory): String = when (c) {
+    StandardCategory.MOVIE -> "電影"
+    StandardCategory.SERIES -> "劇集"
+    StandardCategory.ANIME -> "動漫"
+    StandardCategory.VARIETY -> "綜藝"
+    StandardCategory.KOREAN -> "韓劇"
+    StandardCategory.CHINESE -> "陸劇"
+    StandardCategory.HK -> "港劇"
+    StandardCategory.TAIWAN -> "台劇"
+    StandardCategory.JAPANESE -> "日劇"
+    StandardCategory.AMERICAN -> "美劇"
+    StandardCategory.DOCUMENTARY -> "紀錄片"
+    StandardCategory.ADULT -> "倫理"
+}
+
+@Composable
+private fun MoreSourcesHeader() {
+    val dims = LocalDimensions.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 28.dp, bottom = 4.dp, start = dims.screenHorizontalPadding),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("✨", fontSize = 16.sp)
+        Spacer(Modifier.width(8.dp))
+        Text("更多來源", fontSize = 16.sp, fontWeight = FontWeight.Bold,
+            color = CinemaTextPrimary, letterSpacing = 0.4.sp)
+        Spacer(Modifier.width(8.dp))
+        Text("｜內容池差異化推薦", fontSize = 11.sp, color = CinemaTextMuted)
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun MoreSourceRow(
+    sourceType: SourceType,
+    typeId: Int,
+    title: String,
+    onItemClick: (Vod) -> Unit,
+    onMoreClick: () -> Unit,
+    viewModel: HomeViewModel,
+) {
+    // collectAsState binds to ViewModel-cached StateFlow; first access kicks off fetch,
+    // subsequent recompositions reuse cached items. refresh() clears the cache.
+    val items by viewModel.moreSourceRow(sourceType, typeId).collectAsState()
+    if (items.isEmpty()) return  // hide row until data arrives or after fetch fail
+    ContentRow(title, typeId, sourceType, items,
+        onItemClick = onItemClick,
+        onMoreClick = onMoreClick,
+    )
 }
 
 @Composable

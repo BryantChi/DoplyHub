@@ -38,6 +38,11 @@ fun BrowseScreen(
     val dims = LocalDimensions.current
     val uiState by vm.uiState.collectAsState()
     val gridState = rememberLazyGridState()
+    val browseIsAtTop by remember {
+        derivedStateOf {
+            gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
+        }
+    }
 
     // Auto load more: trigger when the last visible item is within 4 items of the end
     LaunchedEffect(gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index) {
@@ -113,6 +118,7 @@ fun BrowseScreen(
                 RefreshableContainer(
                     isRefreshing = uiState.isRefreshing,
                     onRefresh = { vm.refresh() },
+                    enabled = browseIsAtTop,
                 ) {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(dims.gridMinCellWidth),

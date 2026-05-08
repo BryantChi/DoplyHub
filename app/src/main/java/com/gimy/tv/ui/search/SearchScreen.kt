@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
 import com.gimy.tv.domain.model.SourceType
+import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.theme.*
 
@@ -153,6 +154,11 @@ fun SearchScreen(
             }
             uiState.results.isNotEmpty() -> {
                 val gridState = rememberLazyGridState()
+                val searchIsAtTop by remember {
+                    derivedStateOf {
+                        gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
+                    }
+                }
 
                 // Auto load more when scrolling near bottom
                 LaunchedEffect(gridState) {
@@ -168,13 +174,51 @@ fun SearchScreen(
                     }
                 }
 
+                // Per-source counts for chip filter (Phase 3.2)
+                val sourceCounts = remember(uiState.results) {
+                    uiState.results.groupBy { it.sourceType }.mapValues { it.value.size }
+                }
+                var selectedSource by remember { mutableStateOf<SourceType?>(null) }
+                // Reset chip when query changes
+                LaunchedEffect(uiState.query) { selectedSource = null }
+                val filteredResults = remember(uiState.results, selectedSource) {
+                    if (selectedSource == null) uiState.results
+                    else uiState.results.filter { it.sourceType == selectedSource }
+                }
+
                 RefreshableContainer(
                     isRefreshing = uiState.isRefreshing,
                     onRefresh = { viewModel.refresh() },
+                    enabled = searchIsAtTop,
                 ) {
                     Column(Modifier.fillMaxSize()) {
-                        Text("找到 ${uiState.results.size} 個結果", color = CinemaTextMuted, fontSize = 12.sp,
-                            modifier = Modifier.padding(bottom = 12.dp))
+                        Text("找到 ${filteredResults.size} 個結果（總 ${uiState.results.size}）",
+                            color = CinemaTextMuted, fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 8.dp))
+
+                        // Source filter chips: 「全部 N」 + 每來源 count（只列出有結果的）
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        ) {
+                            item(key = "chip_all") {
+                                SourceFilterChip(
+                                    label = "全部 ${uiState.results.size}",
+                                    selected = selectedSource == null,
+                                    onClick = { selectedSource = null },
+                                )
+                            }
+                            items(SourceType.values().filter { (sourceCounts[it] ?: 0) > 0 },
+                                key = { "chip_${it.name}" }) { src ->
+                                val count = sourceCounts[src] ?: 0
+                                SourceFilterChip(
+                                    label = "${src.displayName} $count",
+                                    selected = selectedSource == src,
+                                    onClick = { selectedSource = if (selectedSource == src) null else src },
+                                )
+                            }
+                        }
+
                         LazyVerticalGrid(
                             columns = GridCells.Adaptive(dims.gridMinCellWidth),
                             state = gridState,
@@ -182,7 +226,7 @@ fun SearchScreen(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            items(uiState.results, key = { "${it.sourceType}_${it.id}" }) { vod ->
+                            items(filteredResults, key = { "${it.sourceType}_${it.id}" }) { vod ->
                                 VodCard(vod, onClick = { onVodClick(vod.sourceType, vod.id) })
                             }
                         }
@@ -244,6 +288,38 @@ fun SearchScreen(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun SourceFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val isTV = LocalIsTelevision.current
+    var f by remember { mutableStateOf(false) }
+    val container = when {
+        selected -> CinemaRed
+        f -> CinemaRed.copy(0.6f)
+        else -> CinemaSurface
+    }
+    val textColor = if (selected || f) Color.White else CinemaTextMuted
+    if (isTV) {
+        Button(
+            onClick = onClick,
+            modifier = Modifier.onFocusChanged { f = it.isFocused },
+            shape = ButtonDefaults.shape(shape = RoundedCornerShape(20.dp)),
+            colors = ButtonDefaults.colors(containerColor = container, focusedContainerColor = CinemaRed),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
+        ) { Text(label, color = textColor, fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) }
+    } else {
+        androidx.compose.material3.Button(
+            onClick = onClick,
+            shape = RoundedCornerShape(20.dp),
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                containerColor = container, contentColor = Color.White),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
+        ) { Text(label, color = textColor, fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) }
     }
 }
 

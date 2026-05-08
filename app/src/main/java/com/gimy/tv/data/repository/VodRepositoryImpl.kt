@@ -2,6 +2,7 @@ package com.gimy.tv.data.repository
 
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.data.local.dao.VodCacheDao
+import com.gimy.tv.data.preferences.SourcePreferencesRepository
 import com.gimy.tv.data.scraper.EynyTvSource
 import com.gimy.tv.data.scraper.GimyMaxSource
 import com.gimy.tv.data.scraper.GimyTvSource
@@ -35,6 +36,7 @@ class VodRepositoryImpl @Inject constructor(
     private val vodCacheDao: VodCacheDao,
     private val okHttpClient: OkHttpClient,
     private val endpointResolver: EndpointResolver,
+    private val sourcePreferencesRepository: SourcePreferencesRepository,
 ) : VodRepository {
 
     // In-memory home row cache (survives Activity recreation since VodRepositoryImpl is @Singleton)
@@ -143,12 +145,16 @@ class VodRepositoryImpl @Inject constructor(
 
     // ── Cross-source search ──
 
-    /** Search across all 8 sources in parallel. Order = display priority (stability/popularity).
+    /** Search across enabled sources in parallel. Order = display priority (stability/popularity).
+     *  User-disabled sources are filtered out via SourcePreferencesRepository.enabledSources.
      *  Each source has its own 5s timeout — slow/failing sources don't block fast ones. */
-    private val searchOrder: List<SiteSource> get() = listOf(
-        gimyTvSource, gimyMaxSource, imapleTvSource, gimyTwSource,
-        eynyTvSource, momovodSource, kubo123Source, movieffmSource,
-    )
+    private val searchOrder: List<SiteSource> get() {
+        val enabled = sourcePreferencesRepository.enabledSources.value
+        return listOf(
+            gimyTvSource, gimyMaxSource, imapleTvSource, gimyTwSource,
+            eynyTvSource, momovodSource, kubo123Source, movieffmSource,
+        ).filter { it.sourceType in enabled }
+    }
 
     /** Best-effort adult-content filter for non-18+ paths.
      *  Phase 4 will upgrade this to a precise per-source typeId match (Vod model needs typeId field).

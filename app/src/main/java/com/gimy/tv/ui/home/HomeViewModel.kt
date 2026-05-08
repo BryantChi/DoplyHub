@@ -30,11 +30,38 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val vodRepository: VodRepository,
-    private val watchHistoryRepository: WatchHistoryRepository
+    private val watchHistoryRepository: WatchHistoryRepository,
+    sourcePreferencesRepository: com.gimy.tv.data.preferences.SourcePreferencesRepository,
 ) : ViewModel() {
+
+    val enabledSources: kotlinx.coroutines.flow.StateFlow<Set<SourceType>> =
+        sourcePreferencesRepository.enabledSources
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    /**
+     * Per-(source,typeId) lazy-loaded "More Sources" rows.
+     * Each row fetches once on first access; survives until refresh() clears them.
+     * Phase 3.1 lets the home page surface the 5 new MacCMS sources without blocking
+     * the primary load — the rows materialize as the user scrolls down.
+     */
+    private val moreSourceCache = mutableMapOf<String, MutableStateFlow<List<Vod>>>()
+
+    fun moreSourceRow(sourceType: SourceType, typeId: Int): StateFlow<List<Vod>> {
+        val key = "${sourceType.name}_$typeId"
+        return moreSourceCache.getOrPut(key) {
+            MutableStateFlow<List<Vod>>(emptyList()).also { flow ->
+                viewModelScope.launch {
+                    try {
+                        flow.value = vodRepository.getVodList(sourceType, typeId, 1).items.take(15)
+                    } catch (_: Exception) {
+                        flow.value = emptyList()
+                    }
+                }
+            }
+        }
+    }
 
     // Movieffm typeId → matching gimymax typeId for interleaving
     private val ffmToGimyMap = mapOf(
@@ -61,6 +88,7 @@ class HomeViewModel @Inject constructor(
 
     fun refresh() {
         if (_uiState.value.isRefreshing) return
+        moreSourceCache.clear()  // force "More Sources" rows to re-fetch on next collect
         fetchHome(isRefresh = true)
     }
 
