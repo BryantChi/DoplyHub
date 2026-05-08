@@ -3,7 +3,10 @@ package com.gimy.tv.ui.settings
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Switch
@@ -12,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -281,8 +285,24 @@ private fun SourceToggleRow(
     isPrimary: Boolean,
     onToggle: (Boolean) -> Unit,
 ) {
+    // 用 Modifier.toggleable 整合 click + focus + accessibility（Compose 為 row-level
+    // toggle 設計）。TV 上 D-pad OK 觸發；Phone/Pad 觸控也 work。Switch onCheckedChange
+    // 設 null 避免 Switch 自身消費 touch 事件導致 row click 失靈。
+    var focused by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = enabled,
+                onValueChange = onToggle,
+                role = Role.Switch,
+            )
+            .onFocusChanged { focused = it.isFocused }
+            .background(
+                if (focused) CinemaRed.copy(0.10f) else Color.Transparent,
+                RoundedCornerShape(6.dp),
+            )
+            .padding(horizontal = 6.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -301,12 +321,16 @@ private fun SourceToggleRow(
         }
         Switch(
             checked = enabled,
-            onCheckedChange = onToggle,
+            onCheckedChange = null,  // row-level click handles toggle (TV-compatible)
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = CinemaRed,
                 uncheckedThumbColor = CinemaTextMuted,
                 uncheckedTrackColor = CinemaSurface,
+                disabledCheckedThumbColor = Color.White,
+                disabledCheckedTrackColor = CinemaRed,
+                disabledUncheckedThumbColor = CinemaTextMuted,
+                disabledUncheckedTrackColor = CinemaSurface,
             ),
         )
     }

@@ -137,27 +137,53 @@ fun PinInputDialog(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun PinKey(label: String, enabled: Boolean, onClick: () -> Unit) {
-    var f by remember { mutableStateOf(false) }
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier
-            .size(56.dp)
-            .onFocusChanged { f = it.isFocused },
-        shape = ButtonDefaults.shape(shape = RoundedCornerShape(8.dp)),
-        colors = ButtonDefaults.colors(
-            containerColor = if (f) CinemaRed else CinemaSurface,
-            focusedContainerColor = CinemaRed,
-            disabledContainerColor = CinemaSurface.copy(0.4f),
-        ),
-        contentPadding = PaddingValues(0.dp),
-    ) {
-        Text(
-            label,
-            color = if (f) Color.White else CinemaTextPrimary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
+    val isTV = LocalIsTelevision.current
+    if (isTV) {
+        // TV: focus-based selection with D-pad
+        var f by remember { mutableStateOf(false) }
+        Button(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier
+                .size(56.dp)
+                .onFocusChanged { f = it.isFocused },
+            shape = ButtonDefaults.shape(shape = RoundedCornerShape(8.dp)),
+            colors = ButtonDefaults.colors(
+                containerColor = if (f) CinemaRed else CinemaSurface,
+                focusedContainerColor = CinemaRed,
+                disabledContainerColor = CinemaSurface.copy(0.4f),
+            ),
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(
+                label,
+                color = if (f) Color.White else CinemaTextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    } else {
+        // Phone / Pad: standard touch button — tv.material3.Button doesn't fire onClick on touch
+        androidx.compose.material3.Button(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier.size(56.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                containerColor = CinemaSurface,
+                contentColor = CinemaTextPrimary,
+                disabledContainerColor = CinemaSurface.copy(0.4f),
+                disabledContentColor = CinemaTextMuted,
+            ),
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(
+                label,
+                color = CinemaTextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
 }
 

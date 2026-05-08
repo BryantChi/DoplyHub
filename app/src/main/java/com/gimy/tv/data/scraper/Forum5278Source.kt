@@ -99,17 +99,34 @@ class Forum5278Source @Inject constructor(
     // ─── Parsing ───
 
     private fun parseListCards(doc: Document): List<Vod> {
+        // Pass 1: collect IDs of pinned threads via Discuz's purple style marker.
+        // Each thread has 3 <a> tags (thumb / title / reply count); the title tag
+        // carries inline style="color: #8F2A90;" when pinned. Title-only filtering
+        // would miss this because we may hit the thumb tag first and short-circuit.
+        val pinnedIds = mutableSetOf<Long>()
+        for (link in doc.select("a[href^=thread-][style*=8F2A90]")) {
+            val match = Regex("""thread-(\d+)-""").find(link.attr("href")) ?: continue
+            match.groupValues[1].toLongOrNull()?.let { pinnedIds.add(it) }
+        }
+
         val items = mutableListOf<Vod>()
-        // Discuz threads: <a href="thread-{id}-1-1.html" title="..." onclick="atarget(this)">
-        for (link in doc.select("a[href^=thread-]")) {
+        // Pass 2: collect normal threads. Prefer the title-bearing link (has [title] attr)
+        // — it carries the actual thread title; the thumb link only has class="z" with
+        // a title attr but no inner text.
+        for (link in doc.select("a[href^=thread-][title]")) {
             val href = link.attr("href")
             val match = Regex("""thread-(\d+)-1-1\.html""").find(href) ?: continue
             val threadId = match.groupValues[1].toLongOrNull() ?: continue
+            if (threadId in pinnedIds) continue                  // skip pinned
+            if (link.hasClass("z")) continue                     // skip thumb-only links
+
             val title = link.attr("title").trim().ifBlank { link.text().trim() }
             if (title.isBlank() || title.length < 5) continue
-            // Skip pinned/version/announcement rows that pollute the list
-            if (title.contains("版規") || title.contains("公告") || title.contains("瀏覽器支援") ||
-                title.contains("更新") && title.length < 20) continue
+            // Keyword backup filter (covers pinned threads that lack the purple marker)
+            if (title.contains("版規") || title.contains("公告") ||
+                title.contains("瀏覽器支援") || title.contains("教學") ||
+                title.contains("置頂") || title.contains("Sticky") ||
+                (title.contains("更新") && title.length < 20)) continue
 
             // Cover: thread row may have a preview image nearby (in the same <tr> for Discuz)
             val cover = link.closest("tr")?.selectFirst("img.threadimg, img[src*=thread]")
