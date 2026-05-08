@@ -34,10 +34,12 @@ import com.gimy.tv.ui.theme.*
 fun AdultContentScreen(
     onVodClick: (SourceType, Long) -> Unit,
     onBack: () -> Unit,
+    onMoreClick: () -> Unit = {},
     vm: AdultContentScreenViewModel = hiltViewModel(),
 ) {
     val dims = LocalDimensions.current
     val enabledSources by vm.enabledSources.collectAsState()
+    val adultPlusEnabled by vm.adultPlusEnabled.collectAsState()
     val tabs = remember(enabledSources) { vm.adultTabs(enabledSources) }
     var selectedTab by remember { mutableStateOf<AdultTab?>(null) }
 
@@ -78,6 +80,17 @@ fun AdultContentScreen(
                     selected = tab.key == selectedTab?.key,
                     onClick = { selectedTab = tab },
                 )
+            }
+            // Phase 6 — 「⋯ 更多」chip surfaces only after user opts in via Settings.
+            // Tapping navigates to AdultPlusScreen (jable / xnxx / 5278 sources).
+            if (adultPlusEnabled) {
+                item(key = "more_chip") {
+                    AdultSourceTab(
+                        label = "⋯ 更多",
+                        selected = false,
+                        onClick = onMoreClick,
+                    )
+                }
             }
         }
 

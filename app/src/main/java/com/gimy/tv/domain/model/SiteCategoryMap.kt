@@ -129,4 +129,23 @@ val SourceType.categoryMap: SiteCategoryMap get() = when (this) {
         japanese = 16, american = 25, documentary = 20,
         adultCategories = listOf(AdultEntry(23, "倫理")),
     )
+
+    // Adult-plus sources — no standard category model (path-based listings instead).
+    // AdultPlusScreen wires these directly with hardcoded list URLs per row, bypassing
+    // the typeId mechanism. categoryMap is a placeholder to satisfy the exhaustive when.
+    SourceType.JABLE_TV -> SiteCategoryMap(
+        movie = -1, series = -1, variety = -1, anime = -1,
+        korean = -1, chinese = -1, hk = -1, taiwan = -1,
+        japanese = -1, american = -1, documentary = -1,
+    )
+    SourceType.XNXX -> SiteCategoryMap(
+        movie = -1, series = -1, variety = -1, anime = -1,
+        korean = -1, chinese = -1, hk = -1, taiwan = -1,
+        japanese = -1, american = -1, documentary = -1,
+    )
+    SourceType.FORUM5278 -> SiteCategoryMap(
+        movie = -1, series = -1, variety = -1, anime = -1,
+        korean = -1, chinese = -1, hk = -1, taiwan = -1,
+        japanese = -1, american = -1, documentary = -1,
+    )
 }

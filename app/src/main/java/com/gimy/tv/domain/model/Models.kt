@@ -2,7 +2,8 @@ package com.gimy.tv.domain.model
 
 enum class SourceType {
     GIMYMAX, GIMYTV, MOVIEFFM,
-    GIMY_TW, EYNY_TV, IMAPLE_TV, MOMOVOD, KUBO123
+    GIMY_TW, EYNY_TV, IMAPLE_TV, MOMOVOD, KUBO123,
+    JABLE_TV, XNXX, FORUM5278  // adult-plus sources
 }
 
 val SourceType.displayName: String get() = when (this) {
@@ -14,6 +15,9 @@ val SourceType.displayName: String get() = when (this) {
     SourceType.IMAPLE_TV -> "Imaple"
     SourceType.MOMOVOD -> "Momo"
     SourceType.KUBO123 -> "Kubo"
+    SourceType.JABLE_TV -> "Jable"
+    SourceType.XNXX -> "XNXX"
+    SourceType.FORUM5278 -> "5278"
 }
 
 data class Category(

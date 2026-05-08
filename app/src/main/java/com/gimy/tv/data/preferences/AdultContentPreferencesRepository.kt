@@ -46,6 +46,8 @@ class AdultContentPreferencesRepository @Inject constructor(
         private val KEY_PIN_HASH = stringPreferencesKey("adult_pin_hash")
         private val KEY_FAIL_COUNT = intPreferencesKey("adult_fail_count")
         private val KEY_LOCKED_UNTIL = longPreferencesKey("adult_locked_until_ms")
+        // Phase 6 — Advanced adult sources (jable / xnxx / 5278). Off by default.
+        private val KEY_ADULT_PLUS_ENABLED = booleanPreferencesKey("adult_plus_enabled")
     }
 
     private val dataStore = context.adultContentDataStore
@@ -71,6 +73,12 @@ class AdultContentPreferencesRepository @Inject constructor(
         .map { it[KEY_LOCKED_UNTIL] ?: 0L }
         .stateIn(scope, SharingStarted.Eagerly, 0L)
 
+    /** Phase 6 toggle for advanced adult sources (jable.tv / xnxx.com / 5278.cc).
+     *  Off by default; user must explicitly opt in via Settings. */
+    val adultPlusEnabled: StateFlow<Boolean> = dataStore.data
+        .map { it[KEY_ADULT_PLUS_ENABLED] ?: false }
+        .stateIn(scope, SharingStarted.Eagerly, false)
+
     /** In-memory only — resets to false on cold start. Set when user passes PIN this session. */
     private val _unlocked = MutableStateFlow(false)
     val unlocked: StateFlow<Boolean> = _unlocked.asStateFlow()
@@ -83,7 +91,15 @@ class AdultContentPreferencesRepository @Inject constructor(
 
     suspend fun setEnabled(value: Boolean) {
         dataStore.edit { it[KEY_ENABLED] = value }
-        if (!value) _unlocked.value = false  // disabling resets session unlock
+        if (!value) {
+            _unlocked.value = false  // disabling resets session unlock
+            // Disabling the master switch implicitly disables advanced sources too
+            dataStore.edit { it[KEY_ADULT_PLUS_ENABLED] = false }
+        }
+    }
+
+    suspend fun setAdultPlusEnabled(value: Boolean) {
+        dataStore.edit { it[KEY_ADULT_PLUS_ENABLED] = value }
     }
 
     suspend fun setPinRequired(value: Boolean) {

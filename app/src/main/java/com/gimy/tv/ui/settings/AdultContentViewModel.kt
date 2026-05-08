@@ -18,12 +18,14 @@ class AdultContentViewModel @Inject constructor(
     val unlocked: StateFlow<Boolean> = repo.unlocked
     val lockedUntilMs: StateFlow<Long> = repo.lockedUntilMs
     val failCount: StateFlow<Int> = repo.failCount
+    val adultPlusEnabled: StateFlow<Boolean> = repo.adultPlusEnabled
 
     fun setEnabled(value: Boolean) = viewModelScope.launch { repo.setEnabled(value) }
     fun setPinRequired(value: Boolean) = viewModelScope.launch { repo.setPinRequired(value) }
     fun savePin(pin: String) = viewModelScope.launch { repo.setPin(pin) }
     fun clearPin() = viewModelScope.launch { repo.clearPin() }
     fun resetAll() = viewModelScope.launch { repo.resetAll() }
+    fun setAdultPlusEnabled(value: Boolean) = viewModelScope.launch { repo.setAdultPlusEnabled(value) }
 
     suspend fun verifyPin(input: String): Boolean = repo.verifyPin(input)
     fun isLocked(): Boolean = repo.isLocked()

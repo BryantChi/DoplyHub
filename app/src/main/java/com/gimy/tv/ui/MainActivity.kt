@@ -137,6 +137,18 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                             onBack = { navController.popBackStack() },
+                            onMoreClick = { navController.navigate(Screen.AdultPlus.route) },
+                        )
+                    }
+
+                    composable(Screen.AdultPlus.route) {
+                        com.gimy.tv.ui.adultplus.AdultPlusScreen(
+                            onVodClick = { sourceType, vodId ->
+                                navController.navigate(
+                                    Screen.Detail.createRoute(sourceType.name, vodId)
+                                )
+                            },
+                            onBack = { navController.popBackStack() },
                         )
                     }
 

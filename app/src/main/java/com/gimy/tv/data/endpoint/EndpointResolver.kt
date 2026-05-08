@@ -69,6 +69,9 @@ class EndpointResolver @Inject constructor(
             SourceType.IMAPLE_TV to listOf("https://imaple.tv"),
             SourceType.MOMOVOD to listOf("https://momovod.app"),
             SourceType.KUBO123 to listOf("https://123kubo.net"),
+            SourceType.JABLE_TV to listOf("https://jable.tv"),
+            SourceType.XNXX to listOf("https://www.xnxx.com"),
+            SourceType.FORUM5278 to listOf("https://5278.cc"),
         )
 
         private fun keyFor(type: SourceType) = stringPreferencesKey("url_${type.name}")
@@ -181,6 +184,9 @@ class EndpointResolver @Inject constructor(
             "imaple_tv" to SourceType.IMAPLE_TV,
             "momovod" to SourceType.MOMOVOD,
             "kubo123" to SourceType.KUBO123,
+            "jable_tv" to SourceType.JABLE_TV,
+            "xnxx" to SourceType.XNXX,
+            "forum5278" to SourceType.FORUM5278,
         )
         val result = mutableMapOf<SourceType, List<String>>()
         keyMap.forEach { (key, type) ->

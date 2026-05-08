@@ -45,6 +45,7 @@ fun SettingsScreen(
     val adultEnabled by adultVm.enabled.collectAsState()
     val pinRequired by adultVm.pinRequired.collectAsState()
     val pinHash by adultVm.pinHash.collectAsState()
+    val adultPlusEnabled by adultVm.adultPlusEnabled.collectAsState()
     var showSetPinDialog by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
     var pinSetupStep by remember { mutableStateOf(0) }       // 0 = entering, 1 = confirming
@@ -167,6 +168,31 @@ fun SettingsScreen(
                                     shape = RoundedCornerShape(6.dp),
                                 ) { Text("變更 PIN", color = CinemaTextPrimary, fontSize = 12.sp) }
                             }
+                        }
+                        // Phase 6 — Advanced adult sources gate. Locked behind PIN being set
+                        // (we don't want a fresh-install-then-toggle path with no friction).
+                        SourceToggleRow(
+                            label = "進階成人來源（jable / xnxx / 5278）",
+                            enabled = adultPlusEnabled,
+                            isPrimary = false,
+                            onToggle = { newValue ->
+                                if (newValue && pinHash == null) {
+                                    // Force user to set a PIN first — disclaimer happens implicitly
+                                    firstPin = ""
+                                    pinSetupStep = 0
+                                    pinErrorMsg = null
+                                    showSetPinDialog = true
+                                } else {
+                                    adultVm.setAdultPlusEnabled(newValue)
+                                }
+                            },
+                        )
+                        if (adultPlusEnabled) {
+                            Text(
+                                "⚠ 內容為第三方聚合站，未經授權；使用須自行承擔法律責任。",
+                                color = CinemaRed.copy(0.8f), fontSize = 11.sp,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 4.dp),
+                            )
                         }
                         Spacer(Modifier.height(10.dp))
                         DoplyButton(
