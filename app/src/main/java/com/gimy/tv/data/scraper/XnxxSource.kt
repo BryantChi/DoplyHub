@@ -44,25 +44,39 @@ class XnxxSource @Inject constructor(
 
     override fun parseListCards(doc: Document): List<Vod> {
         val items = mutableListOf<Vod>()
-        // Cards: <a href="/video-{id}/{slug}" title="..."><img src="..."></a>
-        for (card in doc.select("a[href*=/video-]")) {
-            val href = card.attr("href")
+        // XNXX list HTML structure:
+        //   <div class="thumb-block video" data-video='{...JSON...}'>
+        //     <div class="thumb">
+        //       <a class="thumb-link" href="/video-{id}/{slug}"><img src=blank data-src=real></a>
+        //     </div>
+        //     <p class="title"><a href="/video-{id}/{slug}">Real Title Text</a></p>
+        //   </div>
+        // Each card has two anchors — thumb-link (carries img, no text) and title-link
+        // (carries text, no img). Iterating "a[href*=/video-]" mixed them up: distinctBy
+        // kept whichever came first, losing either cover or title. We now pivot on the
+        // .thumb-block container and pull both pieces from one place.
+        for (block in doc.select("div.thumb-block, div.thumb-under, .video-block")) {
+            val link = block.selectFirst("a[href*=/video-]") ?: continue
+            val href = link.attr("href")
             val match = Regex("/video-([a-zA-Z0-9]+)/([^/?\"#]+)").find(href) ?: continue
             val videoId = match.groupValues[1]
             val slug = match.groupValues[2]
             if (videoId.isBlank()) continue
 
-            // Use "{videoId}/{slug}" as cache key so detailUrlFor can rebuild full URL
             val key = "$videoId/$slug"
 
-            val title = card.attr("title").trim().ifBlank {
-                card.text().trim().take(80)
-            }
-            if (title.isBlank()) continue
+            // Title preference: explicit .title text → title-link aria-label → first .title-link text
+            val title = block.selectFirst("p.title a, .title-link, .video-title a, .video-title")
+                ?.text()?.trim()
+                ?: link.attr("title").trim().ifBlank { null }
+                ?: link.attr("aria-label").trim().ifBlank { null }
+                ?: continue
+            if (title.isBlank() || title == "Video") continue
 
-            val cover = card.selectFirst("img")?.let { img ->
+            // Cover from any <img> inside the block (data-src lazy-load preferred)
+            val cover = block.selectFirst("img")?.let { img ->
                 listOf(img.attr("data-src"), img.attr("data-original"), img.attr("src"))
-                    .firstOrNull { it.isNotBlank() }
+                    .firstOrNull { it.isNotBlank() && !it.contains("blank.gif") }
             }.orEmpty()
 
             val id = stableId(key)

@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "endpoints": {
     "gimymax": [
       "https://gimy01.tv"
@@ -9,6 +9,30 @@
     ],
     "movieffm": [
       "https://www.movieffm.net"
+    ],
+    "gimy_tw": [
+      "https://gimy.tw"
+    ],
+    "eyny_tv": [
+      "https://eynytv.com"
+    ],
+    "imaple_tv": [
+      "https://imaple.tv"
+    ],
+    "momovod": [
+      "https://momovod.app"
+    ],
+    "kubo123": [
+      "https://123kubo.net"
+    ],
+    "jable_tv": [
+      "https://jable.tv"
+    ],
+    "xnxx": [
+      "https://www.xnxx.com"
+    ],
+    "forum5278": [
+      "https://5278.cc"
     ]
   },
   "update": {

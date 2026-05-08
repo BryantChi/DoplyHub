@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -292,23 +293,34 @@ private fun DetailInfo(
     onRefresh: () -> Unit,
 ) {
     val isTV = LocalIsTelevision.current
+    // Phone hero is laid out as a centered column above the cover. Without explicit
+    // textAlign + fillMaxWidth, short titles get auto-centered (Column align rule)
+    // but long titles size to fill, leaving Text-internal alignment Start → "looks left".
+    // Force Text content alignment so behavior is identical regardless of length.
+    val titleAlign = if (isTV) TextAlign.Start else TextAlign.Center
+    val rowArrange = if (isTV) Arrangement.spacedBy(8.dp) else Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+    val actionArrange = if (isTV) Arrangement.spacedBy(10.dp) else Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)
+    val widthMod = if (isTV) Modifier else Modifier.fillMaxWidth()
+
     Text(d.vod.title, color = Color.White, fontSize = 26.sp,
-        fontWeight = FontWeight.Black, letterSpacing = (-0.3).sp)
+        fontWeight = FontWeight.Black, letterSpacing = (-0.3).sp,
+        textAlign = titleAlign, modifier = widthMod)
 
     Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(modifier = widthMod, horizontalArrangement = rowArrange) {
         if (d.vod.status.isNotBlank()) InfoBadge(d.vod.status, CinemaRed)
         if (d.vod.year > 0) InfoBadge(d.vod.year.toString(), CinemaSurface)
         if (d.vod.category.isNotBlank()) InfoBadge(d.vod.category, CinemaSurface)
     }
 
     Spacer(Modifier.height(12.dp))
-    if (d.director.isNotBlank()) MetaLine("導演", d.director)
-    if (d.actors.isNotEmpty()) MetaLine("主演", d.actors.take(5).joinToString(" / "))
+    if (d.director.isNotBlank()) MetaLine("導演", d.director, isTV)
+    if (d.actors.isNotEmpty()) MetaLine("主演", d.actors.take(5).joinToString(" / "), isTV)
 
     Spacer(Modifier.height(16.dp))
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = widthMod,
+        horizontalArrangement = actionArrange,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ActionButton("返回", false, onBack)
@@ -346,7 +358,8 @@ private fun DetailInfo(
     if (d.synopsis.isNotBlank()) {
         Spacer(Modifier.height(14.dp))
         Text(d.synopsis, color = CinemaTextMuted, fontSize = 13.sp,
-            maxLines = 3, overflow = TextOverflow.Ellipsis, lineHeight = 20.sp)
+            maxLines = 3, overflow = TextOverflow.Ellipsis, lineHeight = 20.sp,
+            textAlign = titleAlign, modifier = widthMod)
     }
 }
 
@@ -358,8 +371,10 @@ private fun InfoBadge(text: String, bg: Color) {
 }
 
 @Composable
-private fun MetaLine(label: String, value: String) {
-    Row(Modifier.padding(vertical = 1.dp)) {
+private fun MetaLine(label: String, value: String, isTV: Boolean = true) {
+    val arrangement = if (isTV) Arrangement.Start else Arrangement.Center
+    val widthMod = if (isTV) Modifier else Modifier.fillMaxWidth()
+    Row(widthMod.padding(vertical = 1.dp), horizontalArrangement = arrangement) {
         Text("$label  ", color = CinemaTextMuted, fontSize = 13.sp)
         Text(value, color = CinemaTextPrimary.copy(0.8f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -439,29 +454,38 @@ private fun EpisodeGrid(
                     val watched = lastEp != null && ep.number < lastEp
                     var f by remember { mutableStateOf(false) }
                     val epColor = when { cur -> CinemaRed; watched -> CinemaRedDim.copy(0.5f); else -> CinemaSurface }
+                    // Compact label: long titles like "特別篇 - 大結局" get truncated to
+                    // ep.number to keep button heights uniform and avoid awkward 中文 character
+                    // breaks. Threshold of 5 chars matches "第01集" / "第123集" / 番外篇.
+                    val rawLabel = ep.title.ifBlank { ep.number.toString() }
+                    val label = if (rawLabel.length > 5) ep.number.toString() else rawLabel
                     if (isTV) {
                         Button(
                             onClick = { onEpClick(group.sourceId, ep.number) },
-                            modifier = Modifier.weight(1f).onFocusChanged { f = it.isFocused },
+                            modifier = Modifier.weight(1f).heightIn(min = 36.dp).onFocusChanged { f = it.isFocused },
                             shape = ButtonDefaults.shape(shape = RoundedCornerShape(4.dp)),
                             colors = ButtonDefaults.colors(containerColor = epColor, focusedContainerColor = CinemaRed),
-                            contentPadding = PaddingValues(4.dp)
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
                         ) {
-                            Text(ep.title.ifBlank { ep.number.toString() },
+                            Text(label,
                                 fontSize = 12.sp, color = Color.White,
-                                fontWeight = if (cur || f) FontWeight.Bold else FontWeight.Normal)
+                                fontWeight = if (cur || f) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false,
+                                textAlign = TextAlign.Center)
                         }
                     } else {
                         androidx.compose.material3.Button(
                             onClick = { onEpClick(group.sourceId, ep.number) },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).heightIn(min = 36.dp),
                             shape = RoundedCornerShape(4.dp),
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = epColor, contentColor = Color.White),
-                            contentPadding = PaddingValues(4.dp)
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
                         ) {
-                            Text(ep.title.ifBlank { ep.number.toString() },
+                            Text(label,
                                 fontSize = 12.sp, color = Color.White,
-                                fontWeight = if (cur) FontWeight.Bold else FontWeight.Normal)
+                                fontWeight = if (cur) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false,
+                                textAlign = TextAlign.Center)
                         }
                     }
                     } // key

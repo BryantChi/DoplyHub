@@ -152,7 +152,7 @@ private fun AdultPlusRowSection(
                     horizontalArrangement = Arrangement.spacedBy(dims.cardSpacing),
                 ) {
                     items(state.items, key = { "${it.sourceType}_${it.id}" }) { vod ->
-                        VodCard(vod = vod, onClick = { onItemClick(vod) })
+                        VodCard(vod = vod, landscape = true, onClick = { onItemClick(vod) })
                     }
                 }
             }
@@ -193,7 +193,7 @@ private fun AdultStaticRow(
             horizontalArrangement = Arrangement.spacedBy(dims.cardSpacing),
         ) {
             items(items, key = { "${it.sourceType}_${it.id}" }) { vod ->
-                VodCard(vod = vod, onClick = { onItemClick(vod) })
+                VodCard(vod = vod, landscape = true, onClick = { onItemClick(vod) })
             }
         }
     }

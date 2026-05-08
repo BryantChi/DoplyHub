@@ -106,10 +106,17 @@ fun VodCard(
     vod: Vod,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Use 16:9 widescreen aspect for sources whose thumbnails are landscape (jable / xnxx).
+     *  The default 2:3 portrait fits typical poster art; using Crop on a 16:9 source clips
+     *  most of the image. Pass landscape = true so the card matches the source aspect. */
+    landscape: Boolean = false,
 ) {
     val dims = LocalDimensions.current
     val isTV = LocalIsTelevision.current
+    // 16:9 cards are a touch wider than the default poster card so they remain readable
+    val cardW = if (landscape) (dims.cardWidth.value * 1.55f).dp else dims.cardWidth
+    val cardH = if (landscape) (cardW.value * 9f / 16f).dp + 24.dp else dims.cardHeight  // +24dp for title strip
 
     if (isTV) {
         var focused by remember { mutableStateOf(false) }
@@ -118,8 +125,8 @@ fun VodCard(
             onClick = onClick,
             onLongClick = onLongClick ?: {},
             modifier = modifier
-                .width(dims.cardWidth)
-                .height(dims.cardHeight)
+                .width(cardW)
+                .height(cardH)
                 .onFocusChanged { focused = it.isFocused },
             shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp)),
             scale = CardDefaults.scale(focusedScale = 1.05f),
@@ -133,8 +140,8 @@ fun VodCard(
     } else {
         androidx.compose.material3.Card(
             modifier = modifier
-                .width(dims.cardWidth)
-                .height(dims.cardHeight)
+                .width(cardW)
+                .height(cardH)
                 .combinedClickable(
                     onClick = onClick,
                     onLongClick = onLongClick,

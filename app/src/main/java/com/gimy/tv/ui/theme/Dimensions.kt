@@ -38,7 +38,9 @@ val TvDimensions = DoplyDimensions(
     coverWidth = 175.dp,
     coverHeight = 250.dp,
     gridMinCellWidth = 166.dp,
-    episodeColumns = 14,
+    // 14 columns crammed long episode titles ("特別篇 - 大結局") into ~70dp cells —
+    // 10 columns gives ~98dp each which fits typical chinese episode labels comfortably.
+    episodeColumns = 10,
     loadingIndicatorSize = 48.dp,
 )
 
@@ -55,7 +57,7 @@ val TabletDimensions = DoplyDimensions(
     coverWidth = 165.dp,
     coverHeight = 240.dp,
     gridMinCellWidth = 155.dp,
-    episodeColumns = 10,
+    episodeColumns = 7,  // was 10 — same crowding fix as TV
     loadingIndicatorSize = 44.dp,
 )
 
@@ -72,7 +74,7 @@ val PhoneDimensions = DoplyDimensions(
     coverWidth = 120.dp,
     coverHeight = 180.dp,
     gridMinCellWidth = 110.dp,
-    episodeColumns = 6,
+    episodeColumns = 4,  // was 6 — phone screens too narrow for 6 readable episode buttons
     loadingIndicatorSize = 36.dp,
 )
 

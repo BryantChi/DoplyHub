@@ -42,20 +42,29 @@ class JableTvSource @Inject constructor(
 
     override fun parseListCards(doc: Document): List<Vod> {
         val items = mutableListOf<Vod>()
-        // Jable cards: <a href="https://jable.tv/videos/{slug}/" title="..."><img data-src="..."></a>
-        for (card in doc.select("a[href*=/videos/]")) {
-            val href = card.attr("href")
+        // Jable card actually has TWO <a href="/videos/{slug}/"> elements per video:
+        //   1. thumb anchor — wraps <img> + <span class="label">2:17:00</span> (duration)
+        //   2. title anchor — inside <h6 class="title">, contains the actual title text
+        // The old single-pass + distinctBy{id} pattern hit the thumb anchor first and
+        // saved its text() = "2:17:00" as the title. Pivot to h6.title.a as source of
+        // truth for title, then walk up to the common parent to grab the cover image.
+        for (titleLink in doc.select("h6.title a[href*=/videos/]")) {
+            val href = titleLink.attr("href")
             val match = Regex("/videos/([^/?\"]+)/?").find(href) ?: continue
             val slug = match.groupValues[1]
             if (slug.isBlank() || slug == "videos") continue
 
-            val title = card.attr("title").trim().ifBlank {
-                card.parent()?.selectFirst(".title, h6")?.text()?.trim().orEmpty()
-            }.ifBlank { card.text().trim().take(80) }
+            val title = titleLink.text().trim()
             if (title.isBlank()) continue
 
-            val cover = card.selectFirst("img")?.let { img ->
-                listOf(img.attr("data-src"), img.attr("src")).firstOrNull { it.isNotBlank() }
+            // Cover lives in a sibling thumb anchor's <img>. Walk up two levels to a
+            // common card container (varies by template — .grid-item / .video-img-box
+            // / generic div). Fallback to titleLink.parent if structure differs.
+            val container = titleLink.closest("div.grid-item, div.video-img-box, .col, [class*=video]")
+                ?: titleLink.parent()?.parent()
+            val cover = container?.selectFirst("img")?.let { img ->
+                listOf(img.attr("data-src"), img.attr("src"))
+                    .firstOrNull { it.isNotBlank() && !it.contains("blank") }
             }.orEmpty()
 
             val id = stableId(slug)
