@@ -75,11 +75,20 @@ class XnxxSource @Inject constructor(
                 title in setOf("Video", "視頻", "视频", "影片", "加載中", "Loading"))
                 continue
 
-            // Cover from any <img> inside the block (data-src lazy-load preferred)
-            val cover = block.selectFirst("img")?.let { img ->
-                listOf(img.attr("data-src"), img.attr("data-original"), img.attr("src"))
-                    .firstOrNull { it.isNotBlank() && !it.contains("blank.gif") }
-            }.orEmpty()
+            // Cover. Two-strategy lookup — XNXX templates vary slightly by locale:
+            //   1) data-video JSON attribute on .thumb-block carries sfwThumbUrl (most reliable)
+            //   2) <img data-src=...> on the thumb anchor (used when JSON is absent)
+            val cover = run {
+                val dataVideo = block.attr("data-video")
+                if (dataVideo.isNotBlank()) {
+                    val m = Regex("\"sfwThumbUrl\"\\s*:\\s*\"([^\"]+)\"").find(dataVideo)
+                    if (m != null) return@run m.groupValues[1].replace("\\/", "/")
+                }
+                block.selectFirst("img")?.let { img ->
+                    listOf(img.attr("data-src"), img.attr("data-original"), img.attr("src"))
+                        .firstOrNull { it.isNotBlank() && !it.contains("blank.gif") }
+                }.orEmpty()
+            }
 
             val id = stableId(key)
             items.add(Vod(id, sourceType, title, cover, "", 0, ""))

@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "endpoints": {
     "gimymax": [
       "https://gimy01.tv"
@@ -24,7 +24,9 @@
     ],
     "kubo123": [
       "https://123kubo.net"
-    ],
+    ]
+  },
+  "adult_endpoints": {
     "jable_tv": [
       "https://jable.tv"
     ],

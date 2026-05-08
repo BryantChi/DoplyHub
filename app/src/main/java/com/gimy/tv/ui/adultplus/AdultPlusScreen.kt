@@ -154,6 +154,17 @@ private fun AdultPlusRowSection(
                     items(state.items, key = { "${it.sourceType}_${it.id}" }) { vod ->
                         VodCard(vod = vod, landscape = true, onClick = { onItemClick(vod) })
                     }
+                    // "→ 更多" trailing card — visible whenever the source still has more pages.
+                    // Tapping appends the next page in-place (no navigation). Hidden once
+                    // exhausted (hasMore = false). Spinner replaces it during loadMore fetches.
+                    if (state.hasMore) {
+                        item(key = "load_more_${row.key}") {
+                            LoadMoreCard(
+                                loading = state.loadingMore,
+                                onClick = { vm.loadMore(row) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -196,6 +207,53 @@ private fun AdultStaticRow(
                 VodCard(vod = vod, landscape = true, onClick = { onItemClick(vod) })
             }
         }
+    }
+}
+
+/** Trailing "→ 更多" card matching the 16:9 cover-card aspect of AdultPlus rows.
+ *  Shows a spinner overlay while a page is loading; otherwise the arrow + "更多" text. */
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun LoadMoreCard(loading: Boolean, onClick: () -> Unit) {
+    val dims = LocalDimensions.current
+    val isTV = LocalIsTelevision.current
+    var f by remember { mutableStateOf(false) }
+    // Match landscape cards' geometry so the row's vertical alignment stays clean
+    val w = (dims.cardWidth.value * 1.55f).dp
+    val h = (w.value * 9f / 16f).dp + 24.dp
+
+    @Composable fun cardBody() {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (loading) {
+                DoplyLoadingIndicator(28.dp)
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("▶", fontSize = 24.sp, color = if (f) CinemaRed else CinemaTextMuted)
+                    Spacer(Modifier.height(6.dp))
+                    Text("更多", fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                        color = if (f) CinemaRed else CinemaTextPrimary)
+                }
+            }
+        }
+    }
+
+    if (isTV) {
+        androidx.tv.material3.Card(
+            onClick = onClick,
+            modifier = Modifier.width(w).height(h).onFocusChanged { f = it.isFocused },
+            shape = androidx.tv.material3.CardDefaults.shape(shape = RoundedCornerShape(8.dp)),
+            border = androidx.tv.material3.CardDefaults.border(
+                focusedBorder = androidx.tv.material3.Border(BorderStroke(2.dp, CinemaRed), 8.dp)),
+            scale = androidx.tv.material3.CardDefaults.scale(focusedScale = 1.05f),
+            colors = androidx.tv.material3.CardDefaults.colors(containerColor = CinemaSurface),
+        ) { cardBody() }
+    } else {
+        androidx.compose.material3.Card(
+            onClick = onClick,
+            modifier = Modifier.width(w).height(h),
+            shape = RoundedCornerShape(8.dp),
+            colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = CinemaSurface),
+        ) { cardBody() }
     }
 }
 

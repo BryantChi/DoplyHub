@@ -174,7 +174,12 @@ class EndpointResolver @Inject constructor(
             )
         }
 
-        val endpoints = root.optJSONObject("endpoints") ?: return@runCatching null
+        // v2.4.0+ JSON layout splits adult sources into a separate `adult_endpoints` object
+        // for visual / management isolation. We merge both objects here so the rest of the
+        // resolver behaves as before. Earlier configs (single `endpoints` object) still work.
+        val endpoints = root.optJSONObject("endpoints")
+        val adultEndpoints = root.optJSONObject("adult_endpoints")
+        if (endpoints == null && adultEndpoints == null) return@runCatching null
         val keyMap = mapOf(
             "gimymax" to SourceType.GIMYMAX,
             "gimytv" to SourceType.GIMYTV,
@@ -190,7 +195,9 @@ class EndpointResolver @Inject constructor(
         )
         val result = mutableMapOf<SourceType, List<String>>()
         keyMap.forEach { (key, type) ->
-            val arr = endpoints.optJSONArray(key) ?: return@forEach
+            // Look first in `endpoints`, then fall through to `adult_endpoints`.
+            // (No conflict in practice — keys partition cleanly between the two objects.)
+            val arr = endpoints?.optJSONArray(key) ?: adultEndpoints?.optJSONArray(key) ?: return@forEach
             val list = (0 until arr.length()).mapNotNull { idx ->
                 arr.optString(idx, "").trim().takeIf { it.isNotBlank() }
             }

@@ -34,6 +34,12 @@ data class AdultPlusRowState(
     val items: List<Vod> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
+    /** Currently-loaded page (1-based). Each loadMore() bumps this. */
+    val currentPage: Int = 1,
+    /** Whether the source reports more pages available. Drives "→ 更多" button. */
+    val hasMore: Boolean = false,
+    /** True while a loadMore() is in flight; UI shows spinner instead of "更多" button. */
+    val loadingMore: Boolean = false,
 )
 
 @HiltViewModel
@@ -115,38 +121,66 @@ class AdultPlusViewModel @Inject constructor(
     private fun cacheKey(row: AdultPlusRow): String =
         "${row.sourceType.name}|${row.key}"
 
+    /** Fetch a row's first page (initial load OR pull-to-refresh). */
     private fun fetch(row: AdultPlusRow, flow: MutableStateFlow<AdultPlusRowState>) {
-        flow.value = flow.value.copy(loading = true, error = null)
+        fetchPage(row, flow, page = 1, append = false)
+    }
+
+    /** Append the next page to an existing row. Driven by the "→ 更多" button. */
+    fun loadMore(row: AdultPlusRow) {
+        val flow = rowCache[cacheKey(row)] ?: return
+        val state = flow.value
+        if (state.loading || state.loadingMore || !state.hasMore) return
+        fetchPage(row, flow, page = state.currentPage + 1, append = true)
+    }
+
+    private fun fetchPage(
+        row: AdultPlusRow,
+        flow: MutableStateFlow<AdultPlusRowState>,
+        page: Int,
+        append: Boolean,
+    ) {
+        flow.value = if (append) flow.value.copy(loadingMore = true, error = null)
+        else flow.value.copy(loading = true, error = null)
         viewModelScope.launch {
             try {
                 withTimeout(12_000) {
-                    val items = when (row.sourceType) {
-                        SourceType.JABLE_TV ->
-                            jableSource.fetchVodListByPath(row.key, 1).items.take(24)
-                        SourceType.XNXX ->
-                            xnxxSource.fetchVodListByPath(row.key, 1).items.take(24)
+                    val result = when (row.sourceType) {
+                        SourceType.JABLE_TV -> jableSource.fetchVodListByPath(row.key, page)
+                        SourceType.XNXX -> xnxxSource.fetchVodListByPath(row.key, page)
                         SourceType.FORUM5278 -> {
                             val forumId = row.key.removePrefix("forum:").toIntOrNull() ?: 23
-                            forum5278Source.fetchVodList(forumId, 1).items.take(24)
+                            forum5278Source.fetchVodList(forumId, page)
                         }
-                        else -> emptyList()
+                        else -> com.gimy.tv.domain.model.PaginatedResult(emptyList<Vod>(), page, 0, false)
                     }
-                    // 5278 occasionally returns 0 items because the whole forum is in
-                    // maintenance mode (Discuz "提示信息" wall). Surface a friendlier
-                    // message so users know to retry later instead of thinking the App is broken.
-                    if (items.isEmpty() && row.sourceType == SourceType.FORUM5278) {
+                    val limited = result.items.take(24)
+                    val combined = if (append) flow.value.items + limited else limited
+                    val unique = combined.distinctBy { "${it.sourceType}_${it.id}" }
+                    val gotNew = !append || unique.size > flow.value.items.size
+
+                    if (unique.isEmpty() && row.sourceType == SourceType.FORUM5278) {
                         flow.value = AdultPlusRowState(items = emptyList(), loading = false,
-                            error = "站方維護中，稍後再試")
+                            loadingMore = false, error = "站方維護中，稍後再試",
+                            currentPage = 1, hasMore = false)
                     } else {
-                        flow.value = AdultPlusRowState(items = items, loading = false, error = null)
+                        flow.value = AdultPlusRowState(
+                            items = unique, loading = false, loadingMore = false, error = null,
+                            currentPage = page,
+                            hasMore = result.hasMore && gotNew,
+                        )
                     }
                 }
             } catch (_: TimeoutCancellationException) {
-                flow.value = AdultPlusRowState(items = emptyList(), loading = false, error = "載入超時")
+                flow.value = flow.value.copy(loading = false, loadingMore = false,
+                    error = if (append) null else "載入超時",
+                    hasMore = if (append) false else flow.value.hasMore)
             } catch (e: Exception) {
                 val msg = if (row.sourceType == SourceType.FORUM5278) "站方維護中，稍後再試"
                 else e.message?.takeIf { it.isNotBlank() } ?: "載入失敗"
-                flow.value = AdultPlusRowState(items = emptyList(), loading = false, error = msg)
+                flow.value = flow.value.copy(loading = false, loadingMore = false,
+                    error = if (append) null else msg,
+                    hasMore = if (append) false else flow.value.hasMore)
             }
         }
     }
