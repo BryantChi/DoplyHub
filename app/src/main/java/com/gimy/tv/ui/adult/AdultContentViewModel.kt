@@ -16,9 +16,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
-/** Per-source row state: tracks loading + result + error so the UI can distinguish
- *  "still loading" from "loaded but empty" from "failed". Without this users couldn't
- *  tell whether to wait, retry, or give up — they reported "卡很久都沒反應". */
+/** A single tab in the 18+ zone — uniquely identified by (source, typeId).
+ *  gimy.tw contributes two tabs (露骨 39 / 劇情倫理 27); other sites one each. */
+data class AdultTab(
+    val sourceType: SourceType,
+    val typeId: Int,
+    val label: String,
+) {
+    val key: String get() = "${sourceType.name}_$typeId"
+}
+
 data class AdultRowState(
     val items: List<Vod> = emptyList(),
     val loading: Boolean = true,
@@ -33,39 +40,39 @@ class AdultContentScreenViewModel @Inject constructor(
 
     val enabledSources: StateFlow<Set<SourceType>> = sourcePreferencesRepository.enabledSources
 
-    private val rowCache = mutableMapOf<SourceType, MutableStateFlow<AdultRowState>>()
+    /** All adult tabs from currently-enabled sources. Sources can contribute multiple tabs
+     *  (gimy.tw has both 39 露骨 and 27 劇情倫理). Order matches enum declaration order. */
+    fun adultTabs(enabled: Set<SourceType>): List<AdultTab> =
+        SourceType.values()
+            .filter { it in enabled }
+            .flatMap { src ->
+                src.categoryMap.adultCategories.map { entry ->
+                    AdultTab(src, entry.typeId, entry.label)
+                }
+            }
 
-    fun rowFor(sourceType: SourceType): StateFlow<AdultRowState> {
-        val existing = rowCache[sourceType]
+    private val rowCache = mutableMapOf<String, MutableStateFlow<AdultRowState>>()
+
+    fun rowFor(tab: AdultTab): StateFlow<AdultRowState> {
+        val existing = rowCache[tab.key]
         if (existing != null) return existing.asStateFlow()
         val flow = MutableStateFlow(AdultRowState(loading = true))
-        rowCache[sourceType] = flow
-        fetchInto(sourceType, flow)
+        rowCache[tab.key] = flow
+        fetchInto(tab, flow)
         return flow.asStateFlow()
     }
 
-    /** Force re-fetch for one source (used by retry button). */
-    fun refreshSource(sourceType: SourceType) {
-        val flow = rowCache[sourceType] ?: return
-        fetchInto(sourceType, flow)
+    fun refreshTab(tab: AdultTab) {
+        val flow = rowCache[tab.key] ?: return
+        fetchInto(tab, flow)
     }
 
-    /** Force re-fetch all currently-cached sources (used by pull-to-refresh). */
-    fun refreshAll() {
-        rowCache.forEach { (src, flow) -> fetchInto(src, flow) }
-    }
-
-    private fun fetchInto(sourceType: SourceType, flow: MutableStateFlow<AdultRowState>) {
-        val typeId = sourceType.categoryMap.adult
-        if (typeId <= 0) {
-            flow.value = AdultRowState(loading = false, error = "此來源無 18+ 分區")
-            return
-        }
+    private fun fetchInto(tab: AdultTab, flow: MutableStateFlow<AdultRowState>) {
         flow.value = flow.value.copy(loading = true, error = null)
         viewModelScope.launch {
             try {
                 withTimeout(10_000) {
-                    val items = vodRepository.getVodList(sourceType, typeId, 1).items.take(60)
+                    val items = vodRepository.getVodList(tab.sourceType, tab.typeId, 1).items.take(60)
                     flow.value = AdultRowState(items = items, loading = false, error = null)
                 }
             } catch (_: TimeoutCancellationException) {
@@ -76,7 +83,4 @@ class AdultContentScreenViewModel @Inject constructor(
             }
         }
     }
-
-    fun adultSources(enabled: Set<SourceType>): List<SourceType> =
-        SourceType.values().filter { it in enabled && it.categoryMap.adult > 0 }
 }

@@ -14,9 +14,14 @@ enum class StandardCategory {
     DOCUMENTARY, ADULT
 }
 
+/** One adult typeId on a source, with the user-facing label that distinguishes it.
+ *  Most sites have a single entry; gimy.tw has two (typeId=39 真·露骨 and typeId=27 劇情倫理). */
+data class AdultEntry(val typeId: Int, val label: String)
+
 /**
- * Per-source typeId table. `adult = -1` means the source has no adult category
- * (or it is an off-site link). Filtering must use each source's own `adult` value.
+ * Per-source typeId table. `adultCategories` carries 0..N adult-zone IDs with labels
+ * (multiple supported because gimy.tw exposes both露骨 and 劇情倫理 under different typeIds).
+ * Filtering uses each source's own list — never a single hard-coded constant.
  */
 data class SiteCategoryMap(
     val movie: Int,
@@ -30,8 +35,12 @@ data class SiteCategoryMap(
     val japanese: Int,
     val american: Int,
     val documentary: Int,
-    val adult: Int = -1,
+    val adultCategories: List<AdultEntry> = emptyList(),
 ) {
+    /** First adult typeId, or -1 if the source has none. Kept for backward compat with
+     *  callers that just need a "does this source have any adult content?" check. */
+    val adult: Int get() = adultCategories.firstOrNull()?.typeId ?: -1
+
     fun typeIdFor(category: StandardCategory): Int = when (category) {
         StandardCategory.MOVIE -> movie
         StandardCategory.SERIES -> series
@@ -90,30 +99,34 @@ val SourceType.categoryMap: SiteCategoryMap get() = when (this) {
         movie = 1, series = 2, variety = 3, anime = 4,
         korean = 23, chinese = 13, hk = 14, taiwan = 15,
         japanese = 16, american = 24, documentary = 20,
-        adult = 39,
+        // Two distinct adult zones: 39 = explicit, 27 = soft-core / R-rated drama
+        adultCategories = listOf(
+            AdultEntry(39, "露骨"),
+            AdultEntry(27, "劇情倫理"),
+        ),
     )
     SourceType.EYNY_TV -> SiteCategoryMap(
         movie = 1, series = 2, variety = 3, anime = 4,
         korean = 23, chinese = 13, hk = 14, taiwan = 15,
         japanese = 16, american = 24, documentary = 20,
-        adult = 27,
+        adultCategories = listOf(AdultEntry(27, "倫理")),
     )
     SourceType.IMAPLE_TV -> SiteCategoryMap(
         movie = 1, series = 2, variety = 3, anime = 4,
         korean = 15, chinese = 13, hk = 21, taiwan = 20,
         japanese = 22, american = 16, documentary = 32,
-        adult = 59,
+        adultCategories = listOf(AdultEntry(59, "倫理")),
     )
     SourceType.MOMOVOD -> SiteCategoryMap(
         movie = 1, series = 2, variety = 3, anime = 4,
         korean = 23, chinese = 13, hk = 14, taiwan = 15,
         japanese = 16, american = 24, documentary = 20,
-        adult = 27,
+        adultCategories = listOf(AdultEntry(27, "倫理")),
     )
     SourceType.KUBO123 -> SiteCategoryMap(
         movie = 1, series = 2, variety = 3, anime = 4,
         korean = 24, chinese = 13, hk = 14, taiwan = 15,
         japanese = 16, american = 25, documentary = 20,
-        adult = 23,
+        adultCategories = listOf(AdultEntry(23, "倫理")),
     )
 }

@@ -38,12 +38,14 @@ fun AdultContentScreen(
 ) {
     val dims = LocalDimensions.current
     val enabledSources by vm.enabledSources.collectAsState()
-    val sources = remember(enabledSources) { vm.adultSources(enabledSources) }
-    var selectedSource by remember { mutableStateOf<SourceType?>(null) }
+    val tabs = remember(enabledSources) { vm.adultTabs(enabledSources) }
+    var selectedTab by remember { mutableStateOf<AdultTab?>(null) }
 
-    LaunchedEffect(sources) {
-        if (sources.isEmpty()) selectedSource = null
-        else if (selectedSource !in sources) selectedSource = sources.firstOrNull()
+    LaunchedEffect(tabs) {
+        if (tabs.isEmpty()) selectedTab = null
+        else if (selectedTab == null || tabs.none { it.key == selectedTab?.key }) {
+            selectedTab = tabs.firstOrNull()
+        }
     }
 
     Column(
@@ -51,7 +53,7 @@ fun AdultContentScreen(
     ) {
         PageHeader("18+", onBack)
 
-        if (sources.isEmpty()) {
+        if (tabs.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("尚無可用 18+ 內容來源", color = CinemaTextPrimary,
@@ -64,21 +66,22 @@ fun AdultContentScreen(
             return@Column
         }
 
-        // Source tabs
+        // Tab strip — one button per (source, typeId) pair.
+        // gimy.tw contributes two tabs (露骨 / 劇情倫理); other sources one each.
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = dims.screenHorizontalPadding, vertical = 12.dp),
         ) {
-            items(sources, key = { "tab_${it.name}" }) { src ->
+            items(tabs, key = { it.key }) { tab ->
                 AdultSourceTab(
-                    label = src.displayName,
-                    selected = src == selectedSource,
-                    onClick = { selectedSource = src },
+                    label = "${tab.sourceType.displayName} ${tab.label}",
+                    selected = tab.key == selectedTab?.key,
+                    onClick = { selectedTab = tab },
                 )
             }
         }
 
-        val current = selectedSource
+        val current = selectedTab
         if (current != null) {
             val gridState = rememberLazyGridState()
             val isAtTop by remember {
@@ -90,7 +93,7 @@ fun AdultContentScreen(
 
             RefreshableContainer(
                 isRefreshing = rowState.loading && rowState.items.isNotEmpty(),
-                onRefresh = { vm.refreshSource(current) },
+                onRefresh = { vm.refreshTab(current) },
                 enabled = isAtTop,
             ) {
                 when {
@@ -99,7 +102,7 @@ fun AdultContentScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 DoplyLoadingIndicator(dims.loadingIndicatorSize)
                                 Spacer(Modifier.height(12.dp))
-                                Text("正在載入 ${current.displayName} 內容…",
+                                Text("正在載入 ${current.sourceType.displayName} ${current.label} 內容…",
                                     color = CinemaTextMuted, fontSize = 12.sp)
                             }
                         }
@@ -113,7 +116,7 @@ fun AdultContentScreen(
                                 Text(rowState.error ?: "", color = CinemaTextMuted, fontSize = 12.sp)
                                 Spacer(Modifier.height(16.dp))
                                 DoplyButton(
-                                    onClick = { vm.refreshSource(current) },
+                                    onClick = { vm.refreshTab(current) },
                                     containerColor = CinemaRed,
                                     shape = RoundedCornerShape(6.dp),
                                 ) { Text("重試", color = Color.White, fontSize = 13.sp) }
@@ -122,7 +125,7 @@ fun AdultContentScreen(
                     }
                     rowState.items.isEmpty() -> {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("此來源暫無 18+ 內容",
+                            Text("此分類暫無內容",
                                 color = CinemaTextMuted, fontSize = 13.sp)
                         }
                     }
