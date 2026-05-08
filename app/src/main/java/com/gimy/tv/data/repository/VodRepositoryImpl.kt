@@ -4,14 +4,17 @@ import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.data.local.dao.VodCacheDao
 import com.gimy.tv.data.preferences.SourcePreferencesRepository
 import com.gimy.tv.data.scraper.EynyTvSource
+import com.gimy.tv.data.scraper.Forum5278Source
 import com.gimy.tv.data.scraper.GimyMaxSource
 import com.gimy.tv.data.scraper.GimyTvSource
 import com.gimy.tv.data.scraper.GimyTwSource
 import com.gimy.tv.data.scraper.ImapleTvSource
+import com.gimy.tv.data.scraper.JableTvSource
 import com.gimy.tv.data.scraper.Kubo123Source
 import com.gimy.tv.data.scraper.MomovodSource
 import com.gimy.tv.data.scraper.MovieffmSource
 import com.gimy.tv.data.scraper.SiteSource
+import com.gimy.tv.data.scraper.XnxxSource
 import com.gimy.tv.domain.model.*
 import com.gimy.tv.domain.repository.HomeRowData
 import com.gimy.tv.domain.repository.VodRepository
@@ -33,6 +36,9 @@ class VodRepositoryImpl @Inject constructor(
     private val imapleTvSource: ImapleTvSource,
     private val momovodSource: MomovodSource,
     private val kubo123Source: Kubo123Source,
+    private val jableTvSource: JableTvSource,
+    private val xnxxSource: XnxxSource,
+    private val forum5278Source: Forum5278Source,
     private val vodCacheDao: VodCacheDao,
     private val okHttpClient: OkHttpClient,
     private val endpointResolver: EndpointResolver,
@@ -101,6 +107,9 @@ class VodRepositoryImpl @Inject constructor(
         SourceType.IMAPLE_TV -> imapleTvSource
         SourceType.MOMOVOD -> momovodSource
         SourceType.KUBO123 -> kubo123Source
+        SourceType.JABLE_TV -> jableTvSource
+        SourceType.XNXX -> xnxxSource
+        SourceType.FORUM5278 -> forum5278Source
     }
 
     // ── Basic operations ──

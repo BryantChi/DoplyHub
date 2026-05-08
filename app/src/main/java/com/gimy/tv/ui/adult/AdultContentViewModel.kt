@@ -2,6 +2,7 @@ package com.gimy.tv.ui.adult
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gimy.tv.data.preferences.AdultContentPreferencesRepository
 import com.gimy.tv.data.preferences.SourcePreferencesRepository
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
@@ -41,9 +42,14 @@ data class AdultRowState(
 class AdultContentScreenViewModel @Inject constructor(
     private val vodRepository: VodRepository,
     sourcePreferencesRepository: SourcePreferencesRepository,
+    adultContentPreferencesRepository: AdultContentPreferencesRepository,
 ) : ViewModel() {
 
     val enabledSources: StateFlow<Set<SourceType>> = sourcePreferencesRepository.enabledSources
+
+    /** Phase 6 toggle — when true the screen surfaces a「⋯ 更多」chip that navigates
+     *  to the AdultPlusScreen with jable/xnxx/5278 content. Off by default. */
+    val adultPlusEnabled: StateFlow<Boolean> = adultContentPreferencesRepository.adultPlusEnabled
 
     fun adultTabs(enabled: Set<SourceType>): List<AdultTab> =
         SourceType.values()
