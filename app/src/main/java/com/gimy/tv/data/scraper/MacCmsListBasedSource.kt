@@ -48,9 +48,23 @@ abstract class MacCmsListBasedSource(
         return "$baseUrl/vodsearch/-------------.html?wd=$enc"
     }
 
-    /** Stability order by Chinese line name. Lower index = more stable (preferred). */
+    /**
+     * Stability order by Chinese line name. Lower index = more preferred.
+     *
+     * Order ranks BOTH coverage (fraction of sites where the line is available + reachable)
+     * AND median latency. Pure speed isn't enough — a fast line that only exists on 2/5 sites
+     * is worse as a default than a slightly slower line that works everywhere.
+     *
+     * Cross-site test: 5 sites × 1 vod each × 3 trials best-of, 2026-05-08:
+     *   無盡雲 (wjm3u8) — 5/5 sites,  0.58s  ← best default: universal + fast
+     *   索尼雲 (snm3u8) — 4/5 sites,  0.58s
+     *   優質雲 (1080zyk)— 2/5 sites,  0.45s  ← fastest but imaple/momovod only
+     *   閃電雲 (sdm3u8) — 3/5 sites,  0.64s  (imaple+momovod's v13.fentvoss instance is HTTP 000)
+     *   極速雲 (jsm3u8) — 3/5 sites,  0.80s
+     *   卧龍雲 (wolong) — 2/5 sites,  1.15s  (gimy.tw's wlcdn99 mirror is HTTP 000)
+     */
     protected open val stabilityOrder: List<String> =
-        listOf("卧龍雲", "索尼雲", "無盡雲", "閃電雲", "極速雲", "優質雲")
+        listOf("無盡雲", "索尼雲", "優質雲", "閃電雲", "極速雲", "卧龍雲")
 
     private val userAgent =
         "Mozilla/5.0 (Linux; Android 10) Mobile Safari/537.36"
