@@ -66,15 +66,17 @@ data class SiteCategoryMap(
 
 val SourceType.categoryMap: SiteCategoryMap get() = when (this) {
     // Existing sources — preserve current numbering
+    // gimytv.ai / gimy01.tv: hk=21 (not 15), japanese=15 (not 21), documentary=22 (not 3 / 30).
+    // Verified 2026-05-08 by hitting /type/{id}.html and reading the page <title>.
     SourceType.GIMYTV -> SiteCategoryMap(
         movie = 1, series = 2, variety = 29, anime = 4,
-        korean = 20, chinese = 13, hk = 15, taiwan = 14,
-        japanese = 21, american = 16, documentary = 3,
+        korean = 20, chinese = 13, hk = 21, taiwan = 14,
+        japanese = 15, american = 16, documentary = 22,
     )
     SourceType.GIMYMAX -> SiteCategoryMap(
         movie = 1, series = 2, variety = 29, anime = 4,
-        korean = 20, chinese = 13, hk = 15, taiwan = 14,
-        japanese = 21, american = 16, documentary = 30,
+        korean = 20, chinese = 13, hk = 21, taiwan = 14,
+        japanese = 15, american = 16, documentary = 22,
     )
     SourceType.MOVIEFFM -> SiteCategoryMap(
         // Movieffm uses different typeId range; -1 marks unsupported

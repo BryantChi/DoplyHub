@@ -45,10 +45,10 @@ private val categories = listOf(
     CategoryItem("GIMYTV", 20, "韓劇", "🇰🇷"),
     CategoryItem("GIMYTV", 13, "陸劇", "🇨🇳"),
     CategoryItem("GIMYTV", 16, "美劇", "🇺🇸"),
-    CategoryItem("GIMYTV", 21, "日劇", "🇯🇵"),
+    CategoryItem("GIMYTV", 15, "日劇", "🇯🇵"),
     CategoryItem("GIMYTV", 14, "台劇", "🇹🇼"),
-    CategoryItem("GIMYTV", 15, "港劇", "🇭🇰"),
-    CategoryItem("GIMYTV", 3, "紀錄片", "🎥"),
+    CategoryItem("GIMYTV", 21, "港劇", "🇭🇰"),
+    CategoryItem("GIMYTV", 22, "紀錄片", "🎥"),
 )
 
 @Composable

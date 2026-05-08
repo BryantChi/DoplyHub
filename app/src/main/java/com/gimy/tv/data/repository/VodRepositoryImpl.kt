@@ -403,9 +403,9 @@ class VodRepositoryImpl @Inject constructor(
         }
         val rows = coroutineScope {
             val categories = listOf(
-                20 to "韓劇", 13 to "陸劇", 16 to "美劇", 21 to "日劇",
-                1 to "電影", 4 to "動漫", 14 to "台劇", 15 to "港劇",
-                29 to "綜藝", 3 to "紀錄片"
+                20 to "韓劇", 13 to "陸劇", 16 to "美劇", 15 to "日劇",
+                1 to "電影", 4 to "動漫", 14 to "台劇", 21 to "港劇",
+                29 to "綜藝", 22 to "紀錄片"
             )
             categories.map { (typeId, name) ->
                 async {

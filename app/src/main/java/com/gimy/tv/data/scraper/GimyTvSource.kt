@@ -24,9 +24,9 @@ class GimyTvSource @Inject constructor(
         Category(2, "電視劇", sourceType), Category(1, "電影", sourceType),
         Category(4, "動漫", sourceType), Category(29, "綜藝", sourceType),
         Category(13, "陸劇", sourceType), Category(20, "韓劇", sourceType),
-        Category(16, "美劇", sourceType), Category(21, "日劇", sourceType),
-        Category(14, "台劇", sourceType), Category(15, "港劇", sourceType),
-        Category(3, "紀錄片", sourceType),
+        Category(16, "美劇", sourceType), Category(15, "日劇", sourceType),
+        Category(14, "台劇", sourceType), Category(21, "港劇", sourceType),
+        Category(22, "紀錄片", sourceType),
     )
 
     override suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod> =
