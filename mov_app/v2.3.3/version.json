@@ -1,0 +1,21 @@
+{
+  "app": "Doply Hub",
+  "packageName": "com.gimy.tv",
+  "versionName": "2.3.3",
+  "versionCode": 233,
+  "buildDate": "2026-05-09 05:14:09",
+  "buildTimestamp": "20260509_051409",
+  "git": {
+    "branch": "dev",
+    "commit": "de87a02"
+  },
+  "apk": {
+    "filename": "DoplyHub-v2.3.3.apk",
+    "size": "8.6M",
+    "sizeBytes": 9049351,
+    "md5": "7b47175c95215190771e9cd614d59c95"
+  },
+  "minSdk": 28,
+  "targetSdk": 35,
+  "supportedDevices": ["phone", "tablet", "tv"]
+}
