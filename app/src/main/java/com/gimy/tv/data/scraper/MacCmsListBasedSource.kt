@@ -135,11 +135,23 @@ abstract class MacCmsListBasedSource(
 
     // ─── List parsing ───
 
-    /** Cards: <a class="myui-vodlist__thumb lazyload" href="{detailPath}/{id}.html" title="..." data-original="..."> */
+    /** Cards: <a class="myui-vodlist__thumb lazyload" href="{detailPath}/{id}.html" title="..." data-original="...">
+     *
+     *  Important: list pages typically also render a "熱門推薦 / 相關" panel below the
+     *  main listing using the SAME card class. Without scoping we'd merge those into
+     *  results — the user reported "18+ 區裡面有些不像 18+" caused exactly by this.
+     *  We restrict the scope to the first .myui-vodlist (or equivalent) container,
+     *  and pre-strip the ranking sidebar that some templates emit. */
     protected open fun parseVodList(doc: Document, page: Int): PaginatedResult<Vod> {
+        // Strip sidebar / ranking panels — they'd otherwise leak into our card sweep
+        doc.select("#stickyside, .myui-side, aside, .rankings, .rank-list, .stui-pannel--side").remove()
+
         val items = mutableListOf<Vod>()
         val detailHrefRegex = Regex("$detailUrlPath/(\\d+)\\.html")
-        for (card in doc.select("a.myui-vodlist__thumb, a[class*=video-pic][data-original]")) {
+        // Prefer the first main vodlist container (the panel the user navigated into);
+        // later panels are recommendations with off-topic content.
+        val scope = doc.selectFirst(".myui-vodlist, ul.myui-vodlist__media, .module-list, .stui-vodlist") ?: doc
+        for (card in scope.select("a.myui-vodlist__thumb, a[class*=video-pic][data-original]")) {
             val href = card.attr("href")
             val id = detailHrefRegex.find(href)?.groupValues?.get(1)?.toLongOrNull() ?: continue
             val title = card.attr("title").trim().ifBlank {

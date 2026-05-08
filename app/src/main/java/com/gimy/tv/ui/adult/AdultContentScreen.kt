@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
@@ -21,7 +22,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.displayName
+import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
+import com.gimy.tv.ui.components.RefreshableContainer
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.favorites.PageHeader
 import com.gimy.tv.ui.theme.*
@@ -75,28 +78,71 @@ fun AdultContentScreen(
             }
         }
 
-        // Grid for the selected source
         val current = selectedSource
         if (current != null) {
-            val items by vm.rowFor(current).collectAsState()
-            if (items.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    DoplyLoadingIndicator(dims.loadingIndicatorSize)
+            val gridState = rememberLazyGridState()
+            val isAtTop by remember {
+                derivedStateOf {
+                    gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
                 }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(dims.gridMinCellWidth),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(
-                        start = dims.screenHorizontalPadding,
-                        end = dims.screenHorizontalPadding,
-                        bottom = 24.dp,
-                    ),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    items(items, key = { "${it.sourceType}_${it.id}" }) { vod ->
-                        VodCard(vod, onClick = { onVodClick(vod.sourceType, vod.id) })
+            }
+            val rowState by vm.rowFor(current).collectAsState()
+
+            RefreshableContainer(
+                isRefreshing = rowState.loading && rowState.items.isNotEmpty(),
+                onRefresh = { vm.refreshSource(current) },
+                enabled = isAtTop,
+            ) {
+                when {
+                    rowState.loading && rowState.items.isEmpty() -> {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                DoplyLoadingIndicator(dims.loadingIndicatorSize)
+                                Spacer(Modifier.height(12.dp))
+                                Text("正在載入 ${current.displayName} 內容…",
+                                    color = CinemaTextMuted, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                    rowState.items.isEmpty() && rowState.error != null -> {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("載入失敗", color = CinemaTextPrimary,
+                                    fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(6.dp))
+                                Text(rowState.error ?: "", color = CinemaTextMuted, fontSize = 12.sp)
+                                Spacer(Modifier.height(16.dp))
+                                DoplyButton(
+                                    onClick = { vm.refreshSource(current) },
+                                    containerColor = CinemaRed,
+                                    shape = RoundedCornerShape(6.dp),
+                                ) { Text("重試", color = Color.White, fontSize = 13.sp) }
+                            }
+                        }
+                    }
+                    rowState.items.isEmpty() -> {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("此來源暫無 18+ 內容",
+                                color = CinemaTextMuted, fontSize = 13.sp)
+                        }
+                    }
+                    else -> {
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(dims.gridMinCellWidth),
+                            state = gridState,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(
+                                start = dims.screenHorizontalPadding,
+                                end = dims.screenHorizontalPadding,
+                                bottom = 24.dp,
+                            ),
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            items(rowState.items, key = { "${it.sourceType}_${it.id}" }) { vod ->
+                                VodCard(vod, onClick = { onVodClick(vod.sourceType, vod.id) })
+                            }
+                        }
                     }
                 }
             }
