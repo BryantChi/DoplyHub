@@ -1,11 +1,19 @@
 package com.gimy.tv.domain.model
 
-enum class SourceType { GIMYMAX, GIMYTV, MOVIEFFM }
+enum class SourceType {
+    GIMYMAX, GIMYTV, MOVIEFFM,
+    GIMY_TW, EYNY_TV, IMAPLE_TV, MOMOVOD, KUBO123
+}
 
 val SourceType.displayName: String get() = when (this) {
     SourceType.GIMYMAX -> "GimyMax"
     SourceType.GIMYTV -> "GimyTV"
     SourceType.MOVIEFFM -> "MovieFFM"
+    SourceType.GIMY_TW -> "Gimy"
+    SourceType.EYNY_TV -> "Eyny"
+    SourceType.IMAPLE_TV -> "Imaple"
+    SourceType.MOMOVOD -> "Momo"
+    SourceType.KUBO123 -> "Kubo"
 }
 
 data class Category(
