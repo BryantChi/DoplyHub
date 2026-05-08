@@ -41,36 +41,53 @@ class JableTvSource @Inject constructor(
     }
 
     override fun parseListCards(doc: Document): List<Vod> {
-        val items = mutableListOf<Vod>()
-        // Jable card actually has TWO <a href="/videos/{slug}/"> elements per video:
-        //   1. thumb anchor — wraps <img> + <span class="label">2:17:00</span> (duration)
-        //   2. title anchor — inside <h6 class="title">, contains the actual title text
-        // The old single-pass + distinctBy{id} pattern hit the thumb anchor first and
-        // saved its text() = "2:17:00" as the title. Pivot to h6.title.a as source of
-        // truth for title, then walk up to the common parent to grab the cover image.
-        for (titleLink in doc.select("h6.title a[href*=/videos/]")) {
-            val href = titleLink.attr("href")
-            val match = Regex("/videos/([^/?\"]+)/?").find(href) ?: continue
-            val slug = match.groupValues[1]
-            if (slug.isBlank() || slug == "videos") continue
+        // Jable cards split title and cover across TWO anchors per video:
+        //   1. thumb anchor — wraps <img> + <span class="label">2:17:00</span>
+        //   2. title anchor — <h6 class="title"><a>...</a></h6>
+        //
+        // Multi-pass merge by slug is more robust than a single selector chain because
+        // jable's HTML varies by UA / cookie / locale (some users see the layout
+        // collapsed into a different wrapper). We collect each piece separately and
+        // emit one Vod per slug only if BOTH title and a real (non-placeholder) title text
+        // are present.
+        val titleBySlug = HashMap<String, String>()
+        val coverBySlug = HashMap<String, String>()
+        val placeholderTitles = setOf("視頻", "视频", "Video", "影片", "加載中", "Loading")
 
-            val title = titleLink.text().trim()
-            if (title.isBlank()) continue
-
-            // Cover lives in a sibling thumb anchor's <img>. Walk up two levels to a
-            // common card container (varies by template — .grid-item / .video-img-box
-            // / generic div). Fallback to titleLink.parent if structure differs.
-            val container = titleLink.closest("div.grid-item, div.video-img-box, .col, [class*=video]")
-                ?: titleLink.parent()?.parent()
-            val cover = container?.selectFirst("img")?.let { img ->
-                listOf(img.attr("data-src"), img.attr("src"))
-                    .firstOrNull { it.isNotBlank() && !it.contains("blank") }
-            }.orEmpty()
-
-            val id = stableId(slug)
-            items.add(Vod(id, sourceType, title, cover, "", 0, ""))
+        // Pass 1: titles — prefer h6.title.a, fall back to any link with [title] attr,
+        // else the title- / link-attribute on the link.
+        for (a in doc.select("h6.title a[href*=/videos/], h5.title a[href*=/videos/], .title a[href*=/videos/]")) {
+            val slug = slugFrom(a.attr("href")) ?: continue
+            val text = a.text().trim()
+            if (text.isNotBlank() && text !in placeholderTitles) titleBySlug.putIfAbsent(slug, text)
         }
-        return items.distinctBy { it.id }
+        // Secondary title source: any anchor with a non-placeholder title attribute
+        for (a in doc.select("a[href*=/videos/][title]")) {
+            val slug = slugFrom(a.attr("href")) ?: continue
+            val attrTitle = a.attr("title").trim()
+            if (attrTitle.isNotBlank() && attrTitle !in placeholderTitles) titleBySlug.putIfAbsent(slug, attrTitle)
+        }
+
+        // Pass 2: covers — any <a href=videos/...> that contains an <img>.
+        for (a in doc.select("a[href*=/videos/]")) {
+            val slug = slugFrom(a.attr("href")) ?: continue
+            if (coverBySlug.containsKey(slug)) continue
+            val img = a.selectFirst("img") ?: continue
+            val url = listOf(img.attr("data-src"), img.attr("src"))
+                .firstOrNull { it.isNotBlank() && !it.contains("blank") }
+                ?: continue
+            coverBySlug[slug] = url
+        }
+
+        return titleBySlug.entries.map { (slug, title) ->
+            Vod(stableId(slug), sourceType, title, coverBySlug[slug].orEmpty(), "", 0, "")
+        }
+    }
+
+    private fun slugFrom(href: String): String? {
+        val m = Regex("/videos/([^/?\"]+)/?").find(href) ?: return null
+        val slug = m.groupValues[1]
+        return slug.takeIf { it.isNotBlank() && it != "videos" }
     }
 
     override fun detailUrlFor(vodId: Long): String {

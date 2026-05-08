@@ -71,7 +71,9 @@ class XnxxSource @Inject constructor(
                 ?: link.attr("title").trim().ifBlank { null }
                 ?: link.attr("aria-label").trim().ifBlank { null }
                 ?: continue
-            if (title.isBlank() || title == "Video") continue
+            if (title.isBlank() ||
+                title in setOf("Video", "視頻", "视频", "影片", "加載中", "Loading"))
+                continue
 
             // Cover from any <img> inside the block (data-src lazy-load preferred)
             val cover = block.selectFirst("img")?.let { img ->
