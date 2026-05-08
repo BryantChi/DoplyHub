@@ -32,6 +32,8 @@ import com.gimy.tv.ui.theme.*
 fun AdultPlusScreen(
     onVodClick: (SourceType, Long) -> Unit,
     onBack: () -> Unit,
+    /** Navigate to the per-row「查看更多」full-grid page. Receives (sourceType, pathKey, title). */
+    onMoreClick: (SourceType, String, String) -> Unit = { _, _, _ -> },
     vm: AdultPlusViewModel = hiltViewModel(),
 ) {
     val dims = LocalDimensions.current
@@ -84,6 +86,7 @@ fun AdultPlusScreen(
                         row = row,
                         vm = vm,
                         onItemClick = { vod -> onVodClick(vod.sourceType, vod.id) },
+                        onMoreClick = { onMoreClick(row.sourceType, row.key, row.title) },
                     )
                 }
             }
@@ -97,6 +100,7 @@ private fun AdultPlusRowSection(
     row: AdultPlusRow,
     vm: AdultPlusViewModel,
     onItemClick: (com.gimy.tv.domain.model.Vod) -> Unit,
+    onMoreClick: () -> Unit,
 ) {
     val dims = LocalDimensions.current
     val state by vm.rowState(row).collectAsState()
@@ -154,14 +158,14 @@ private fun AdultPlusRowSection(
                     items(state.items, key = { "${it.sourceType}_${it.id}" }) { vod ->
                         VodCard(vod = vod, landscape = true, onClick = { onItemClick(vod) })
                     }
-                    // "→ 更多" trailing card — visible whenever the source still has more pages.
-                    // Tapping appends the next page in-place (no navigation). Hidden once
-                    // exhausted (hasMore = false). Spinner replaces it during loadMore fetches.
-                    if (state.hasMore) {
+                    // "→ 查看更多" trailing card — like HomeScreen ContentRow's MoreCard,
+                    // tapping navigates to a dedicated full-grid page (AdultPlusBrowseScreen)
+                    // with infinite scroll. Always shown if the source claims more pages.
+                    if (state.hasMore || state.items.size >= 20) {
                         item(key = "load_more_${row.key}") {
                             LoadMoreCard(
-                                loading = state.loadingMore,
-                                onClick = { vm.loadMore(row) },
+                                loading = false,
+                                onClick = onMoreClick,
                             )
                         }
                     }

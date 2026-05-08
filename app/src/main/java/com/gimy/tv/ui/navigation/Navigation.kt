@@ -19,4 +19,12 @@ sealed class Screen(val route: String) {
     data object Settings : Screen("settings")
     data object AdultZone : Screen("adult_zone")
     data object AdultPlus : Screen("adult_plus")
+    /** AdultPlus per-row「查看更多」整頁。path & title 經 URL-encode 以容納 / 與空白。 */
+    data object AdultPlusBrowse : Screen("adult_plus_browse/{sourceType}/{path}/{title}") {
+        fun createRoute(sourceType: String, path: String, title: String): String {
+            val encPath = java.net.URLEncoder.encode(path, "UTF-8")
+            val encTitle = java.net.URLEncoder.encode(title, "UTF-8")
+            return "adult_plus_browse/$sourceType/$encPath/$encTitle"
+        }
+    }
 }
