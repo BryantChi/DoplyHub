@@ -180,12 +180,14 @@ class VodRepositoryImpl @Inject constructor(
     }
 
     override suspend fun searchAllSources(keyword: String, page: Int): PaginatedResult<Vod> {
-        // Canonicalize the cache key so "斗罗大陆2", " 斗羅大陸 2 ", "斗羅大陸2" all
-        // map to the same entry instead of fan-out-fetching the same query 3 times.
-        // Trim/collapse whitespace, lowercase, then reuse the simp→trad fold from
-        // normalizeTitle. Search call itself still uses the raw `keyword` string —
-        // only the CACHE LOOKUP is normalized.
-        val cacheKey = "${normalizeSearchKey(keyword)}|$page"
+        // Cache key has three parts:
+        //   1) normalized keyword — collapses whitespace / case / simp-trad variants
+        //   2) page number
+        //   3) enabled-sources fingerprint — toggling sources MUST invalidate cache
+        //      otherwise users see the previous source set's results until cache expires
+        val enabledFp = sourcePreferencesRepository.enabledSources.value
+            .map { it.name }.sorted().joinToString(",")
+        val cacheKey = "${normalizeSearchKey(keyword)}|$page|$enabledFp"
         searchCacheGet(cacheKey)?.let { return it }
 
         val result = coroutineScope {
@@ -324,11 +326,20 @@ class VodRepositoryImpl @Inject constructor(
 
     // ── Enriched detail with cross-source episode groups ──
 
-    override suspend fun getEnrichedVodDetail(sourceType: SourceType, vodId: Long, cachedPrimary: VodDetail?): VodDetail {
+    override suspend fun getEnrichedVodDetail(
+        sourceType: SourceType,
+        vodId: Long,
+        cachedPrimary: VodDetail?,
+        forceRefresh: Boolean,
+    ): VodDetail {
         val cacheKey = "${sourceType.name}|$vodId"
         // Cache hit returns the fully-enriched (8-source merged) detail — skips re-querying 7 sources.
         // Caller's `cachedPrimary` is only the primary-source detail, so prefer our richer cache.
-        detailCacheGet(cacheKey)?.let { return it }
+        // forceRefresh=true (user pulled-to-refresh) bypasses cache so we re-fan to all 8 sources;
+        // without this, refresh within 60s would return the same stale enriched result.
+        if (!forceRefresh) {
+            detailCacheGet(cacheKey)?.let { return it }
+        }
 
         return coroutineScope {
             // Reuse caller-provided primary if present, otherwise fetch
@@ -357,7 +368,10 @@ class VodRepositoryImpl @Inject constructor(
             }.mapNotNull { it.await() }
 
             if (matchedDetails.isEmpty()) {
-                detailCachePut(cacheKey, primaryDetail)
+                // Don't cache primary-only — caching here used to pin every visit to the
+                // primary list for 60s, including transient cases where 7 secondaries
+                // happened to all timeout. Caller passed cachedPrimary so re-running
+                // enrichment costs nothing for primary, only re-fans the 7 secondaries.
                 return@coroutineScope primaryDetail
             }
 

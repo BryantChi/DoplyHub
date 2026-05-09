@@ -22,7 +22,14 @@ interface VodRepository {
 
     // Multi-source integration
     suspend fun searchAllSources(keyword: String, page: Int): PaginatedResult<Vod>
-    suspend fun getEnrichedVodDetail(sourceType: SourceType, vodId: Long, cachedPrimary: VodDetail? = null): VodDetail
+    suspend fun getEnrichedVodDetail(
+        sourceType: SourceType,
+        vodId: Long,
+        cachedPrimary: VodDetail? = null,
+        /** Bypass the in-memory detail cache when set. Used by user-initiated refresh
+         *  so a stale 60s-cached result doesn't shadow the fresh fetch. */
+        forceRefresh: Boolean = false,
+    ): VodDetail
     suspend fun getGimyHomeRows(forceRefresh: Boolean = false): List<HomeRowData>
     suspend fun getMovieffmHomeRows(forceRefresh: Boolean = false): List<HomeRowData>
 }

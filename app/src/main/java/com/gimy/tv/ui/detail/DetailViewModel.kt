@@ -103,7 +103,9 @@ class DetailViewModel @Inject constructor(
 
                 // Phase 2: enrich with cross-source data (non-blocking).
                 try {
-                    val enriched = vodRepository.getEnrichedVodDetail(sourceType, id, cachedPrimary = detail)
+                    val enriched = vodRepository.getEnrichedVodDetail(
+                        sourceType, id, cachedPrimary = detail, forceRefresh = isRefresh,
+                    )
                     if (!isActive) return@launch
                     _uiState.update { state ->
                         // Preserve series from Phase 1.5 if enriched doesn't have any.
