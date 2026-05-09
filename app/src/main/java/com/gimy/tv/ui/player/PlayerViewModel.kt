@@ -8,8 +8,10 @@ import com.gimy.tv.domain.repository.VodRepository
 import com.gimy.tv.domain.repository.WatchHistoryEntry
 import com.gimy.tv.domain.repository.WatchHistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 data class PlayerUiState(
@@ -137,17 +139,26 @@ class PlayerViewModel @Inject constructor(
     ): String? {
         var lastErr: String? = null
         for ((i, src) in candidates.withIndex()) {
-            val ep = src.episodes.find { it.number == episodeNum } ?: src.episodes.firstOrNull()
+            // Strict episode match. Previously we fell back to `firstOrNull()` when the
+            // requested number didn't exist on this line — that silently took the user
+            // from "第30集" to "第1集" without telling them. Now we skip the line and
+            // surface "no line carries ep N" if every candidate misses.
+            val ep = src.episodes.find { it.number == episodeNum }
             if (ep == null) {
-                lastErr = "「${src.sourceName}」無集數"
-                android.util.Log.w("PlayerFallback", "${src.sourceName}: empty episodes")
+                lastErr = "「${src.sourceName}」無第${episodeNum}集"
+                android.util.Log.w("PlayerFallback",
+                    "${src.sourceName}: missing ep$episodeNum (has ${src.episodes.size} eps)")
                 continue
             }
             val msg = if (i == 0) "正在連接「${src.sourceName}」線路…"
                 else "「${candidates[i - 1].sourceName}」無法播放，改用「${src.sourceName}」…"
             _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = msg) }
             try {
-                val data = vodRepository.getPlayerData(sourceType, ep.playUrl)
+                // 8s per-line timeout — slow/stuck sources used to block the whole chain
+                // for 30+ seconds (OkHttp default read timeout) before we moved on.
+                val data = withTimeout(8_000) {
+                    vodRepository.getPlayerData(sourceType, ep.playUrl)
+                }
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -162,6 +173,11 @@ class PlayerViewModel @Inject constructor(
                     )
                 }
                 return null
+            } catch (e: TimeoutCancellationException) {
+                lastErr = "${src.sourceName}: 連線逾時（>8s）"
+                android.util.Log.w("PlayerFallback",
+                    "${src.sourceName} ep${ep.number} url=${ep.playUrl.take(120)} → TIMEOUT")
+                continue
             } catch (e: Exception) {
                 lastErr = "${src.sourceName}: ${e.javaClass.simpleName}${e.message?.let { ": $it" }.orEmpty()}"
                 android.util.Log.w("PlayerFallback",

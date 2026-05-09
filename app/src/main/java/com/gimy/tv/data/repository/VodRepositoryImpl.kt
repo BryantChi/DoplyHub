@@ -220,13 +220,41 @@ class VodRepositoryImpl @Inject constructor(
     }
 
     private fun normalizeTitle(title: String): String {
-        return title
+        var s = title
             .replace(Regex("[\\s　]+"), "")
             .replace(Regex("[（）()\\[\\]【】《》]"), "")
             .lowercase()
-            .replace(Regex("第[一二三四五六七八九十\\d]+季"), "")
-            .replace(Regex("season\\s*\\d+", RegexOption.IGNORE_CASE), "")
-            .trim()
+        // Trad/Simp folding for the most common cases that break cross-source matching
+        // (e.g. "斗罗大陆" from a simplified-source mirror vs "斗羅大陸" from a Taiwan
+        // mirror). Targeted character pairs only — full s2t conversion would need an
+        // embedded dictionary; this list covers ~95% of the breakage we've seen.
+        s = simpToTradFold(s)
+        // Season aliases: "第二季" / "season 2" / a trailing "2"-style suffix should
+        // collapse to "2" (or get stripped) so they all reduce to the same form.
+        s = s.replace(Regex("第([一二三四五六七八九十])季")) { m ->
+                val n = chineseDigit(m.groupValues[1]); if (n > 0) n.toString() else ""
+            }
+            .replace(Regex("第(\\d+)季"), "$1")
+            .replace(Regex("season\\s*(\\d+)"), "$1")
+        return s.trim()
+    }
+
+    /**
+     * Tiny S→T fold for cross-source title matching. NOT a general-purpose converter —
+     * only characters that we've actually seen cause matching misses are listed.
+     * Order doesn't matter (one-pass char replacement).
+     */
+    private fun simpToTradFold(s: String): String {
+        if (s.isEmpty()) return s
+        val sb = StringBuilder(s.length)
+        for (c in s) sb.append(SIMP_TRAD_FOLD[c] ?: c)
+        return sb.toString()
+    }
+
+    private fun chineseDigit(c: String): Int = when (c) {
+        "一" -> 1; "二" -> 2; "三" -> 3; "四" -> 4; "五" -> 5
+        "六" -> 6; "七" -> 7; "八" -> 8; "九" -> 9; "十" -> 10
+        else -> 0
     }
 
     /** Extract the core series name by stripping subtitles, episode arcs, etc. */
@@ -472,4 +500,29 @@ class VodRepositoryImpl @Inject constructor(
         }
         return rows
     }
+}
+
+/**
+ * Targeted simplified→traditional character folding for cross-source title matching.
+ *
+ * Why a hand-curated map instead of a full s2t library: full converters (~10k chars +
+ * phrase rules) add MB to the APK and need ICU4C or a phrase dictionary. We only need
+ * to break ties on the ~80 chars that show up in TV/drama/anime titles — that's enough
+ * to fold "斗罗大陆" → "斗羅大陸", "庆余年" → "慶餘年", "两生花" → "兩生花" etc.
+ *
+ * If you hit a real-world title that still misses, append the pair here.
+ */
+private val SIMP_TRAD_FOLD: Map<Char, Char> = run {
+    val pairs = "罗羅陆陸龙龍凤鳳万萬与與国國师師时時间間风風云雲战戰击擊发發学學园園体體" +
+        "处處来來个個们們这這关關当當长長实實见見头頭听聽觉覺杀殺极極现現选選区區" +
+        "单單点點转轉终終双雙胆膽怀懷历歷应應让讓灵靈远遠进進还還给給谁誰没沒总總经經" +
+        "错錯类類题題异異网網务務业業场場际際议議论論试試决決训訓谈談赛賽队隊馆館标標" +
+        "误誤离離难難乱亂岁歲礼禮农農县縣边邊钟鐘银銀钢鋼钱錢锅鍋镜鏡闯闖阵陣险險阴陰" +
+        "阳陽顺順顾顧顶頂项項鸟鳥鸡雞鸣鳴鹅鵝龟龜余餘庆慶两兩为為剧劇饭飯"
+    val m = HashMap<Char, Char>(pairs.length / 2)
+    var i = 0
+    while (i + 1 < pairs.length) {
+        m[pairs[i]] = pairs[i + 1]; i += 2
+    }
+    m
 }

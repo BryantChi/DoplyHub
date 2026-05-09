@@ -239,21 +239,26 @@ fun DetailScreen(
                     if (filteredEpisodes.size > 1) {
                         item {
                             // Stale-line marker: a line whose episode count is meaningfully
-                            // behind the freshest line is flagged with "N集⚠" so users can
-                            // see at a glance which lines are likely outdated. Threshold:
-                            // diff > max(3, 30% of max) — protects long shows (300ep) from
-                            // being flagged for a 4-ep gap, and short shows (10ep) from
-                            // being unmarked at 30% gap.
-                            val maxCountInTabs = filteredEpisodes.maxOfOrNull { it.episodes.size } ?: 0
-                            val staleThreshold = maxOf(3, maxCountInTabs * 30 / 100)
+                            // behind the freshest line is flagged with "N集⚠".
+                            //
+                            // Reference is the GLOBAL max across all sources (d.episodes),
+                            // not the filtered subset — otherwise picking a single source
+                            // family hides the cross-family laggards we want to flag.
+                            //
+                            // Threshold = max(3, min(20, max*30%)). The 20-cap protects
+                            // long anime (1000 ep × 30% = 300 was too lenient — a line
+                            // missing 200 episodes wouldn't get flagged). The 3-floor
+                            // protects short shows (10 ep) from over-flagging.
+                            val globalMax = d.episodes.maxOfOrNull { it.episodes.size } ?: 0
+                            val staleThreshold = maxOf(3, minOf(20, globalMax * 30 / 100))
                             Column(Modifier.padding(horizontal = dims.screenHorizontalPadding)) {
                                 Text("播放線路", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.height(8.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     items(filteredEpisodes.size) { i ->
                                         val g = filteredEpisodes[i]; val sel = i == safeSrcIdx
-                                        val isStale = g.episodes.size < maxCountInTabs &&
-                                            (maxCountInTabs - g.episodes.size) > staleThreshold
+                                        val isStale = g.episodes.size < globalMax &&
+                                            (globalMax - g.episodes.size) > staleThreshold
                                         val label = buildString {
                                             if (i == 0) append("${g.sourceName} ★") else append(g.sourceName)
                                             if (isStale) append(" ${g.episodes.size}集⚠")
@@ -346,14 +351,16 @@ private fun DetailInfo(
         textAlign = titleAlign, modifier = widthMod)
 
     Spacer(Modifier.height(8.dp))
-    // Status badge — prefer the cross-source max episode count over the primary's
-    // static "更新至 N 集" text. When the primary line is stable-but-stale (e.g.
-    // "更新至 25 集" while another tier-1 line carries 30), the static text is wrong;
-    // the actual episodes we just merged tell us how many are really available.
+    // Status badge — combine raw status text with cross-source max episode count.
+    // The static `vod.status` from the primary scraper still carries useful UX cues
+    // ("完結" / "HD" / "預告" / "中字") that pure count loses; the count is added on
+    // top so users know how many episodes the union of all lines reached.
     val maxEpisodeCount = d.episodes.maxOfOrNull { it.episodes.size } ?: 0
+    val rawStatus = d.vod.status
     val displayStatus = when {
+        maxEpisodeCount > 1 && rawStatus.contains("完結") -> "完結 · 共 $maxEpisodeCount 集"
         maxEpisodeCount > 1 -> "更新至 $maxEpisodeCount 集"
-        else -> d.vod.status
+        else -> rawStatus
     }
     Row(modifier = widthMod, horizontalArrangement = rowArrange) {
         if (displayStatus.isNotBlank()) InfoBadge(displayStatus, CinemaRed)
@@ -524,7 +531,10 @@ private fun EpisodeGrid(
                     // ep.number to keep button heights uniform and avoid awkward 中文 character
                     // breaks. Threshold of 5 chars matches "第01集" / "第123集" / 番外篇.
                     val rawLabel = ep.title.ifBlank { ep.number.toString() }
-                    val label = if (rawLabel.length > 5) ep.number.toString() else rawLabel
+                    // Long episode titles (e.g. "聖光篇 第1集") used to degrade to a
+                    // bare ep.number which loses the named-arc context. Truncate
+                    // instead so anime users still see "聖光篇…" rather than "1".
+                    val label = if (rawLabel.length > 5) "${rawLabel.take(5)}…" else rawLabel
                     if (isTV) {
                         Button(
                             onClick = { onEpClick(group.sourceId, ep.number) },
