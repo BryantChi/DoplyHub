@@ -4,6 +4,7 @@ import android.app.Application
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.gimy.tv.data.endpoint.EndpointResolver
+import com.gimy.tv.data.local.dao.MovieffmSlugDao
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,12 +17,25 @@ import javax.inject.Inject
 class DoplyApp : Application(), ImageLoaderFactory {
 
     @Inject lateinit var endpointResolver: EndpointResolver
+    @Inject lateinit var movieffmSlugDao: MovieffmSlugDao
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
         appScope.launch { endpointResolver.warmUp() }
+
+        // Prune MovieFFM slug cache rows untouched for >30 days. Single DELETE WHERE,
+        // negligible disk cost. Skips WorkManager scheduling because the slug table only
+        // grows while the app is active anyway — running this on each launch is enough
+        // to keep the table from accumulating across months/years of casual use. Errors
+        // ignored: prune is best-effort, never blocks startup.
+        appScope.launch {
+            runCatching {
+                val cutoff = System.currentTimeMillis() - 30L * 24 * 3600 * 1000
+                movieffmSlugDao.pruneOlderThan(cutoff)
+            }
+        }
     }
 
     /**
