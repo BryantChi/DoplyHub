@@ -115,17 +115,22 @@ fun DetailScreen(
                 // keeping content legible — the gradient stops are tuned so the bottom
                 // half still fades cleanly into pure CinemaBlack and doesn't fight the
                 // metadata column underneath.
-                Box(Modifier.fillMaxWidth().height(if (isTV) 520.dp else 340.dp)) {
+                Box(Modifier.fillMaxWidth().height(if (isTV) 680.dp else 460.dp)) {
                     AsyncImage(
                         model = d.vod.coverUrl, contentDescription = null,
                         contentScale = ContentScale.Crop,
                         alpha = 0.32f,
                         modifier = Modifier.fillMaxSize()
                     )
+                    // 4-stop gradient: keep the top airy, extend the soft mid-band so the
+                    // blur fades naturally over the larger area without an abrupt cut, then
+                    // pin the bottom to pure CinemaBlack so the metadata column underneath
+                    // sits on a solid background.
                     Box(Modifier.fillMaxSize().background(
                         Brush.verticalGradient(
-                            0f to CinemaBlack.copy(0.10f),
-                            0.55f to CinemaBlack.copy(0.55f),
+                            0f to CinemaBlack.copy(0.08f),
+                            0.45f to CinemaBlack.copy(0.40f),
+                            0.80f to CinemaBlack.copy(0.85f),
                             1f to CinemaBlack,
                         )
                     ))
