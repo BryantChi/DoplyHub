@@ -103,9 +103,12 @@ class PlayerViewModel @Inject constructor(
                     allSources = detail.episodes,
                 ) }
 
-                val ok = playWithFallback(ordered, initialEpisodeNum, resumeMs)
-                if (!ok) {
-                    _uiState.update { it.copy(isLoading = false, error = "所有線路均無法播放") }
+                val err = playWithFallback(ordered, initialEpisodeNum, resumeMs)
+                if (err != null) {
+                    _uiState.update { it.copy(
+                        isLoading = false,
+                        error = "所有線路均無法播放\n（最後錯誤: $err）"
+                    ) }
                     return@launch
                 }
                 enrichWithCrossSource()
@@ -121,20 +124,25 @@ class PlayerViewModel @Inject constructor(
      * Try playing `episodeNum` across `candidates` sequentially. First successful
      * URL resolution commits the stream + state; on every failure we move to the
      * next candidate with a "「X」失敗，改用「Y」…" hint so users see what's happening.
-     * Returns true on success, false when every line failed.
      *
-     * Used by initial load + episode/source switches so a dead line never lands the
-     * user at a static error screen — we walk down the rank automatically.
+     * Returns null on success, or a short summary of the LAST failure when every
+     * candidate failed — callers can surface that to the user / it also lands in
+     * Logcat under tag "PlayerFallback" per-attempt so we can diagnose dead lines
+     * without having to reproduce the issue.
      */
     private suspend fun playWithFallback(
         candidates: List<EpisodeGroup>,
         episodeNum: Int,
         resumeMs: Long = 0L,
-    ): Boolean {
+    ): String? {
+        var lastErr: String? = null
         for ((i, src) in candidates.withIndex()) {
-            val ep = src.episodes.find { it.number == episodeNum }
-                ?: src.episodes.firstOrNull()
-                ?: continue
+            val ep = src.episodes.find { it.number == episodeNum } ?: src.episodes.firstOrNull()
+            if (ep == null) {
+                lastErr = "「${src.sourceName}」無集數"
+                android.util.Log.w("PlayerFallback", "${src.sourceName}: empty episodes")
+                continue
+            }
             val msg = if (i == 0) "正在連接「${src.sourceName}」線路…"
                 else "「${candidates[i - 1].sourceName}」無法播放，改用「${src.sourceName}」…"
             _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = msg) }
@@ -153,12 +161,15 @@ class PlayerViewModel @Inject constructor(
                         resumePositionMs = if (i == 0) resumeMs else 0L,
                     )
                 }
-                return true
-            } catch (_: Exception) {
+                return null
+            } catch (e: Exception) {
+                lastErr = "${src.sourceName}: ${e.javaClass.simpleName}${e.message?.let { ": $it" }.orEmpty()}"
+                android.util.Log.w("PlayerFallback",
+                    "${src.sourceName} ep${ep.number} url=${ep.playUrl.take(120)} → $lastErr")
                 continue
             }
         }
-        return false
+        return lastErr ?: "no candidates"
     }
 
     /** Reorder so [primarySourceId] is first; the rest keep their original (ranked) order. */
@@ -200,9 +211,12 @@ class PlayerViewModel @Inject constructor(
         val ordered = orderedSourcesFrom(detail.episodes, _uiState.value.sourceId)
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = "正在載入第${episodeNum}集…") }
-            val ok = playWithFallback(ordered, episodeNum, resumeMs = 0L)
-            if (!ok) {
-                _uiState.update { it.copy(isLoading = false, error = "所有線路均無法播放第${episodeNum}集") }
+            val err = playWithFallback(ordered, episodeNum, resumeMs = 0L)
+            if (err != null) {
+                _uiState.update { it.copy(
+                    isLoading = false,
+                    error = "所有線路均無法播放第${episodeNum}集\n（最後錯誤: $err）"
+                ) }
             }
         }
     }
@@ -219,9 +233,12 @@ class PlayerViewModel @Inject constructor(
                 error = null,
                 loadingMessage = "正在切換至「${target.sourceName}」…",
             ) }
-            val ok = playWithFallback(ordered, episodeNum, resumeMs = 0L)
-            if (!ok) {
-                _uiState.update { it.copy(isLoading = false, error = "所有線路均無法播放") }
+            val err = playWithFallback(ordered, episodeNum, resumeMs = 0L)
+            if (err != null) {
+                _uiState.update { it.copy(
+                    isLoading = false,
+                    error = "所有線路均無法播放\n（最後錯誤: $err）"
+                ) }
             }
         }
     }
