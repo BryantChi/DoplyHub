@@ -121,7 +121,10 @@ class PlayerViewModel @Inject constructor(
                     allSources = detail.episodes,
                 ) }
 
-                val err = playWithFallback(ordered, initialEpisodeNum, resumeMs)
+                val err = playWithFallback(
+                    ordered, initialEpisodeNum, resumeMs,
+                    episodeKind = progress?.episodeKind,
+                )
                 if (err != null) {
                     _uiState.update { it.copy(
                         isLoading = false,
@@ -152,6 +155,11 @@ class PlayerViewModel @Inject constructor(
         candidates: List<EpisodeGroup>,
         episodeNum: Int,
         resumeMs: Long = 0L,
+        /** When set, prefer episodes whose kind matches; falls back to plain
+         *  number match if no kind-tagged variant exists on a candidate line.
+         *  Used by continue-play so a saved "OAD 5" history routes back to the
+         *  OAD entry instead of grabbing the first ep with number=5. */
+        episodeKind: String? = null,
     ): String? {
         var lastErr: String? = null
         for ((i, src) in candidates.withIndex()) {
@@ -159,7 +167,9 @@ class PlayerViewModel @Inject constructor(
             // requested number didn't exist on this line — that silently took the user
             // from "第30集" to "第1集" without telling them. Now we skip the line and
             // surface "no line carries ep N" if every candidate misses.
-            val ep = src.episodes.find { it.number == episodeNum }
+            val ep = (if (episodeKind != null) {
+                src.episodes.firstOrNull { it.number == episodeNum && it.kind == episodeKind }
+            } else null) ?: src.episodes.firstOrNull { it.number == episodeNum }
             if (ep == null) {
                 lastErr = "「${src.sourceName}」無第${episodeNum}集"
                 android.util.Log.w("PlayerFallback",
