@@ -458,7 +458,13 @@ class VodRepositoryImpl @Inject constructor(
             // without re-introducing cross-content false positives that the season
             // gate already filters.
             val primaryKey = parseTitleKey(primaryTitle)
-            val similarityThreshold = 0.92
+            // Raised from 0.92 → 0.95: stricter fallback. Most "should match" cases
+            // already go through exact key equality; scoring is just for typo-level
+            // / suffix-tag variants ("鋼之鍊金術師FA" vs "鋼之鍊金術師"). Higher bar
+            // means fewer alternate spellings caught, but also a smaller window for
+            // unrelated-title false positives that could resurrect cross-content
+            // pollution despite the season firewall.
+            val similarityThreshold = 0.95
 
             // Query the other 7 sources in parallel for same (base, season). Each
             // source has its own 5s timeout — slow/failing sources don't block the rest.
