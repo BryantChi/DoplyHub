@@ -80,6 +80,13 @@ trap "rm -f $TMP_NOTES" EXIT
     -e 's/倫理/特殊分類/g' \
     -e 's/成人/特殊內容/g' \
     -e 's/[Aa]dult/category/g' \
+    -e 's/[Jj]able\.tv/來源 A/g' \
+    -e 's/JABLE\.TV/來源 A/g' \
+    -e 's/[Jj]able/來源 A/g' \
+    -e 's/JABLE/來源 A/g' \
+    -e 's/[Xx]nxx/來源 B/g' \
+    -e 's/XNXX/來源 B/g' \
+    -e 's/5278/來源 C/g' \
   > "$TMP_NOTES"
 
 # Append user-provided extra bullets (after `--`)
@@ -101,7 +108,7 @@ cat "$TMP_NOTES"
 echo "═════════════════════════════════════════════════════════"
 
 # Lint: sanity-check no sensitive words leaked through
-LEAKED=$(grep -E "18\+|成人|倫理|露骨|[Aa]dult" "$TMP_NOTES" || true)
+LEAKED=$(grep -Ei "18\+|成人|倫理|露骨|adult|jable|xnxx|5278" "$TMP_NOTES" || true)
 if [ -n "$LEAKED" ]; then
   echo ""
   echo "⚠️  WARNING: 過濾後仍偵測到敏感詞，請檢查 SED_CMD 規則："
