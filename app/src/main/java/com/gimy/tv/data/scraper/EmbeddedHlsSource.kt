@@ -56,35 +56,23 @@ abstract class EmbeddedHlsSource(
     // mapping so detailUrlFor() can reconstruct the URL. Cache lives for the process —
     // first list visit re-populates it after cold start (history/favorite are best-effort).
     //
-    // Bounded LRU (2000 entries each) — previously unbounded ConcurrentHashMap would grow
-    // forever as users browse more vods. 2000 fits ~10 deep-paged lists per source while
-    // capping memory at ~140KB/map. Eviction means a stale slug recomputes the same id
+    // Bounded LRU (2000 entries each) via shared TtlLruCache — previously this was a
+    // hand-rolled `Collections.synchronizedMap(LinkedHashMap with removeEldestEntry)`
+    // duplicated across scrapers. Eviction means a stale slug recomputes the same id
     // (deterministic hash), so no correctness issue — only "soft cold start" for the
     // evicted slug if user opens it from history.
 
     private val slugCacheCapacity = 2000
-    protected val slugToId: MutableMap<String, Long> =
-        java.util.Collections.synchronizedMap(
-            object : LinkedHashMap<String, Long>(slugCacheCapacity, 0.75f, /* accessOrder = */ true) {
-                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean =
-                    size > slugCacheCapacity
-            }
-        )
-    protected val idToSlug: MutableMap<Long, String> =
-        java.util.Collections.synchronizedMap(
-            object : LinkedHashMap<Long, String>(slugCacheCapacity, 0.75f, true) {
-                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>?): Boolean =
-                    size > slugCacheCapacity
-            }
-        )
+    protected val slugToId = com.gimy.tv.data.cache.TtlLruCache<String, Long>(slugCacheCapacity)
+    protected val idToSlug = com.gimy.tv.data.cache.TtlLruCache<Long, String>(slugCacheCapacity)
 
     protected fun stableId(slug: String): Long = slugToId.getOrPut(slug) {
         val id = stableHashLong(slug)
-        idToSlug[id] = slug
+        idToSlug.put(id, slug)
         id
     }
 
-    protected fun slugForId(vodId: Long): String? = idToSlug[vodId]
+    protected fun slugForId(vodId: Long): String? = idToSlug.get(vodId)
 
     private fun stableHashLong(s: String): Long {
         var h = 1125899906842597L

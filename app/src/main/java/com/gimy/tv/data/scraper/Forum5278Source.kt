@@ -40,24 +40,14 @@ class Forum5278Source @Inject constructor(
      * Thread cover cache (tid → coverUrl). Populated from listing parses.
      *
      * Why: thread pages do NOT carry og:image and rarely have the cover image
-     * in their post body — the listing's `<img>` URL (Discuz auto-generated
-     * thumbnail under `neweratt.5278.cc/attachment/forum/threadcover/{aa}/{bb}/{tid}.jpg`)
-     * is the only source. The {aa}/{bb} segments are unpredictable from tid
-     * alone, so we can't reconstruct the URL — must remember what we saw on
-     * the listing. Cold-start (e.g. opening from history) misses.
+     * in their post body — the listing's `<img>` URL is the only source.
+     * The {aa}/{bb} hash dirs are unpredictable from tid, so we can't
+     * reconstruct the URL — must remember what we saw on the listing.
      *
-     * Bounded LRU (1000) — without the cap this map grew forever as users browse
-     * more threads. Eviction means a covered card might lose its image until the
-     * user revisits the listing, which is acceptable.
+     * Bounded LRU (1000) via shared TtlLruCache. Eviction means a covered card
+     * might lose its image until the user revisits the listing — acceptable.
      */
-    private val coverCacheCapacity = 1000
-    private val coverCache: MutableMap<Long, String> =
-        java.util.Collections.synchronizedMap(
-            object : LinkedHashMap<Long, String>(coverCacheCapacity, 0.75f, /* accessOrder = */ true) {
-                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>?): Boolean =
-                    size > coverCacheCapacity
-            }
-        )
+    private val coverCache = com.gimy.tv.data.cache.TtlLruCache<Long, String>(capacity = 1000)
 
     /** Forums we surface. typeId = Discuz forum number. */
     override suspend fun fetchCategories(): List<Category> = listOf(
@@ -88,7 +78,7 @@ class Forum5278Source @Inject constructor(
             //      in current Discuz; older `t_msgfont/postmessage` are kept as fallback.
             //      Static Discuz icons (under `static/image/`) and avatar/smileys are
             //      filtered out.
-            val cachedCover = coverCache[vodId]
+            val cachedCover = coverCache.get(vodId)
             val cover = if (!cachedCover.isNullOrBlank()) cachedCover else {
                 val rawCover = doc.select("td.t_f img, div.t_msgfont img, div.postmessage img, img.zoom")
                     .map { it.attr("file").ifBlank { it.attr("src") } }
@@ -104,7 +94,7 @@ class Forum5278Source @Inject constructor(
                     rawCover.startsWith("//") -> "https:$rawCover"
                     rawCover.startsWith("http") -> rawCover
                     else -> "$baseUrl/${rawCover.trimStart('/')}"
-                }.also { if (it.isNotBlank()) coverCache[vodId] = it }
+                }.also { if (it.isNotBlank()) coverCache.put(vodId, it) }
             }
             // Single virtual episode — fetchPlayerData does the 2-layer extraction
             val ep = Episode(1, title, "embed:$vodId")
@@ -189,7 +179,7 @@ class Forum5278Source @Inject constructor(
             if (!cover.startsWith("http://") && !cover.startsWith("https://")) continue
 
             // Remember the threadcover URL for the detail page — see coverCache docstring.
-            coverCache[threadId] = cover
+            coverCache.put(threadId, cover)
             items.add(Vod(threadId, sourceType, title, cover, "", 0, ""))
         }
         return items

@@ -1,5 +1,6 @@
 package com.gimy.tv.data.repository
 
+import com.gimy.tv.data.cache.TtlLruCache
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.data.local.dao.VodCacheDao
 import com.gimy.tv.data.preferences.SourcePreferencesRepository
@@ -52,54 +53,21 @@ class VodRepositoryImpl @Inject constructor(
     @Volatile private var movieffmHomeCacheTime: Long = 0L
     private val homeCacheTtlMs = 5 * 60 * 1000L // 5 minutes
 
-    // Search/detail caches: 60s TTL; LRU-evicted by capacity. Memory-only — they exist to
-    // dedupe rapid repeat queries (e.g. switching source chips on the search page) so we
-    // don't fan out 8 sources for a question we just answered.
-    private val searchCacheTtlMs = 60 * 1000L
-    private val searchCacheCapacity = 10
-    private val detailCacheTtlMs = 60 * 1000L
-    private val detailCacheCapacity = 20
+    // Search/detail caches: 60s TTL, LRU-evicted by capacity. Both deduplicate rapid
+    // repeat queries (e.g. switching source chips on the search page) so we don't
+    // fan out 8 scrapers for a question we just answered. TtlLruCache handles
+    // eviction/synchronization — see app/data/cache/TtlLruCache.kt.
+    private val searchCache = TtlLruCache<String, PaginatedResult<Vod>>(
+        capacity = 10, ttlMs = 60_000L,
+    )
+    private val detailCache = TtlLruCache<String, VodDetail>(
+        capacity = 20, ttlMs = 60_000L,
+    )
 
-    private data class SearchCacheEntry(val result: PaginatedResult<Vod>, val timestamp: Long)
-    private data class DetailCacheEntry(val detail: VodDetail, val timestamp: Long)
-
-    // LRU caches with built-in eviction. Previously we manually `while (size > cap)`
-    // with iterator-based removal — same outcome, but `removeEldestEntry` is the
-    // idiomatic LinkedHashMap hook, runs once per put, and reads cleaner.
-    private val searchCache: LinkedHashMap<String, SearchCacheEntry> =
-        object : LinkedHashMap<String, SearchCacheEntry>(searchCacheCapacity, 0.75f, /* accessOrder = */ true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, SearchCacheEntry>?): Boolean =
-                size > searchCacheCapacity
-        }
-    private val detailCache: LinkedHashMap<String, DetailCacheEntry> =
-        object : LinkedHashMap<String, DetailCacheEntry>(detailCacheCapacity, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DetailCacheEntry>?): Boolean =
-                size > detailCacheCapacity
-        }
-
-    private fun searchCacheGet(key: String): PaginatedResult<Vod>? = synchronized(searchCache) {
-        val entry = searchCache[key] ?: return null
-        if (System.currentTimeMillis() - entry.timestamp > searchCacheTtlMs) {
-            searchCache.remove(key); return null
-        }
-        entry.result
-    }
-
-    private fun searchCachePut(key: String, result: PaginatedResult<Vod>) = synchronized(searchCache) {
-        searchCache[key] = SearchCacheEntry(result, System.currentTimeMillis())
-    }
-
-    private fun detailCacheGet(key: String): VodDetail? = synchronized(detailCache) {
-        val entry = detailCache[key] ?: return null
-        if (System.currentTimeMillis() - entry.timestamp > detailCacheTtlMs) {
-            detailCache.remove(key); return null
-        }
-        entry.detail
-    }
-
-    private fun detailCachePut(key: String, detail: VodDetail) = synchronized(detailCache) {
-        detailCache[key] = DetailCacheEntry(detail, System.currentTimeMillis())
-    }
+    private fun searchCacheGet(key: String): PaginatedResult<Vod>? = searchCache.get(key)
+    private fun searchCachePut(key: String, result: PaginatedResult<Vod>) = searchCache.put(key, result)
+    private fun detailCacheGet(key: String): VodDetail? = detailCache.get(key)
+    private fun detailCachePut(key: String, detail: VodDetail) = detailCache.put(key, detail)
 
     private fun getSource(sourceType: SourceType): SiteSource = when (sourceType) {
         SourceType.GIMYMAX -> gimyMaxSource

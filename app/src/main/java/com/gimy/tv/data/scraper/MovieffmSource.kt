@@ -24,42 +24,26 @@ class MovieffmSource @Inject constructor(
     override val baseUrl: String get() = endpointResolver.getBaseUrl(sourceType)
 
     // Bidirectional slug <-> ID mapping (in-memory cache, backed by Room).
-    // Bounded LRU (2000 each) — without the cap these maps grew forever as users
-    // browse, leaking memory in long sessions. Eviction is safe: registerSlug recomputes
-    // an evicted slug to the same id (deterministic hash), and `idToSlug` falls back to
-    // the Room slugDao at the call site (line ~87).
+    // Bounded LRU (2000 each) via shared TtlLruCache — see app/data/cache/TtlLruCache.kt.
+    // Eviction is safe: registerSlug recomputes an evicted slug to the same id
+    // (deterministic hash), and `idToSlug` falls back to the Room slugDao at the
+    // call site (line ~87).
     private val slugCacheCapacity = 2000
-    private val slugToId: MutableMap<String, Long> =
-        java.util.Collections.synchronizedMap(
-            object : LinkedHashMap<String, Long>(slugCacheCapacity, 0.75f, /* accessOrder = */ true) {
-                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean =
-                    size > slugCacheCapacity
-            }
-        )
-    private val idToSlug: MutableMap<Long, String> =
-        java.util.Collections.synchronizedMap(
-            object : LinkedHashMap<Long, String>(slugCacheCapacity, 0.75f, true) {
-                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>?): Boolean =
-                    size > slugCacheCapacity
-            }
-        )
-    private val idToContentType: MutableMap<Long, String> =
-        java.util.Collections.synchronizedMap(
-            object : LinkedHashMap<Long, String>(slugCacheCapacity, 0.75f, true) {
-                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>?): Boolean =
-                    size > slugCacheCapacity
-            }
-        )
+    private val slugToId = com.gimy.tv.data.cache.TtlLruCache<String, Long>(slugCacheCapacity)
+    private val idToSlug = com.gimy.tv.data.cache.TtlLruCache<Long, String>(slugCacheCapacity)
+    private val idToContentType = com.gimy.tv.data.cache.TtlLruCache<Long, String>(slugCacheCapacity)
 
     private fun registerSlug(slug: String, contentType: String): Long {
         return slugToId.getOrPut(slug) {
             var id = slug.hashCode().toLong() and Long.MAX_VALUE
-            // Handle hash collisions: if ID is taken by a different slug, increment
-            while (idToSlug.containsKey(id) && idToSlug[id] != slug) {
+            // Handle hash collisions: if ID is taken by a different slug, increment.
+            while (true) {
+                val existing = idToSlug.get(id)
+                if (existing == null || existing == slug) break
                 id = (id + 1) and Long.MAX_VALUE
             }
-            idToSlug[id] = slug
-            idToContentType[id] = contentType
+            idToSlug.put(id, slug)
+            idToContentType.put(id, contentType)
             id
         }
     }
@@ -105,11 +89,11 @@ class MovieffmSource @Inject constructor(
 
     override suspend fun fetchVodDetail(vodId: Long): VodDetail =
         withContext(Dispatchers.IO) {
-            val slug = idToSlug[vodId]
-                ?: slugDao.getSlug(vodId)?.also { idToSlug[vodId] = it }
+            val slug = idToSlug.get(vodId)
+                ?: slugDao.getSlug(vodId)?.also { idToSlug.put(vodId, it) }
                 ?: throw ScraperException("Unknown movieffm ID: $vodId")
-            val contentType = idToContentType[vodId]
-                ?: slugDao.getContentType(vodId)?.also { idToContentType[vodId] = it }
+            val contentType = idToContentType.get(vodId)
+                ?: slugDao.getContentType(vodId)?.also { idToContentType.put(vodId, it) }
                 ?: "movies"
             val doc = fetchDocument("$baseUrl/$contentType/$slug/")
             val relatedSlugs = mutableListOf<MovieffmSlugEntity>()
