@@ -54,11 +54,15 @@ fun AdultPlusBrowseScreen(
         }
     }
 
-    // Adult-plus listings (jable / xnxx) ship widescreen 16:9 thumbnails — use the
-    // landscape VodCard variant so cropping doesn't kill the image. 5278 (BBS posts)
-    // doesn't have proper covers anyway so landscape is harmless.
+    // All three adult-plus sources ship widescreen thumbnails:
+    //   jable / xnxx → 16:9 video stills
+    //   5278         → Discuz threadcover @ 208×120 (≈16:9)
+    // Use the landscape VodCard variant for all of them so cropping doesn't slice the
+    // sides off. Previously 5278 fell through to the portrait 2:3 box, which made the
+    // browse grid look inconsistent with the other two sources.
     val isLandscape = state.sourceType == SourceType.JABLE_TV ||
-        state.sourceType == SourceType.XNXX
+        state.sourceType == SourceType.XNXX ||
+        state.sourceType == SourceType.FORUM5278
 
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
