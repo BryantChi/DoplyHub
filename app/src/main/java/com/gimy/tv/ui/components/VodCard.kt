@@ -111,12 +111,25 @@ fun VodCard(
      *  The default 2:3 portrait fits typical poster art; using Crop on a 16:9 source clips
      *  most of the image. Pass landscape = true so the card matches the source aspect. */
     landscape: Boolean = false,
+    /** When true, the card stretches to its parent's width (used by LazyVerticalGrid cells)
+     *  with height computed from aspect ratio. When false, the card uses fixed dims-based
+     *  width/height (used by LazyRow rails on Home/AdultPlus). */
+    fillCellWidth: Boolean = false,
 ) {
     val dims = LocalDimensions.current
     val isTV = LocalIsTelevision.current
-    // 16:9 cards are a touch wider than the default poster card so they remain readable
     val cardW = if (landscape) (dims.cardWidth.value * 1.55f).dp else dims.cardWidth
-    val cardH = if (landscape) (cardW.value * 9f / 16f).dp + 24.dp else dims.cardHeight  // +24dp for title strip
+    val cardH = if (landscape) (cardW.value * 9f / 16f).dp + 24.dp else dims.cardHeight
+
+    val sizeMod = if (fillCellWidth) {
+        // Stretch to grid cell width; aspect ratio matches the card style. Title overlays
+        // the bottom of the image (see VodCardContent), so 16:9 / 2:3 alone is enough.
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(if (landscape) 16f / 9f else dims.cardWidth.value / dims.cardHeight.value)
+    } else {
+        Modifier.width(cardW).height(cardH)
+    }
 
     if (isTV) {
         var focused by remember { mutableStateOf(false) }
@@ -125,8 +138,7 @@ fun VodCard(
             onClick = onClick,
             onLongClick = onLongClick ?: {},
             modifier = modifier
-                .width(cardW)
-                .height(cardH)
+                .then(sizeMod)
                 .onFocusChanged { focused = it.isFocused },
             shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp)),
             scale = CardDefaults.scale(focusedScale = 1.05f),
@@ -140,8 +152,7 @@ fun VodCard(
     } else {
         androidx.compose.material3.Card(
             modifier = modifier
-                .width(cardW)
-                .height(cardH)
+                .then(sizeMod)
                 .combinedClickable(
                     onClick = onClick,
                     onLongClick = onLongClick,

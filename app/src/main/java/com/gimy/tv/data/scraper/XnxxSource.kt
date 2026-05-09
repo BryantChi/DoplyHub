@@ -103,7 +103,13 @@ class XnxxSource @Inject constructor(
             val id = stableId(key)
             items.add(Vod(id, sourceType, title, cover, "", 0, ""))
         }
-        return items.distinctBy { it.id }
+        val unique = items.distinctBy { it.id }
+        // Log first few covers to logcat so we can verify parser output on real devices
+        // (XNXX cover regression has been hard to repro through curl). Tag: "XnxxScrape".
+        unique.take(3).forEachIndexed { i, vod ->
+            android.util.Log.w("XnxxScrape", "[$i] id=${vod.id} title=${vod.title.take(40)} cover=${vod.coverUrl}")
+        }
+        return unique
     }
 
     override fun detailUrlFor(vodId: Long): String {

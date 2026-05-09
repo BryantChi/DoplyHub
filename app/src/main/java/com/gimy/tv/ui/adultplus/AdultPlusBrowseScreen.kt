@@ -114,7 +114,12 @@ fun AdultPlusBrowseScreen(
                         modifier = Modifier.weight(1f),
                     ) {
                         items(state.items, key = { "${it.sourceType}_${it.id}" }) { vod ->
-                            VodCard(vod = vod, landscape = isLandscape, onClick = { onVodClick(vod.sourceType, vod.id) })
+                            VodCard(
+                                vod = vod,
+                                landscape = isLandscape,
+                                fillCellWidth = true,
+                                onClick = { onVodClick(vod.sourceType, vod.id) },
+                            )
                         }
                     }
                     when {

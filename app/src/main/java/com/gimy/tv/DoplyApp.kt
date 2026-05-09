@@ -44,11 +44,24 @@ class DoplyApp : Application(), ImageLoaderFactory {
                     host.contains("jable") || host.contains("mushroom") -> "https://jable.tv/"
                     host.contains("xnxx-cdn") || host.contains("xnxx") -> "https://www.xnxx.com/"
                     host.contains("hboav") || host.contains("ccccdn") -> "https://5278.cc/"
+                    host.contains("5278") || host.contains("neweratt") -> "https://5278.cc/"
                     else -> null
                 }
                 val builder = req.newBuilder().header("User-Agent", ua)
                 if (referer != null) builder.header("Referer", referer)
-                chain.proceed(builder.build())
+                val isAdultHost = host.contains("xnxx") || host.contains("jable") ||
+                    host.contains("mushroom") || host.contains("hboav") ||
+                    host.contains("ccccdn") || host.contains("5278") ||
+                    host.contains("neweratt")
+                val response = runCatching { chain.proceed(builder.build()) }
+                if (isAdultHost) {
+                    val info = response.fold(
+                        onSuccess = { "HTTP ${it.code}" },
+                        onFailure = { "ERROR ${it.javaClass.simpleName}: ${it.message}" },
+                    )
+                    android.util.Log.w("DoplyImg", "${req.url} → $info")
+                }
+                response.getOrThrow()
             }
             .build()
         return ImageLoader.Builder(this)

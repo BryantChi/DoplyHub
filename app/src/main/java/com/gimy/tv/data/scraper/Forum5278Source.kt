@@ -100,42 +100,48 @@ class Forum5278Source @Inject constructor(
 
     // ─── Parsing ───
 
+    /**
+     * 5278 forum-23 / forum-42 ship a portal-style listing now (no longer table-based).
+     * Each thread sits inside `<li style="width:232px">` with:
+     *   <a class="z" href="thread-{id}-1-1.html"><img src=cover></a>
+     *   <h3 class="xw0"><a href="thread-{id}-1-1.html" title="{realTitle}">{realTitle}</a></h3>
+     *   <cite class="xg1 y">喜歡: N  回復: <a>R</a></cite>
+     *
+     * Filtering strategy (post-mortem on the previous bugs):
+     *   1. Title keyword block-list — covers pinned site rules + obvious ad threads.
+     *   2. Cover URL must be an absolute http(s) URL — sponsored / ad threads use a
+     *      relative `data/attachment/...` path that the CDN won't serve from the App.
+     *      Real video threads always come back with `https://neweratt.5278.cc/...`.
+     *   3. Fallback length guard — titles under 5 chars are stub posts.
+     */
     private fun parseListCards(doc: Document): List<Vod> {
-        // Pass 1: collect IDs of pinned threads via Discuz's purple style marker.
-        // Each thread has 3 <a> tags (thumb / title / reply count); the title tag
-        // carries inline style="color: #8F2A90;" when pinned. Title-only filtering
-        // would miss this because we may hit the thumb tag first and short-circuit.
-        val pinnedIds = mutableSetOf<Long>()
-        for (link in doc.select("a[href^=thread-][style*=8F2A90]")) {
-            val match = Regex("""thread-(\d+)-""").find(link.attr("href")) ?: continue
-            match.groupValues[1].toLongOrNull()?.let { pinnedIds.add(it) }
-        }
-
         val items = mutableListOf<Vod>()
-        // Pass 2: collect normal threads. Prefer the title-bearing link (has [title] attr)
-        // — it carries the actual thread title; the thumb link only has class="z" with
-        // a title attr but no inner text.
-        for (link in doc.select("a[href^=thread-][title]")) {
-            val href = link.attr("href")
-            val match = Regex("""thread-(\d+)-1-1\.html""").find(href) ?: continue
+        val seen = HashSet<Long>()
+        // Block-list keywords. Order doesn't matter — first hit drops the row.
+        val titleBlockKeywords = listOf(
+            "版規", "公告", "瀏覽器支援", "教學", "置頂", "Sticky",
+            "機器人", "夢想成真", "徵求", "徵稿", "邀請", "宣傳", "招募",
+            "官方", "公告", "AI 偶像",
+        )
+
+        for (li in doc.select("li[style*=width:232], li[style*=width: 232]")) {
+            val titleAnchor = li.selectFirst("h3.xw0 a[href^=thread-], h3 a[href^=thread-]") ?: continue
+            val match = Regex("""thread-(\d+)-1-1\.html""").find(titleAnchor.attr("href")) ?: continue
             val threadId = match.groupValues[1].toLongOrNull() ?: continue
-            if (threadId in pinnedIds) continue                  // skip pinned
-            if (link.hasClass("z")) continue                     // skip thumb-only links
+            if (!seen.add(threadId)) continue
 
-            val title = link.attr("title").trim().ifBlank { link.text().trim() }
+            val title = titleAnchor.attr("title").trim().ifBlank { titleAnchor.text().trim() }
             if (title.isBlank() || title.length < 5) continue
-            // Keyword backup filter (covers pinned threads that lack the purple marker)
-            if (title.contains("版規") || title.contains("公告") ||
-                title.contains("瀏覽器支援") || title.contains("教學") ||
-                title.contains("置頂") || title.contains("Sticky") ||
-                (title.contains("更新") && title.length < 20)) continue
+            if (title.contains("更新") && title.length < 20) continue
+            if (titleBlockKeywords.any { title.contains(it, ignoreCase = true) }) continue
 
-            // Cover: thread row may have a preview image nearby (in the same <tr> for Discuz)
-            val cover = link.closest("tr")?.selectFirst("img.threadimg, img[src*=thread]")
-                ?.attr("src").orEmpty()
+            // Cover: first <img src> inside the li. Must be absolute.
+            val cover = li.selectFirst("img[src]")?.attr("src").orEmpty()
+            if (!cover.startsWith("http://") && !cover.startsWith("https://")) continue
+
             items.add(Vod(threadId, sourceType, title, cover, "", 0, ""))
         }
-        return items.distinctBy { it.id }
+        return items
     }
 
     // ─── HTTP ───
