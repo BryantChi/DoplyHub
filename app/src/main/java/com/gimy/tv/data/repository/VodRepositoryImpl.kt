@@ -63,10 +63,19 @@ class VodRepositoryImpl @Inject constructor(
     private data class SearchCacheEntry(val result: PaginatedResult<Vod>, val timestamp: Long)
     private data class DetailCacheEntry(val detail: VodDetail, val timestamp: Long)
 
+    // LRU caches with built-in eviction. Previously we manually `while (size > cap)`
+    // with iterator-based removal — same outcome, but `removeEldestEntry` is the
+    // idiomatic LinkedHashMap hook, runs once per put, and reads cleaner.
     private val searchCache: LinkedHashMap<String, SearchCacheEntry> =
-        LinkedHashMap(searchCacheCapacity, 0.75f, /* accessOrder = */ true)
+        object : LinkedHashMap<String, SearchCacheEntry>(searchCacheCapacity, 0.75f, /* accessOrder = */ true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, SearchCacheEntry>?): Boolean =
+                size > searchCacheCapacity
+        }
     private val detailCache: LinkedHashMap<String, DetailCacheEntry> =
-        LinkedHashMap(detailCacheCapacity, 0.75f, true)
+        object : LinkedHashMap<String, DetailCacheEntry>(detailCacheCapacity, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DetailCacheEntry>?): Boolean =
+                size > detailCacheCapacity
+        }
 
     private fun searchCacheGet(key: String): PaginatedResult<Vod>? = synchronized(searchCache) {
         val entry = searchCache[key] ?: return null
@@ -78,9 +87,6 @@ class VodRepositoryImpl @Inject constructor(
 
     private fun searchCachePut(key: String, result: PaginatedResult<Vod>) = synchronized(searchCache) {
         searchCache[key] = SearchCacheEntry(result, System.currentTimeMillis())
-        while (searchCache.size > searchCacheCapacity) {
-            val it = searchCache.entries.iterator(); it.next(); it.remove()
-        }
     }
 
     private fun detailCacheGet(key: String): VodDetail? = synchronized(detailCache) {
@@ -93,9 +99,6 @@ class VodRepositoryImpl @Inject constructor(
 
     private fun detailCachePut(key: String, detail: VodDetail) = synchronized(detailCache) {
         detailCache[key] = DetailCacheEntry(detail, System.currentTimeMillis())
-        while (detailCache.size > detailCacheCapacity) {
-            val it = detailCache.entries.iterator(); it.next(); it.remove()
-        }
     }
 
     private fun getSource(sourceType: SourceType): SiteSource = when (sourceType) {
@@ -177,7 +180,12 @@ class VodRepositoryImpl @Inject constructor(
     }
 
     override suspend fun searchAllSources(keyword: String, page: Int): PaginatedResult<Vod> {
-        val cacheKey = "$keyword|$page"
+        // Canonicalize the cache key so "斗罗大陆2", " 斗羅大陸 2 ", "斗羅大陸2" all
+        // map to the same entry instead of fan-out-fetching the same query 3 times.
+        // Trim/collapse whitespace, lowercase, then reuse the simp→trad fold from
+        // normalizeTitle. Search call itself still uses the raw `keyword` string —
+        // only the CACHE LOOKUP is normalized.
+        val cacheKey = "${normalizeSearchKey(keyword)}|$page"
         searchCacheGet(cacheKey)?.let { return it }
 
         val result = coroutineScope {
@@ -238,6 +246,14 @@ class VodRepositoryImpl @Inject constructor(
             .replace(Regex("season\\s*(\\d+)"), "$1")
         return s.trim()
     }
+
+    /**
+     * Cache-key canonicalization for searchAllSources. Same query in different
+     * shells (mixed whitespace, mixed simp/trad, mixed case) should hit the same
+     * entry; otherwise the LRU fans out across 3-4 keys for one logical search.
+     */
+    private fun normalizeSearchKey(keyword: String): String =
+        simpToTradFold(keyword.trim().replace(Regex("[\\s　]+"), "").lowercase())
 
     /**
      * Tiny S→T fold for cross-source title matching. NOT a general-purpose converter —

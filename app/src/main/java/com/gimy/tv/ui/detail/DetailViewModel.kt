@@ -8,7 +8,10 @@ import com.gimy.tv.domain.repository.FavoriteRepository
 import com.gimy.tv.domain.repository.VodRepository
 import com.gimy.tv.domain.repository.WatchHistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -41,6 +44,11 @@ class DetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(DetailUiState())
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
 
+    /** Tracks the in-flight loadDetail coroutine. refresh() cancels it before kicking
+     *  off a new one — without this, an old Phase 2 enrichment that finishes after a
+     *  refresh started can race-overwrite the fresh state. */
+    private var loadJob: Job? = null
+
     init {
         loadDetail(isRefresh = false)
         observeFavorite()
@@ -53,7 +61,8 @@ class DetailViewModel @Inject constructor(
     }
 
     private fun loadDetail(isRefresh: Boolean) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.update {
                 if (isRefresh) it.copy(isRefreshing = true, error = null)
                 else it.copy(isLoading = true, error = null)
@@ -66,16 +75,18 @@ class DetailViewModel @Inject constructor(
                 return@launch
             }
             try {
-                // Phase 1: Load primary source detail (fast — show immediately)
+                // Phase 1: Load primary source detail (fast — show immediately).
                 val detail = vodRepository.getVodDetail(sourceType, id)
+                if (!isActive) return@launch  // refresh() cancelled us mid-fetch
                 _uiState.update {
                     it.copy(isLoading = false, isRefreshing = false, isEnriching = true, detail = detail)
                 }
 
-                // Phase 1.5: Search for series items (fast, independent)
+                // Phase 1.5: search for series items (fast, independent child launch).
                 launch {
                     try {
                         val seriesVods = vodRepository.searchSeriesVods(detail.vod)
+                        if (!isActive) return@launch
                         if (seriesVods.isNotEmpty()) {
                             _uiState.update { state ->
                                 val current = state.detail ?: return@update state
@@ -86,14 +97,16 @@ class DetailViewModel @Inject constructor(
                                 ))
                             }
                         }
-                    } catch (_: Exception) { }
+                    } catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { }
                 }
 
-                // Phase 2: Enrich with cross-source data in background (non-blocking)
+                // Phase 2: enrich with cross-source data (non-blocking).
                 try {
                     val enriched = vodRepository.getEnrichedVodDetail(sourceType, id, cachedPrimary = detail)
+                    if (!isActive) return@launch
                     _uiState.update { state ->
-                        // Preserve series from Phase 1.5 if enriched doesn't have any
+                        // Preserve series from Phase 1.5 if enriched doesn't have any.
                         val currentSeries = state.detail?.seriesVods ?: emptyList()
                         val finalSeries = if (enriched.seriesVods.isNotEmpty()) enriched.seriesVods else currentSeries
                         val seriesIds = finalSeries.map { it.id }.toSet()
@@ -102,13 +115,20 @@ class DetailViewModel @Inject constructor(
                             relatedVods = enriched.relatedVods.filter { it.id !in seriesIds }
                         ))
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (_: Exception) {
-                    // Enrichment failed silently — primary detail is already shown
+                    // Enrichment failed silently — primary detail is already shown.
                 } finally {
-                    _uiState.update { it.copy(isEnriching = false) }
+                    // Skip when cancelled — a fresh load is in flight and we shouldn't
+                    // race-clobber its isEnriching state.
+                    if (isActive) _uiState.update { it.copy(isEnriching = false) }
                 }
+            } catch (e: CancellationException) {
+                // A newer loadDetail() cancelled us — leave state alone for the new load.
+                throw e
             } catch (e: java.io.IOException) {
-                // On refresh: keep existing detail visible, drop the spinner silently
+                // On refresh: keep existing detail visible, drop the spinner silently.
                 _uiState.update {
                     if (isRefresh) it.copy(isRefreshing = false, isEnriching = false)
                     else it.copy(isLoading = false, isEnriching = false, error = "網路連線失敗，請檢查網路後重試")
