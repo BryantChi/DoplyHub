@@ -81,6 +81,16 @@ fun DetailScreen(
                 val d = uiState.detail ?: return
                 var srcIdx by remember { mutableIntStateOf(0) }
 
+                // jable/xnxx ship widescreen 16:9 thumbnails; the default 2:3 portrait cover
+                // box + ContentScale.Crop clips ~50% off each side, leaving a sliver in the
+                // middle. Use a wider 16:9 box for these sources so the actual image fits.
+                val isLandscapeCover = d.vod.sourceType == SourceType.JABLE_TV ||
+                    d.vod.sourceType == SourceType.XNXX
+                val coverW = if (isLandscapeCover) (dims.coverWidth.value * 1.5f).dp
+                    else dims.coverWidth
+                val coverH = if (isLandscapeCover) (coverW.value * 9f / 16f).dp
+                    else dims.coverHeight
+
                 // Cross-source filter (Phase 3.3): user can narrow episodes to a single source.
                 // Source labels are parsed from the [Prefix] in EpisodeGroup.sourceName that
                 // VodRepositoryImpl.getEnrichedVodDetail injects for secondary sources.
@@ -134,8 +144,8 @@ fun DetailScreen(
                                     model = d.vod.coverUrl, contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
-                                        .width(dims.coverWidth)
-                                        .height(dims.coverHeight)
+                                        .width(coverW)
+                                        .height(coverH)
                                         .clip(RoundedCornerShape(8.dp))
                                 )
                                 Spacer(Modifier.width(28.dp))
@@ -163,8 +173,8 @@ fun DetailScreen(
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
-                                        .width(dims.coverWidth)
-                                        .height(dims.coverHeight)
+                                        .width(coverW)
+                                        .height(coverH)
                                         .clip(RoundedCornerShape(8.dp))
                                 )
                                 Spacer(Modifier.height(12.dp))

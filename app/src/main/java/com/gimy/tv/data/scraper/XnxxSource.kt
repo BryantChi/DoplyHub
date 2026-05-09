@@ -44,20 +44,30 @@ class XnxxSource @Inject constructor(
 
     override fun parseListCards(doc: Document): List<Vod> {
         val items = mutableListOf<Vod>()
-        // XNXX list HTML structure:
-        //   <div class="thumb-block video" data-video='{...JSON...}'>
+        // XNXX list HTML structure (verified against live HTML):
+        //   <div class="thumb-block video" data-video='{...sfwThumbUrl JSON...}'>
         //     <div class="thumb">
-        //       <a class="thumb-link" href="/video-{id}/{slug}"><img src=blank data-src=real></a>
+        //       <a class="thumb-link" aria-label="Video">       ← no title text
+        //         <img src=blank.gif data-src=real-thumb-url>
+        //       </a>
         //     </div>
-        //     <p class="title"><a href="/video-{id}/{slug}">Real Title Text</a></p>
+        //     <div class="thumb-under">
+        //       <a class="title" href="/video-{id}/{slug}" title="real title">…</a>
+        //     </div>
         //   </div>
-        // Each card has two anchors — thumb-link (carries img, no text) and title-link
-        // (carries text, no img). Iterating "a[href*=/video-]" mixed them up: distinctBy
-        // kept whichever came first, losing either cover or title. We now pivot on the
-        // .thumb-block container and pull both pieces from one place.
-        for (block in doc.select("div.thumb-block, div.thumb-under, .video-block")) {
-            val link = block.selectFirst("a[href*=/video-]") ?: continue
-            val href = link.attr("href")
+        //
+        // Previous bug: we iterated both .thumb-block AND .thumb-under (which is a CHILD
+        // of thumb-block). Walking thumb-block first picked up the thumb-link anchor with
+        // aria-label="Video" → matched the placeholder set → `continue` → emitted nothing
+        // for that card. Then thumb-under iterated, found the real title-link, but had no
+        // <img> nor data-video attr → cover became "". Net effect: every card ended up
+        // with an empty cover URL on the listing page even though the parser otherwise ran.
+        //
+        // Fix: pivot only on .thumb-block and reach INTO it for both pieces — the title
+        // anchor (a.title under .thumb-under) and the img (under .thumb).
+        for (block in doc.select("div.thumb-block")) {
+            val titleLink = block.selectFirst("a.title, p.title a, .video-title a") ?: continue
+            val href = titleLink.attr("href")
             val match = Regex("/video-([a-zA-Z0-9]+)/([^/?\"#]+)").find(href) ?: continue
             val videoId = match.groupValues[1]
             val slug = match.groupValues[2]
@@ -65,24 +75,17 @@ class XnxxSource @Inject constructor(
 
             val key = "$videoId/$slug"
 
-            // Title preference: explicit .title text → title-link aria-label → first .title-link text
-            val title = block.selectFirst("p.title a, .title-link, .video-title a, .video-title")
-                ?.text()?.trim()
-                ?: link.attr("title").trim().ifBlank { null }
-                ?: link.attr("aria-label").trim().ifBlank { null }
-                ?: continue
+            val title = titleLink.attr("title").trim().ifBlank { titleLink.text().trim() }
             if (title.isBlank() ||
                 title in setOf("Video", "視頻", "视频", "影片", "加載中", "Loading"))
                 continue
 
-            // Cover. Browser-equivalent strategy (verified against real listing HTML):
-            //   1) <img data-src=…/xn_NN_t.jpg> — what JS swaps in for src=blank.gif at runtime
-            //   2) <img data-sfwthumb> — fallback explicit attr if data-src missing
-            //   3) data-video JSON sfwThumbUrl (xv_5_t.jpg, an SFW icon variant)
-            // sfwThumbUrl was previously preferred but is the SFW preview, not the
-            // listing thumb — switching to data-src restores the actual cover image.
+            // Cover. Browser-equivalent strategy:
+            //   1) <img data-src=…/xn_NN_t.jpg> — what JS swaps in for src=blank.gif
+            //   2) <img data-sfwthumb> — explicit SFW variant, also valid
+            //   3) data-video JSON sfwThumbUrl — last-resort fallback (XNXX always ships it)
             val cover = run {
-                block.selectFirst("img")?.let { img ->
+                block.selectFirst("a.thumb-link img, .thumb img, img")?.let { img ->
                     val candidates = listOf(
                         img.attr("data-src"),
                         img.attr("data-sfwthumb"),
@@ -104,12 +107,32 @@ class XnxxSource @Inject constructor(
             items.add(Vod(id, sourceType, title, cover, "", 0, ""))
         }
         val unique = items.distinctBy { it.id }
-        // Log first few covers to logcat so we can verify parser output on real devices
-        // (XNXX cover regression has been hard to repro through curl). Tag: "XnxxScrape".
+        // Diagnostic — tag XnxxScrape. Drop once cover regression is known-good in the wild.
         unique.take(3).forEachIndexed { i, vod ->
             android.util.Log.w("XnxxScrape", "[$i] id=${vod.id} title=${vod.title.take(40)} cover=${vod.coverUrl}")
         }
         return unique
+    }
+
+    /**
+     * XNXX uses `<div class="pagination">` with numeric anchors that point to
+     * `/best/{period}/N`, `/tags/{slug}/N`, `/search/{kw}/N` — last URL segment IS the
+     * page number, no rel=next anchor exists. Take the largest trailing-/N from any
+     * anchor in a pagination block. Returns null if no pagination found (single-page
+     * row) so the base class can fall through; AdultPlusBrowseViewModel's `gotNew`
+     * gate will naturally stop infinite-load if items duplicate.
+     */
+    override fun parseMaxPage(doc: Document): Int? {
+        val anchors = doc.select(".pagination a[href], nav.pagination a[href]")
+        if (anchors.isEmpty()) return null
+        val tailNum = Regex("/(\\d+)/?$")
+        return anchors
+            .mapNotNull {
+                val href = it.attr("href").substringBefore('?').trimEnd('/')
+                tailNum.find(href)?.groupValues?.get(1)?.toIntOrNull()
+            }
+            .maxOrNull()
+            ?.takeIf { it > 0 }
     }
 
     override fun detailUrlFor(vodId: Long): String {

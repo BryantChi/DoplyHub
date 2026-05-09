@@ -57,11 +57,19 @@ class Forum5278Source @Inject constructor(
             val rawTitle = doc.selectFirst("title")?.text()?.trim().orEmpty()
             // Strip site suffix from page title: "標題 - 5278 / 5278論壇 - " → "標題"
             val title = rawTitle.split(" - ").firstOrNull()?.trim()?.ifBlank { "Unknown" } ?: "Unknown"
-            // Cover: pick a non-icon image from the post body
-            val cover = doc.select("div.t_msgfont img, div.postmessage img, img.zoom")
+            // Cover: pick a non-icon image from the post body. Discuz embeds attachments as
+            // relative paths (`data/attachment/forum/...`) — feed those to Coil unmodified
+            // and the load fails silently. Normalize all forms to absolute URLs.
+            val rawCover = doc.select("div.t_msgfont img, div.postmessage img, img.zoom")
                 .map { it.attr("file").ifBlank { it.attr("src") } }
                 .firstOrNull { it.isNotBlank() && !it.contains("smil") && !it.contains("avatar") }
                 .orEmpty()
+            val cover = when {
+                rawCover.isBlank() -> ""
+                rawCover.startsWith("//") -> "https:$rawCover"
+                rawCover.startsWith("http") -> rawCover
+                else -> "$baseUrl/${rawCover.trimStart('/')}"
+            }
             // Single virtual episode — fetchPlayerData does the 2-layer extraction
             val ep = Episode(1, title, "embed:$vodId")
             val group = EpisodeGroup("HLS", 1, listOf(ep))
@@ -126,7 +134,12 @@ class Forum5278Source @Inject constructor(
 
         for (li in doc.select("li[style*=width:232], li[style*=width: 232]")) {
             val titleAnchor = li.selectFirst("h3.xw0 a[href^=thread-], h3 a[href^=thread-]") ?: continue
-            val match = Regex("""thread-(\d+)-1-1\.html""").find(titleAnchor.attr("href")) ?: continue
+            // Discuz URL pattern is `thread-{tid}-{postPage}-{forumPage}.html`. Forum
+            // page 1 emits `-1-1`, page 2 emits `-1-2`, etc. The previous regex was
+            // pinned to `-1-1` so every thread on page ≥2 was rejected — `loadMore`
+            // looked broken because we discarded everything we fetched. Match any
+            // postPage and any forumPage suffix.
+            val match = Regex("""thread-(\d+)-\d+-\d+\.html""").find(titleAnchor.attr("href")) ?: continue
             val threadId = match.groupValues[1].toLongOrNull() ?: continue
             if (!seen.add(threadId)) continue
 
