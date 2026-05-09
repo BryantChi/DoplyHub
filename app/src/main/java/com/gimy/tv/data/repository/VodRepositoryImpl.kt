@@ -160,8 +160,14 @@ class VodRepositoryImpl @Inject constructor(
     /** Search across enabled sources in parallel. Order = display priority (stability/popularity).
      *  User-disabled sources are filtered out via SourcePreferencesRepository.enabledSources.
      *  Each source has its own 5s timeout — slow/failing sources don't block fast ones. */
-    private val searchOrder: List<SiteSource> get() {
-        val enabled = sourcePreferencesRepository.enabledSources.value
+    /**
+     * Suspend-based source list — calls snapshot() so cold-start callers wait for
+     * DataStore's first emission rather than racing against the StateFlow seed.
+     * Reading `enabledSources.value` directly here used to return ALL sources before
+     * preferences loaded, polluting the 60s search/enrichment cache for that window.
+     */
+    private suspend fun searchOrder(): List<SiteSource> {
+        val enabled = sourcePreferencesRepository.snapshot()
         return listOf(
             gimyTvSource, gimyMaxSource, imapleTvSource, gimyTwSource,
             eynyTvSource, momovodSource, kubo123Source, movieffmSource,
@@ -185,13 +191,20 @@ class VodRepositoryImpl @Inject constructor(
         //   2) page number
         //   3) enabled-sources fingerprint — toggling sources MUST invalidate cache
         //      otherwise users see the previous source set's results until cache expires
-        val enabledFp = sourcePreferencesRepository.enabledSources.value
-            .map { it.name }.sorted().joinToString(",")
+        // snapshot() suspends until DataStore loads, so the fingerprint reflects the
+        // user's actual settings (not the StateFlow seed).
+        val enabled = sourcePreferencesRepository.snapshot()
+        val enabledFp = enabled.map { it.name }.sorted().joinToString(",")
         val cacheKey = "${normalizeSearchKey(keyword)}|$page|$enabledFp"
         searchCacheGet(cacheKey)?.let { return it }
 
+        val sources = listOf(
+            gimyTvSource, gimyMaxSource, imapleTvSource, gimyTwSource,
+            eynyTvSource, momovodSource, kubo123Source, movieffmSource,
+        ).filter { it.sourceType in enabled }
+
         val result = coroutineScope {
-            val deferreds = searchOrder.map { src ->
+            val deferreds = sources.map { src ->
                 async {
                     try {
                         withTimeout(5_000) { src.search(keyword, page) }
@@ -304,7 +317,7 @@ class VodRepositoryImpl @Inject constructor(
         if (baseTitle.isBlank() || baseTitle.length < 2) return emptyList()
 
         return coroutineScope {
-            val deferreds = searchOrder.map { src ->
+            val deferreds = searchOrder().map { src ->
                 async {
                     try {
                         withTimeout(4_000) { src.search(baseTitle, 1).items }
@@ -350,7 +363,7 @@ class VodRepositoryImpl @Inject constructor(
 
             // Query the other 7 sources in parallel for same title (+ year if available).
             // Each source has its own 5s timeout — slow/failing sources don't block the rest.
-            val otherSources = searchOrder.filter { it.sourceType != sourceType }
+            val otherSources = searchOrder().filter { it.sourceType != sourceType }
             val matchedDetails = otherSources.map { src ->
                 async {
                     try {

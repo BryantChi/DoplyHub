@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -43,6 +44,20 @@ class SourcePreferencesRepository @Inject constructor(
 
     suspend fun setEnabled(sourceType: SourceType, enabled: Boolean) {
         dataStore.edit { it[keyFor(sourceType)] = enabled }
+    }
+
+    /**
+     * Cold-start-safe snapshot of currently-enabled sources.
+     *
+     * `enabledSources.value` returns the seed (all sources enabled) until the underlying
+     * DataStore finishes its first read — that race lets cold-start code paths
+     * (search, enrichment) run against a wider source set than the user actually wants,
+     * polluting the 60s cache for that long. Reading `dataStore.data.first()` directly
+     * suspends until the real value is available, regardless of stateIn timing.
+     */
+    suspend fun snapshot(): Set<SourceType> {
+        val prefs = dataStore.data.first()
+        return SourceType.values().filter { prefs[keyFor(it)] ?: true }.toSet()
     }
 
     private fun keyFor(type: SourceType) = booleanPreferencesKey("source_${type.name}")
