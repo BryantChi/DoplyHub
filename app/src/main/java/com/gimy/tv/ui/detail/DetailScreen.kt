@@ -81,12 +81,15 @@ fun DetailScreen(
                 val d = uiState.detail ?: return
                 var srcIdx by remember { mutableIntStateOf(0) }
 
-                // jable/xnxx ship widescreen 16:9 thumbnails; the default 2:3 portrait cover
-                // box + ContentScale.Crop clips ~50% off each side, leaving a sliver in the
-                // middle. Use a wider 16:9 box for these sources so the actual image fits.
+                // jable/xnxx/5278 all ship widescreen 16:9 thumbnails; the default 2:3
+                // portrait cover box + ContentScale.Crop clips ~50% off each side. Use a
+                // wider 16:9 box for these sources. 2.0x makes the cover visually prominent
+                // (TV: 350×197, phone: 240×135) — earlier 1.5x looked too small next to
+                // the metadata column.
                 val isLandscapeCover = d.vod.sourceType == SourceType.JABLE_TV ||
-                    d.vod.sourceType == SourceType.XNXX
-                val coverW = if (isLandscapeCover) (dims.coverWidth.value * 1.5f).dp
+                    d.vod.sourceType == SourceType.XNXX ||
+                    d.vod.sourceType == SourceType.FORUM5278
+                val coverW = if (isLandscapeCover) (dims.coverWidth.value * 2.0f).dp
                     else dims.coverWidth
                 val coverH = if (isLandscapeCover) (coverW.value * 9f / 16f).dp
                     else dims.coverHeight
@@ -107,16 +110,24 @@ fun DetailScreen(
                 LaunchedEffect(selectedSourceLabel) { srcIdx = 0 }
                 val safeSrcIdx = if (filteredEpisodes.isNotEmpty()) srcIdx.coerceIn(0, filteredEpisodes.size - 1) else 0
 
-                // Background blur image with overlay gradient (single layer to reduce overdraw)
-                Box(Modifier.fillMaxWidth().height(if (isTV) 400.dp else 250.dp)) {
+                // Background hero: blurred cover behind a gradient. We bump both the
+                // bleed area and the alpha so the cover comes through more visibly while
+                // keeping content legible — the gradient stops are tuned so the bottom
+                // half still fades cleanly into pure CinemaBlack and doesn't fight the
+                // metadata column underneath.
+                Box(Modifier.fillMaxWidth().height(if (isTV) 520.dp else 340.dp)) {
                     AsyncImage(
                         model = d.vod.coverUrl, contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        alpha = 0.15f,
+                        alpha = 0.32f,
                         modifier = Modifier.fillMaxSize()
                     )
                     Box(Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(listOf(CinemaBlack.copy(0.3f), CinemaBlack))
+                        Brush.verticalGradient(
+                            0f to CinemaBlack.copy(0.10f),
+                            0.55f to CinemaBlack.copy(0.55f),
+                            1f to CinemaBlack,
+                        )
                     ))
                 }
 

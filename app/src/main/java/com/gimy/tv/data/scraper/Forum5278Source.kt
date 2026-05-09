@@ -8,6 +8,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,6 +37,19 @@ class Forum5278Source @Inject constructor(
     private val userAgent =
         "Mozilla/5.0 (Linux; Android 10) Mobile Safari/537.36"
 
+    /**
+     * Thread cover cache (tid → coverUrl). Populated from listing parses.
+     *
+     * Why: thread pages do NOT carry og:image and rarely have the cover image
+     * in their post body — the listing's `<img>` URL (Discuz auto-generated
+     * thumbnail under `neweratt.5278.cc/attachment/forum/threadcover/{aa}/{bb}/{tid}.jpg`)
+     * is the only source. The {aa}/{bb} segments are unpredictable from tid
+     * alone, so we can't reconstruct the URL — must remember what we saw on
+     * the listing. Cold-start (e.g. opening from history) misses; same
+     * best-effort design as the slug cache in EmbeddedHlsSource.
+     */
+    private val coverCache = ConcurrentHashMap<Long, String>()
+
     /** Forums we surface. typeId = Discuz forum number. */
     override suspend fun fetchCategories(): List<Category> = listOf(
         Category(23, "成人線上", sourceType),
@@ -57,18 +71,31 @@ class Forum5278Source @Inject constructor(
             val rawTitle = doc.selectFirst("title")?.text()?.trim().orEmpty()
             // Strip site suffix from page title: "標題 - 5278 / 5278論壇 - " → "標題"
             val title = rawTitle.split(" - ").firstOrNull()?.trim()?.ifBlank { "Unknown" } ?: "Unknown"
-            // Cover: pick a non-icon image from the post body. Discuz embeds attachments as
-            // relative paths (`data/attachment/forum/...`) — feed those to Coil unmodified
-            // and the load fails silently. Normalize all forms to absolute URLs.
-            val rawCover = doc.select("div.t_msgfont img, div.postmessage img, img.zoom")
-                .map { it.attr("file").ifBlank { it.attr("src") } }
-                .firstOrNull { it.isNotBlank() && !it.contains("smil") && !it.contains("avatar") }
-                .orEmpty()
-            val cover = when {
-                rawCover.isBlank() -> ""
-                rawCover.startsWith("//") -> "https:$rawCover"
-                rawCover.startsWith("http") -> rawCover
-                else -> "$baseUrl/${rawCover.trimStart('/')}"
+            // Cover resolution priority:
+            //   1) coverCache[tid] — populated when the listing was parsed. This is the
+            //      threadcover URL Discuz generates and is the only reliable source.
+            //   2) post-body <img> — usually empty (most threads embed video iframes only).
+            //      The post body lives under `<td class="t_f" id="postmessage_NNN">`
+            //      in current Discuz; older `t_msgfont/postmessage` are kept as fallback.
+            //      Static Discuz icons (under `static/image/`) and avatar/smileys are
+            //      filtered out.
+            val cachedCover = coverCache[vodId]
+            val cover = if (!cachedCover.isNullOrBlank()) cachedCover else {
+                val rawCover = doc.select("td.t_f img, div.t_msgfont img, div.postmessage img, img.zoom")
+                    .map { it.attr("file").ifBlank { it.attr("src") } }
+                    .firstOrNull {
+                        it.isNotBlank() &&
+                            !it.contains("smil") &&
+                            !it.contains("avatar") &&
+                            !it.contains("static/image")
+                    }
+                    .orEmpty()
+                when {
+                    rawCover.isBlank() -> ""
+                    rawCover.startsWith("//") -> "https:$rawCover"
+                    rawCover.startsWith("http") -> rawCover
+                    else -> "$baseUrl/${rawCover.trimStart('/')}"
+                }.also { if (it.isNotBlank()) coverCache[vodId] = it }
             }
             // Single virtual episode — fetchPlayerData does the 2-layer extraction
             val ep = Episode(1, title, "embed:$vodId")
@@ -152,6 +179,8 @@ class Forum5278Source @Inject constructor(
             val cover = li.selectFirst("img[src]")?.attr("src").orEmpty()
             if (!cover.startsWith("http://") && !cover.startsWith("https://")) continue
 
+            // Remember the threadcover URL for the detail page — see coverCache docstring.
+            coverCache[threadId] = cover
             items.add(Vod(threadId, sourceType, title, cover, "", 0, ""))
         }
         return items
