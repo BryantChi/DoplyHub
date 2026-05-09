@@ -360,6 +360,10 @@ class VodRepositoryImpl @Inject constructor(
      *   3.  GimyMax/GimyTv secondary (騰訊/藍光/4K/優質/非凡)
      *   4.  Unknown
      *
+     * Within the same tier, lines with MORE episodes win — stable-but-stale lines
+     * (e.g. primary listing says "更新至 25 集" while another tier-1 line carries 30)
+     * shouldn't be the default pick when a fresher one exists.
+     *
      * The `!name.contains("雲")` guard prevents 「無盡雲」from matching gimyTop's「無盡」tag.
      */
     private fun rankEpisodeGroups(groups: List<EpisodeGroup>): List<EpisodeGroup> {
@@ -367,25 +371,25 @@ class VodRepositoryImpl @Inject constructor(
         val newSiteTopSources = listOf("卧龍雲", "索尼雲", "無盡雲", "閃電雲", "極速雲", "優質雲")
         val gimySecondary = listOf("騰訊", "藍光", "4K", "優質", "非凡")
 
-        return groups.sortedWith(compareBy { group ->
+        fun tierOf(group: EpisodeGroup): Int {
             val name = group.sourceName
-            when {
-                // Tier 1A: GimyMax/GimyTv top stable (0-3)
+            return when {
                 !name.contains("雲") && gimyTopSources.any { name.contains(it) } ->
                     gimyTopSources.indexOfFirst { name.contains(it) }
-                // Tier 1B: new MacCMS site lines (4-9)
                 newSiteTopSources.any { name.contains(it) } ->
                     4 + newSiteTopSources.indexOfFirst { name.contains(it) }
-                // Tier 2: Movieffm direct (15-24)
                 name.contains("MovieFFM") || (group.sourceId >= 1000 && group.sourceId > 0) ->
                     15 + (group.sourceId % 10)
-                // Tier 3: GimyMax/GimyTv secondary (25-29)
                 !name.contains("雲") && gimySecondary.any { name.contains(it) } ->
                     25 + gimySecondary.indexOfFirst { name.contains(it) }
-                // Tier 4: unknown
                 else -> 99
             }
-        })
+        }
+
+        return groups.sortedWith(
+            compareBy<EpisodeGroup> { tierOf(it) }
+                .thenByDescending { it.episodes.size }
+        )
     }
 
     // ── Home page mixed content ──

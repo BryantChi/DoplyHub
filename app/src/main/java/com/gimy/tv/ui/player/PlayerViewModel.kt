@@ -61,7 +61,6 @@ class PlayerViewModel @Inject constructor(
                 return@launch
             }
             try {
-                // Load primary detail first for fast playback start
                 val detail = vodRepository.getVodDetail(sourceType, id)
                 vodDetail = detail
 
@@ -70,99 +69,92 @@ class PlayerViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Pick source: use requested sourceId, or first (already sorted by stability)
-                val sourceGroup = if (initialSourceId > 0) {
-                    detail.episodes.find { it.sourceId == initialSourceId } ?: detail.episodes.first()
-                } else {
-                    detail.episodes.first() // first = most stable due to sorting
-                }
+                // Order: requested source first, then remaining sources as fallbacks.
+                val ordered = orderedSourcesFrom(detail.episodes, initialSourceId)
+                val firstSource = ordered.first()
+                val firstEp = firstSource.episodes.find { it.number == initialEpisodeNum }
+                    ?: firstSource.episodes.firstOrNull()
 
-                val episode = sourceGroup.episodes.find { it.number == initialEpisodeNum }
-                    ?: sourceGroup.episodes.firstOrNull()
-
-                if (episode == null) {
-                    _uiState.update { it.copy(isLoading = false, error = "找不到第${initialEpisodeNum}集") }
-                    return@launch
-                }
-
-                _uiState.update { it.copy(
-                    loadingMessage = "正在連接「${sourceGroup.sourceName}」線路…",
-                    allSources = detail.episodes,
-                    vodTitle = detail.vod.title,
-                    sourceName = sourceGroup.sourceName
-                ) }
-
-                // Get stream URL
-                val playerData = vodRepository.getPlayerData(sourceType, episode.playUrl)
-
-                // Check resume position
+                // Resume position only honored when we land on the exact (source, episode)
+                // pair the user came from. Fallback sources or different episodes restart at 0.
                 val progress = watchHistoryRepository.getProgress(id, sourceType)
-                val resumeMs = if (progress != null &&
-                    progress.episodeNum == episode.number &&
-                    progress.sourceId == sourceGroup.sourceId
+                val resumeMs = if (progress != null && firstEp != null &&
+                    progress.episodeNum == firstEp.number &&
+                    progress.sourceId == firstSource.sourceId
                 ) progress.positionMs else 0L
 
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        streamUrl = playerData.streamUrl,
-                        vodTitle = detail.vod.title,
-                        episodeTitle = episode.title,
-                        episodeNum = episode.number,
-                        sourceId = sourceGroup.sourceId,
-                        sourceName = sourceGroup.sourceName,
-                        resumePositionMs = resumeMs,
-                        totalEpisodes = sourceGroup.episodes.size
-                    )
-                }
+                _uiState.update { it.copy(
+                    vodTitle = detail.vod.title,
+                    allSources = detail.episodes,
+                ) }
 
-                // Background: enrich with cross-source routes for fallback
-                enrichWithCrossSource()
-            } catch (e: Exception) {
-                // If current source fails, try next one
-                val detail = vodDetail
-                if (detail != null && detail.episodes.size > 1) {
-                    val currentIdx = detail.episodes.indexOfFirst { it.sourceId == _uiState.value.sourceId }
-                    val nextIdx = if (currentIdx >= 0 && currentIdx < detail.episodes.size - 1) currentIdx + 1 else -1
-                    if (nextIdx >= 0) {
-                        val nextSource = detail.episodes[nextIdx]
-                        _uiState.update { it.copy(
-                            loadingMessage = "「${_uiState.value.sourceName}」失敗，自動嘗試「${nextSource.sourceName}」…"
-                        ) }
-                        tryAlternateSource(nextSource)
-                        return@launch
-                    }
+                val ok = playWithFallback(ordered, initialEpisodeNum, resumeMs)
+                if (!ok) {
+                    _uiState.update { it.copy(isLoading = false, error = "所有線路均無法播放") }
+                    return@launch
                 }
-                val msg = if (e is java.io.IOException) "網路連線失敗，請檢查網路後重試" else "播放失敗: ${e.message}"
-                _uiState.update { it.copy(isLoading = false, error = msg) }
+                enrichWithCrossSource()
+            } catch (e: java.io.IOException) {
+                _uiState.update { it.copy(isLoading = false, error = "網路連線失敗，請檢查網路後重試") }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = "播放失敗: ${e.message}") }
             }
         }
     }
 
-    private fun tryAlternateSource(sourceGroup: EpisodeGroup) {
-        viewModelScope.launch {
+    /**
+     * Try playing `episodeNum` across `candidates` sequentially. First successful
+     * URL resolution commits the stream + state; on every failure we move to the
+     * next candidate with a "「X」失敗，改用「Y」…" hint so users see what's happening.
+     * Returns true on success, false when every line failed.
+     *
+     * Used by initial load + episode/source switches so a dead line never lands the
+     * user at a static error screen — we walk down the rank automatically.
+     */
+    private suspend fun playWithFallback(
+        candidates: List<EpisodeGroup>,
+        episodeNum: Int,
+        resumeMs: Long = 0L,
+    ): Boolean {
+        for ((i, src) in candidates.withIndex()) {
+            val ep = src.episodes.find { it.number == episodeNum }
+                ?: src.episodes.firstOrNull()
+                ?: continue
+            val msg = if (i == 0) "正在連接「${src.sourceName}」線路…"
+                else "「${candidates[i - 1].sourceName}」無法播放，改用「${src.sourceName}」…"
+            _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = msg) }
             try {
-                val episode = sourceGroup.episodes.find { it.number == _uiState.value.episodeNum }
-                    ?: sourceGroup.episodes.firstOrNull()
-                    ?: throw Exception("No episodes")
-
-                val playerData = vodRepository.getPlayerData(sourceType, episode.playUrl)
-
+                val data = vodRepository.getPlayerData(sourceType, ep.playUrl)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        streamUrl = playerData.streamUrl,
-                        episodeTitle = episode.title,
-                        episodeNum = episode.number,
-                        sourceId = sourceGroup.sourceId,
-                        sourceName = sourceGroup.sourceName,
-                        totalEpisodes = sourceGroup.episodes.size
+                        error = null,
+                        streamUrl = data.streamUrl,
+                        episodeNum = ep.number,
+                        episodeTitle = ep.title,
+                        sourceId = src.sourceId,
+                        sourceName = src.sourceName,
+                        totalEpisodes = src.episodes.size,
+                        resumePositionMs = if (i == 0) resumeMs else 0L,
                     )
                 }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = "所有線路均無法播放") }
+                return true
+            } catch (_: Exception) {
+                continue
             }
         }
+        return false
+    }
+
+    /** Reorder so [primarySourceId] is first; the rest keep their original (ranked) order. */
+    private fun orderedSourcesFrom(
+        all: List<EpisodeGroup>,
+        primarySourceId: Int,
+    ): List<EpisodeGroup> {
+        if (all.isEmpty()) return all
+        val primaryIdx = all.indexOfFirst { it.sourceId == primarySourceId }
+        return if (primaryIdx <= 0) all
+        else listOf(all[primaryIdx]) + all.filterIndexed { i, _ -> i != primaryIdx }
     }
 
     fun saveProgress(positionMs: Long, durationMs: Long) {
@@ -190,48 +182,31 @@ class PlayerViewModel @Inject constructor(
 
     fun switchEpisode(episodeNum: Int) {
         val detail = vodDetail ?: return
-        val sourceGroup = detail.episodes.find { it.sourceId == _uiState.value.sourceId } ?: return
-        val episode = sourceGroup.episodes.find { it.number == episodeNum } ?: return
-
+        val ordered = orderedSourcesFrom(detail.episodes, _uiState.value.sourceId)
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, loadingMessage = "正在載入第${episodeNum}集…") }
-            try {
-                val playerData = vodRepository.getPlayerData(sourceType, episode.playUrl)
-                _uiState.update {
-                    it.copy(
-                        isLoading = false, streamUrl = playerData.streamUrl,
-                        episodeNum = episode.number, episodeTitle = episode.title, resumePositionMs = 0L
-                    )
-                }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = "載入失敗: ${e.message}") }
+            _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = "正在載入第${episodeNum}集…") }
+            val ok = playWithFallback(ordered, episodeNum, resumeMs = 0L)
+            if (!ok) {
+                _uiState.update { it.copy(isLoading = false, error = "所有線路均無法播放第${episodeNum}集") }
             }
         }
     }
 
     fun switchSource(sourceId: Int) {
         val detail = vodDetail ?: return
-        val sourceGroup = detail.episodes.find { it.sourceId == sourceId } ?: return
-        val episode = sourceGroup.episodes.find { it.number == _uiState.value.episodeNum }
-            ?: sourceGroup.episodes.firstOrNull() ?: return
-
+        val ordered = orderedSourcesFrom(detail.episodes, sourceId)
+        if (ordered.isEmpty()) return
+        val target = ordered.first()
+        val episodeNum = _uiState.value.episodeNum
         viewModelScope.launch {
             _uiState.update { it.copy(
                 isLoading = true,
-                loadingMessage = "正在切換至「${sourceGroup.sourceName}」…"
+                error = null,
+                loadingMessage = "正在切換至「${target.sourceName}」…",
             ) }
-            try {
-                val playerData = vodRepository.getPlayerData(sourceType, episode.playUrl)
-                _uiState.update {
-                    it.copy(
-                        isLoading = false, streamUrl = playerData.streamUrl,
-                        sourceId = sourceId, sourceName = sourceGroup.sourceName,
-                        episodeNum = episode.number, episodeTitle = episode.title,
-                        totalEpisodes = sourceGroup.episodes.size
-                    )
-                }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = "線路切換失敗: ${e.message}") }
+            val ok = playWithFallback(ordered, episodeNum, resumeMs = 0L)
+            if (!ok) {
+                _uiState.update { it.copy(isLoading = false, error = "所有線路均無法播放") }
             }
         }
     }

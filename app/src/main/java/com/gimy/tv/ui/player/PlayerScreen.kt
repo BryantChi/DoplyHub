@@ -178,14 +178,42 @@ fun PlayerScreen(
                                     }
                                 }
                             )
-                            // Intercept only BACK key
+                            // Key handling for TV remote:
+                            //   BACK             → save progress + exit
+                            //   DPAD_LEFT  / MEDIA_REWIND       → seek -10s directly
+                            //   DPAD_RIGHT / MEDIA_FAST_FORWARD → seek +10s directly
+                            // Default Media3 behavior leaves DPAD_LEFT/RIGHT as
+                            // controller-focus navigation, so users had to: show controller
+                            // → focus rewind/forward button → press OK to seek. Three steps
+                            // for one seek. Directly mapping LEFT/RIGHT to seek matches the
+                            // YouTube / Netflix TV experience.
                             setOnKeyListener { _, keyCode, event ->
-                                if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
-                                    viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
-                                    onBack()
-                                    true
-                                } else {
-                                    false // Let PlayerView handle everything else
+                                if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                                when (keyCode) {
+                                    KeyEvent.KEYCODE_BACK -> {
+                                        viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
+                                        onBack()
+                                        true
+                                    }
+                                    KeyEvent.KEYCODE_DPAD_LEFT,
+                                    KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                                        val target = (exoPlayer.currentPosition - 10_000).coerceAtLeast(0)
+                                        exoPlayer.seekTo(target)
+                                        showController()
+                                        infoTrigger++
+                                        true
+                                    }
+                                    KeyEvent.KEYCODE_DPAD_RIGHT,
+                                    KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                                        val dur = exoPlayer.duration
+                                        val raw = exoPlayer.currentPosition + 10_000
+                                        val target = if (dur > 0) raw.coerceAtMost(dur) else raw
+                                        exoPlayer.seekTo(target)
+                                        showController()
+                                        infoTrigger++
+                                        true
+                                    }
+                                    else -> false
                                 }
                             }
                             playerView = this

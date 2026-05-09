@@ -15,6 +15,10 @@ import javax.inject.Inject
 data class DetailUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
+    /** Phase 2 in flight — primary detail is on screen but cross-source enrichment
+     *  (additional sources/episode lists/series) is still being fetched. Drives the
+     *  inline "更多來源載入中" hint. */
+    val isEnriching: Boolean = false,
     val detail: VodDetail? = null,
     val isFavorite: Boolean = false,
     val lastEpisode: Int? = null,
@@ -64,7 +68,9 @@ class DetailViewModel @Inject constructor(
             try {
                 // Phase 1: Load primary source detail (fast — show immediately)
                 val detail = vodRepository.getVodDetail(sourceType, id)
-                _uiState.update { it.copy(isLoading = false, isRefreshing = false, detail = detail) }
+                _uiState.update {
+                    it.copy(isLoading = false, isRefreshing = false, isEnriching = true, detail = detail)
+                }
 
                 // Phase 1.5: Search for series items (fast, independent)
                 launch {
@@ -98,17 +104,19 @@ class DetailViewModel @Inject constructor(
                     }
                 } catch (_: Exception) {
                     // Enrichment failed silently — primary detail is already shown
+                } finally {
+                    _uiState.update { it.copy(isEnriching = false) }
                 }
             } catch (e: java.io.IOException) {
                 // On refresh: keep existing detail visible, drop the spinner silently
                 _uiState.update {
-                    if (isRefresh) it.copy(isRefreshing = false)
-                    else it.copy(isLoading = false, error = "網路連線失敗，請檢查網路後重試")
+                    if (isRefresh) it.copy(isRefreshing = false, isEnriching = false)
+                    else it.copy(isLoading = false, isEnriching = false, error = "網路連線失敗，請檢查網路後重試")
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    if (isRefresh) it.copy(isRefreshing = false)
-                    else it.copy(isLoading = false, error = "載入失敗: ${e.message}")
+                    if (isRefresh) it.copy(isRefreshing = false, isEnriching = false)
+                    else it.copy(isLoading = false, isEnriching = false, error = "載入失敗: ${e.message}")
                 }
             }
         }

@@ -238,13 +238,26 @@ fun DetailScreen(
                     // ── Source tabs ──
                     if (filteredEpisodes.size > 1) {
                         item {
+                            // Stale-line marker: a line whose episode count is meaningfully
+                            // behind the freshest line is flagged with "N集⚠" so users can
+                            // see at a glance which lines are likely outdated. Threshold:
+                            // diff > max(3, 30% of max) — protects long shows (300ep) from
+                            // being flagged for a 4-ep gap, and short shows (10ep) from
+                            // being unmarked at 30% gap.
+                            val maxCountInTabs = filteredEpisodes.maxOfOrNull { it.episodes.size } ?: 0
+                            val staleThreshold = maxOf(3, maxCountInTabs * 30 / 100)
                             Column(Modifier.padding(horizontal = dims.screenHorizontalPadding)) {
                                 Text("播放線路", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.height(8.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     items(filteredEpisodes.size) { i ->
                                         val g = filteredEpisodes[i]; val sel = i == safeSrcIdx
-                                        val label = if (i == 0) "${g.sourceName} ★" else g.sourceName
+                                        val isStale = g.episodes.size < maxCountInTabs &&
+                                            (maxCountInTabs - g.episodes.size) > staleThreshold
+                                        val label = buildString {
+                                            if (i == 0) append("${g.sourceName} ★") else append(g.sourceName)
+                                            if (isStale) append(" ${g.episodes.size}集⚠")
+                                        }
                                         var f by remember { mutableStateOf(false) }
                                         if (isTV) {
                                             Button(
@@ -333,8 +346,17 @@ private fun DetailInfo(
         textAlign = titleAlign, modifier = widthMod)
 
     Spacer(Modifier.height(8.dp))
+    // Status badge — prefer the cross-source max episode count over the primary's
+    // static "更新至 N 集" text. When the primary line is stable-but-stale (e.g.
+    // "更新至 25 集" while another tier-1 line carries 30), the static text is wrong;
+    // the actual episodes we just merged tell us how many are really available.
+    val maxEpisodeCount = d.episodes.maxOfOrNull { it.episodes.size } ?: 0
+    val displayStatus = when {
+        maxEpisodeCount > 1 -> "更新至 $maxEpisodeCount 集"
+        else -> d.vod.status
+    }
     Row(modifier = widthMod, horizontalArrangement = rowArrange) {
-        if (d.vod.status.isNotBlank()) InfoBadge(d.vod.status, CinemaRed)
+        if (displayStatus.isNotBlank()) InfoBadge(displayStatus, CinemaRed)
         if (d.vod.year > 0) InfoBadge(d.vod.year.toString(), CinemaSurface)
         if (d.vod.category.isNotBlank()) InfoBadge(d.vod.category, CinemaSurface)
     }
@@ -378,6 +400,24 @@ private fun DetailInfo(
                 ) { Text("▶ 續播第${ep}集", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
             }
             ActionButton("刪除記錄", false) { onDeleteHistory() }
+        }
+    }
+
+    // Phase 2 enrichment hint — primary detail is on screen but cross-source
+    // episodes/lines/series are still being merged in the background. Without
+    // this, the user sees only the primary source's episodes for 1–3s and
+    // assumes that's all there is.
+    if (uiState.isEnriching) {
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = widthMod,
+            horizontalArrangement = if (isTV) Arrangement.Start
+                else Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DoplyLoadingIndicator(14.dp)
+            Spacer(Modifier.width(8.dp))
+            Text("更多線路與集數載入中…", color = CinemaTextMuted, fontSize = 11.sp)
         }
     }
 
