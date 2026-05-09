@@ -55,6 +55,7 @@ class WatchHistoryRepositoryImpl @Inject constructor(
                 playedSourceType = entry.playedSourceType
                     ?.takeIf { it != entry.sourceType }
                     ?.name,
+                episodeKind = entry.episodeKind,
             )
         )
     }
@@ -84,5 +85,6 @@ class WatchHistoryRepositoryImpl @Inject constructor(
         updatedAt = updatedAt,
         playedSourceType = playedSourceType
             ?.let { name -> runCatching { SourceType.valueOf(name) }.getOrNull() },
+        episodeKind = episodeKind,
     )
 }

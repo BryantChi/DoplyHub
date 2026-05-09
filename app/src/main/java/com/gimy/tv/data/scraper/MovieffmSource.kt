@@ -432,6 +432,26 @@ class MovieffmSource @Inject constructor(
     }
 
     /**
+     * Map a raw episode label to an [Episode.kind] tag. null = main-line.
+     *
+     * Used by parseNestedVideoUrls so watch-history can keep "OAD 5" / "番外1" /
+     * "特別篇" progress separate from regular ep5. Pattern matching only on the
+     * label string — we don't try to reach into the JSON for a `type` field
+     * because MovieFFM's payload doesn't expose one consistently.
+     */
+    private fun detectEpisodeKind(label: String): String? {
+        val t = label.lowercase()
+        return when {
+            t.contains("oad") || t.contains("ova") -> "OAD"
+            label.contains("番外") -> "番外"
+            label.contains("特別篇") || t.contains("special") -> "特別篇"
+            label.contains("劇場版") -> "劇場版"
+            label.contains("外傳") -> "外傳"
+            else -> null
+        }
+    }
+
+    /**
      * Format: [{source:0, url:"...", type:"hls", ep:0}, ...]
      * Group by source, each group = one EpisodeGroup.
      */
@@ -483,7 +503,8 @@ class MovieffmSource @Inject constructor(
                 } else {
                     nameRaw
                 }
-                episodes.add(Episode(epNum, displayTitle, url))
+                val kind = detectEpisodeKind(nameRaw)
+                episodes.add(Episode(epNum, displayTitle, url, kind = kind))
             }
             if (episodes.isNotEmpty()) {
                 groups.add(EpisodeGroup("線路 ${i + 1}", i + 1000, episodes.sortedBy { it.number }))

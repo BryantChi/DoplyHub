@@ -73,6 +73,10 @@ data class WatchHistoryEntry(
      *  or pre-v2.5.3 row that never recorded this. Used by 「繼續觀看」 to route back to
      *  the right line on next visit. */
     val playedSourceType: SourceType? = null,
+    /** Episode kind marker carried over from [Episode.kind]. null = main-line; pre-v2.5.4
+     *  rows also use null. Persisted so progress for "OAD 5" doesn't silently overwrite
+     *  progress for the regular ep5 (and vice versa). */
+    val episodeKind: String? = null,
 )
 
 interface SearchHistoryRepository {

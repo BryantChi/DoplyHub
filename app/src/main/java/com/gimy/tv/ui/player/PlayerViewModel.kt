@@ -32,6 +32,10 @@ data class PlayerUiState(
      *  persist it for cross-source 「繼續觀看」 routing. Defaults to null until the first
      *  successful play, treated as "same as primary sourceType" downstream. */
     val playedSourceType: SourceType? = null,
+    /** Currently-playing episode's kind (mirrors [Episode.kind]) — null = main.
+     *  Persisted to watch history so resumed progress for "OAD 5" doesn't get
+     *  conflated with regular ep5. */
+    val episodeKind: String? = null,
 )
 
 @HiltViewModel
@@ -191,6 +195,7 @@ class PlayerViewModel @Inject constructor(
                         totalEpisodes = src.episodes.size,
                         resumePositionMs = if (i == 0) resumeMs else 0L,
                         playedSourceType = effectiveSourceType,
+                        episodeKind = ep.kind,
                     )
                 }
                 return null
@@ -241,6 +246,7 @@ class PlayerViewModel @Inject constructor(
                     // Persist the actual scraper that played so future "繼續觀看"
                     // can route the user back to the same enriched line.
                     playedSourceType = state.playedSourceType,
+                    episodeKind = state.episodeKind,
                 )
             )
         }

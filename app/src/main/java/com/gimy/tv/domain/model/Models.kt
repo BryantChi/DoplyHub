@@ -80,7 +80,13 @@ data class EpisodeGroup(
 data class Episode(
     val number: Int,
     val title: String,
-    val playUrl: String
+    val playUrl: String,
+    /** Episode kind marker — `null` for main-line episodes, otherwise short tag
+     *  like "OAD" / "番外" / "特別篇" / "劇場版" / "外傳". Lets watch-history
+     *  disambiguate "OAD 5" from "第 5 集" even when both share the same
+     *  numeric `number`. Parsers populate this when they detect the marker in
+     *  the original episode label. */
+    val kind: String? = null,
 )
 
 data class PlayerData(
