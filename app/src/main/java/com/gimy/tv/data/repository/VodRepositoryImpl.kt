@@ -375,13 +375,16 @@ class VodRepositoryImpl @Inject constructor(
                 return@coroutineScope primaryDetail
             }
 
-            // Merge episode groups: primary first, then each matched secondary with source prefix
+            // Merge episode groups: primary first, then each matched secondary with source prefix.
+            // sourceType is REQUIRED on secondary groups so the player can route fetchPlayerData
+            // through the actual scraper that knows how to decode the playUrl.
             val secondaryGroups = matchedDetails.flatMap { detail ->
                 val displayName = detail.vod.sourceType.displayName
                 detail.episodes.map { group ->
                     group.copy(
                         sourceName = "[$displayName] ${group.sourceName}",
-                        sourceId = -(detail.vod.sourceType.ordinal * 100 + group.sourceId + 1)
+                        sourceId = -(detail.vod.sourceType.ordinal * 100 + group.sourceId + 1),
+                        sourceType = detail.vod.sourceType,
                     )
                 }
             }

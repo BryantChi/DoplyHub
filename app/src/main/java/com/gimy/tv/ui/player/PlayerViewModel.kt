@@ -154,10 +154,18 @@ class PlayerViewModel @Inject constructor(
                 else "「${candidates[i - 1].sourceName}」無法播放，改用「${src.sourceName}」…"
             _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = msg) }
             try {
+                // Route through the ACTUAL scraper for this group. Cross-source enriched
+                // groups carry their real sourceType; primary groups don't (legacy default
+                // null) and fall back to the player's own sourceType. Without this fix,
+                // every secondary line tried to decode its playUrl with the PRIMARY
+                // scraper's logic, which would fail for any non-trivial scheme (e.g.
+                // EnyTV's slug-based playUrl fed to GimyTV's regex). Suspected root cause
+                // of the "all lines fail" reports for cross-source content.
+                val effectiveSourceType = src.sourceType ?: sourceType
                 // 8s per-line timeout — slow/stuck sources used to block the whole chain
                 // for 30+ seconds (OkHttp default read timeout) before we moved on.
                 val data = withTimeout(8_000) {
-                    vodRepository.getPlayerData(sourceType, ep.playUrl)
+                    vodRepository.getPlayerData(effectiveSourceType, ep.playUrl)
                 }
                 _uiState.update {
                     it.copy(

@@ -50,7 +50,14 @@ data class VodDetail(
 data class EpisodeGroup(
     val sourceName: String,
     val sourceId: Int,
-    val episodes: List<Episode>
+    val episodes: List<Episode>,
+    /** Actual scraper SourceType for cross-source enriched groups. When null, callers
+     *  should fall back to the VodDetail's primary sourceType — that path is the
+     *  backward-compat for primary's own groups, which were emitted before this field
+     *  existed. Without this, PlayerViewModel routed every fallback line through the
+     *  PRIMARY scraper's getPlayerData(), which couldn't decode secondary playUrls
+     *  (e.g. EnyTV's slug→m3u8 logic doesn't match GimyTV's). */
+    val sourceType: SourceType? = null,
 )
 
 data class Episode(
