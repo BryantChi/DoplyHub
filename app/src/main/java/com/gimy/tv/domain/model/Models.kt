@@ -75,6 +75,14 @@ data class EpisodeGroup(
      *  lines are stable should populate this so we don't depend on display-string
      *  matching that breaks if upstream renames a line. */
     val linePriority: Int? = null,
+    /** Raw, unencoded line id within the originating scraper. For secondary groups
+     *  produced by enrichment this is the natural positive id; for primary groups
+     *  callers should fall back to [sourceId] (which already IS the natural id).
+     *  The negatively-encoded [sourceId] for secondary groups remains stable across
+     *  the merged list and is what watch-history persists, so we don't change it
+     *  here; this field is purely additive — gives later code a clear handle to the
+     *  un-encoded id without re-implementing the `-(ordinal*100 + lineId + 1)` math. */
+    val lineId: Int? = null,
 )
 
 data class Episode(

@@ -290,6 +290,64 @@ class VodRepositoryImpl @Inject constructor(
      */
     private data class TitleKey(val base: String, val season: Int = 1)
 
+    /**
+     * Cross-source title similarity score for [TitleKey] pairs.
+     *
+     *   1.0  same season AND same base
+     *   0.0  different season (we never cross-merge across seasons; that's the
+     *        whole point of the (base, season) key)
+     *   else Jaro-Winkler on the base strings — captures things like
+     *        「鋼之鍊金術師FA」 vs 「鋼之鍊金術師」 where exact equality misses but
+     *        the strings are clearly the same show.
+     *
+     * Threshold elsewhere (0.92) is conservative — high enough that this rule
+     * doesn't reintroduce the cross-content collisions that v2.5.1 fixed. Lower
+     * the threshold cautiously: false positives here put unrelated shows on the
+     * same VodDetail, much worse than missing a less common alternate spelling.
+     */
+    private fun scoreMatch(a: TitleKey, b: TitleKey): Double {
+        if (a.season != b.season) return 0.0
+        if (a.base == b.base) return 1.0
+        return jaroWinkler(a.base, b.base)
+    }
+
+    private fun jaroWinkler(s1: String, s2: String): Double {
+        if (s1.isEmpty() || s2.isEmpty()) return 0.0
+        if (s1 == s2) return 1.0
+        val matchDistance = (maxOf(s1.length, s2.length) / 2 - 1).coerceAtLeast(0)
+        val s1Matches = BooleanArray(s1.length)
+        val s2Matches = BooleanArray(s2.length)
+        var matches = 0
+        for (i in s1.indices) {
+            val start = maxOf(0, i - matchDistance)
+            val end = minOf(i + matchDistance + 1, s2.length)
+            for (j in start until end) {
+                if (s2Matches[j] || s1[i] != s2[j]) continue
+                s1Matches[i] = true
+                s2Matches[j] = true
+                matches++
+                break
+            }
+        }
+        if (matches == 0) return 0.0
+        var transpositions = 0
+        var k = 0
+        for (i in s1.indices) {
+            if (!s1Matches[i]) continue
+            while (k < s2Matches.size && !s2Matches[k]) k++
+            if (k < s2.length && s1[i] != s2[k]) transpositions++
+            k++
+        }
+        val m = matches.toDouble()
+        val jaro = (m / s1.length + m / s2.length + (m - transpositions / 2.0) / m) / 3.0
+        // Winkler boost — prefix up to 4 chars
+        var prefix = 0
+        for (i in 0 until minOf(4, minOf(s1.length, s2.length))) {
+            if (s1[i] == s2[i]) prefix++ else break
+        }
+        return jaro + 0.1 * prefix * (1.0 - jaro)
+    }
+
     private fun parseTitleKey(title: String): TitleKey {
         val s = title
             .replace(Regex("[\\s　]+"), "")
@@ -393,11 +451,14 @@ class VodRepositoryImpl @Inject constructor(
             val primaryDetail = cachedPrimary ?: getSource(sourceType).fetchVodDetail(vodId)
             val primaryTitle = primaryDetail.vod.title
             val primaryYear = primaryDetail.vod.year
-            // Match by (base, season) tuple — both must agree. Previous code used
-            // normalizeTitle which stripped season markers entirely, so primary
-            // "斗羅大陸 第二季" matched secondary "斗羅大陸" (S1+S2 全集 100ep) and
-            // 100-ep cross-season-merged content leaked into a S2-only VodDetail.
+            // Match by (base, season) tuple with optional similarity fallback. Season
+            // must match exactly — that's the cross-season firewall from v2.5.1. For
+            // base, exact equality is preferred; if no exact hit, scoreMatch ≥ 0.92
+            // catches close-but-not-equal variants ("鋼之鍊金術師FA" vs "鋼之鍊金術師")
+            // without re-introducing cross-content false positives that the season
+            // gate already filters.
             val primaryKey = parseTitleKey(primaryTitle)
+            val similarityThreshold = 0.92
 
             // Query the other 7 sources in parallel for same (base, season). Each
             // source has its own 5s timeout — slow/failing sources don't block the rest.
@@ -407,11 +468,17 @@ class VodRepositoryImpl @Inject constructor(
                     try {
                         withTimeout(5_000) {
                             val results = src.search(primaryTitle, 1).items
-                            val match = results.firstOrNull {
+                            // Two-pass: prefer exact (key equality) before falling back
+                            // to scoreMatch ≥ threshold. Year filter unchanged.
+                            val candidates = results.filter {
                                 !looksAdult(it) &&
-                                    parseTitleKey(it.title) == primaryKey &&
                                     (primaryYear == 0 || it.year == 0 || it.year == primaryYear)
-                            } ?: return@withTimeout null
+                            }
+                            val match = candidates.firstOrNull { parseTitleKey(it.title) == primaryKey }
+                                ?: candidates.firstOrNull {
+                                    scoreMatch(parseTitleKey(it.title), primaryKey) >= similarityThreshold
+                                }
+                                ?: return@withTimeout null
                             src.fetchVodDetail(match.id)
                         }
                     } catch (_: Exception) { null }
@@ -428,7 +495,9 @@ class VodRepositoryImpl @Inject constructor(
 
             // Merge episode groups: primary first, then each matched secondary with source prefix.
             // sourceType is REQUIRED on secondary groups so the player can route fetchPlayerData
-            // through the actual scraper that knows how to decode the playUrl.
+            // through the actual scraper that knows how to decode the playUrl. lineId carries
+            // the un-encoded original id alongside the negatively-encoded sourceId — see
+            // EpisodeGroup KDoc for why both are kept.
             val secondaryGroups = matchedDetails.flatMap { detail ->
                 val displayName = detail.vod.sourceType.displayName
                 detail.episodes.map { group ->
@@ -436,6 +505,7 @@ class VodRepositoryImpl @Inject constructor(
                         sourceName = "[$displayName] ${group.sourceName}",
                         sourceId = -(detail.vod.sourceType.ordinal * 100 + group.sourceId + 1),
                         sourceType = detail.vod.sourceType,
+                        lineId = group.sourceId,
                     )
                 }
             }
