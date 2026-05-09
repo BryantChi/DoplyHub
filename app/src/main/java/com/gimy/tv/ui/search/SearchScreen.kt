@@ -72,24 +72,51 @@ fun SearchScreen(
             .padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding)
     ) {
         // ── Search bar ──
+        // Phone: drop the「返回」chip (system back covers it via BackHandler above) and
+        // move ✕ inside the TextField as a trailingIcon. Without this, on a 360dp phone
+        // the row was 「返回」/spacer/TextField/spacer/✕/spacer/搜尋/spacer/Refresh —
+        // the weight(1f) TextField got squeezed to ~150dp wide.
+        // TV keeps the explicit「返回」chip because remote nav benefits from a focusable target.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            FocusableChip("返回") {
-                if (uiState.hasSearched) viewModel.clearResults() else onBack()
+            if (isTV) {
+                FocusableChip("返回") {
+                    if (uiState.hasSearched) viewModel.clearResults() else onBack()
+                }
+                Spacer(Modifier.width(12.dp))
             }
-            Spacer(Modifier.width(12.dp))
 
-            // Use Material3 OutlinedTextField — has proper keyboard integration on Android TV
             OutlinedTextField(
                 value = uiState.query,
                 onValueChange = { viewModel.onQueryChange(it) },
-                placeholder = { androidx.compose.material3.Text("輸入關鍵字搜尋…", color = CinemaTextMuted) },
+                placeholder = {
+                    androidx.compose.material3.Text(
+                        "輸入關鍵字搜尋…",
+                        color = CinemaTextMuted,
+                        fontSize = 14.sp,
+                    )
+                },
                 singleLine = true,
+                textStyle = androidx.compose.material3.LocalTextStyle.current.copy(fontSize = 15.sp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = {
                     viewModel.search()
                     keyboardController?.hide()
                     focusManager.clearFocus()
                 }),
+                trailingIcon = if (uiState.query.isNotEmpty()) {
+                    {
+                        androidx.compose.material3.IconButton(onClick = {
+                            viewModel.onQueryChange("")
+                            inputFocusRequester.requestFocus()
+                        }) {
+                            androidx.compose.material3.Text(
+                                "✕",
+                                color = CinemaTextMuted,
+                                fontSize = 16.sp,
+                            )
+                        }
+                    }
+                } else null,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = CinemaTextPrimary,
                     unfocusedTextColor = CinemaTextPrimary,
@@ -105,13 +132,7 @@ fun SearchScreen(
                     .height(if (isTV) 52.dp else 56.dp)
                     .focusRequester(inputFocusRequester)
             )
-            if (uiState.query.isNotEmpty()) {
-                Spacer(Modifier.width(8.dp))
-                FocusableChip("✕") {
-                    viewModel.onQueryChange("")
-                    inputFocusRequester.requestFocus()
-                }
-            }
+
             Spacer(Modifier.width(8.dp))
 
             FocusableChip("搜尋", primary = true) {
