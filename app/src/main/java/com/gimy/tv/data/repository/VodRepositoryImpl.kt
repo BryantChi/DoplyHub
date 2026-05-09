@@ -232,10 +232,13 @@ class VodRepositoryImpl @Inject constructor(
 
     private fun mergeSearchResults(primary: List<Vod>, secondary: List<Vod>): List<Vod> {
         val result = primary.toMutableList()
-        val primaryTitles = primary.map { normalizeTitle(it.title) }.toSet()
-
+        // Dedup by (base, season) — different seasons of the same show stay
+        // separate. Previous normalizeTitle-only dedup folded "斗羅大陸" and
+        // "斗羅大陸 第二季" into one bucket and dropped one of them from search
+        // results.
+        val primaryKeys = primary.map { parseTitleKey(it.title) }.toSet()
         for (vod in secondary) {
-            if (normalizeTitle(vod.title) !in primaryTitles) {
+            if (parseTitleKey(vod.title) !in primaryKeys) {
                 result.add(vod)
             }
         }
@@ -286,6 +289,69 @@ class VodRepositoryImpl @Inject constructor(
         "一" -> 1; "二" -> 2; "三" -> 3; "四" -> 4; "五" -> 5
         "六" -> 6; "七" -> 7; "八" -> 8; "九" -> 9; "十" -> 10
         else -> 0
+    }
+
+    /**
+     * Multi-character Chinese number parser (for season parsing).
+     *
+     * Handles: 一-九 (1-9), 十 (10), 十一-十九 (11-19), 二十-九十 (20-90),
+     * 二十一-九十九 (21-99). Falls back to Int parse for arabic input. Returns 0 if
+     * unparseable. Sufficient for season numbers (rarely exceed 20).
+     */
+    private fun chineseNumberToInt(s: String): Int {
+        if (s.isEmpty()) return 0
+        s.toIntOrNull()?.let { return it }
+        if (s.length == 1) return chineseDigit(s)
+        if (s == "十") return 10
+        if (s.startsWith("十") && s.length == 2) return 10 + chineseDigit(s.substring(1))
+        if (s.length == 2 && s.endsWith("十")) return chineseDigit(s.substring(0, 1)) * 10
+        if (s.length == 3 && s[1] == '十') {
+            return chineseDigit(s.substring(0, 1)) * 10 + chineseDigit(s.substring(2))
+        }
+        return 0
+    }
+
+    /**
+     * Cross-source matching key. Same content across mirrors maps to the same
+     * (base, season) pair; different seasons of the same show stay distinct.
+     *
+     * Default season = 1 — "斗羅大陸" (no marker) matches "斗羅大陸 第一季" but
+     * NOT "斗羅大陸 第二季". Without this distinction, normalizeTitle stripped
+     * season markers entirely and conflated all seasons into one bucket, causing
+     * cross-season-merged lines to leak into other seasons' VodDetail.episodes.
+     */
+    private data class TitleKey(val base: String, val season: Int = 1)
+
+    private fun parseTitleKey(title: String): TitleKey {
+        val s = title
+            .replace(Regex("[\\s　]+"), "")
+            .replace(Regex("[（）()\\[\\]【】《》]"), "")
+            .lowercase()
+            .let { simpToTradFold(it) }
+
+        // Pattern 1: "X第N季" / "X第N部" (Chinese suffix). Most explicit signal.
+        Regex("^(.+?)第([一二三四五六七八九十百\\d]+)[季部]$").find(s)?.let { m ->
+            val n = chineseNumberToInt(m.groupValues[2])
+            if (n > 0) return TitleKey(m.groupValues[1], n)
+        }
+        // Pattern 2: trailing "season N" / "s N".
+        Regex("^(.+?)(?:season|s)(\\d+)$").find(s)?.let { m ->
+            val n = m.groupValues[2].toIntOrNull()
+            if (n != null && n > 0) return TitleKey(m.groupValues[1], n)
+        }
+        // Pattern 3: trailing pure digit (heuristic — "斗羅大陸2" → S2).
+        // Require base to be ≥ 2 chars so we don't strip 'S' from titles ending in
+        // a digit that's actually part of the name. Imperfect: "復仇者2" gets S=2
+        // even though it's a sequel film, but in our model that just means it
+        // won't merge with "復仇者" — same outcome as not parsing it.
+        Regex("^(.+?)(\\d+)$").find(s)?.let { m ->
+            val candidate = m.groupValues[1]
+            val n = m.groupValues[2].toIntOrNull()
+            if (n != null && n > 0 && candidate.length >= 2) {
+                return TitleKey(candidate, n)
+            }
+        }
+        return TitleKey(s, 1)
     }
 
     /** Extract the core series name by stripping subtitles, episode arcs, etc. */
@@ -359,10 +425,14 @@ class VodRepositoryImpl @Inject constructor(
             val primaryDetail = cachedPrimary ?: getSource(sourceType).fetchVodDetail(vodId)
             val primaryTitle = primaryDetail.vod.title
             val primaryYear = primaryDetail.vod.year
-            val normalizedPrimary = normalizeTitle(primaryTitle)
+            // Match by (base, season) tuple — both must agree. Previous code used
+            // normalizeTitle which stripped season markers entirely, so primary
+            // "斗羅大陸 第二季" matched secondary "斗羅大陸" (S1+S2 全集 100ep) and
+            // 100-ep cross-season-merged content leaked into a S2-only VodDetail.
+            val primaryKey = parseTitleKey(primaryTitle)
 
-            // Query the other 7 sources in parallel for same title (+ year if available).
-            // Each source has its own 5s timeout — slow/failing sources don't block the rest.
+            // Query the other 7 sources in parallel for same (base, season). Each
+            // source has its own 5s timeout — slow/failing sources don't block the rest.
             val otherSources = searchOrder().filter { it.sourceType != sourceType }
             val matchedDetails = otherSources.map { src ->
                 async {
@@ -371,7 +441,7 @@ class VodRepositoryImpl @Inject constructor(
                             val results = src.search(primaryTitle, 1).items
                             val match = results.firstOrNull {
                                 !looksAdult(it) &&
-                                    normalizeTitle(it.title) == normalizedPrimary &&
+                                    parseTitleKey(it.title) == primaryKey &&
                                     (primaryYear == 0 || it.year == 0 || it.year == primaryYear)
                             } ?: return@withTimeout null
                             src.fetchVodDetail(match.id)
