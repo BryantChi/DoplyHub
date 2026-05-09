@@ -8,7 +8,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -45,10 +44,20 @@ class Forum5278Source @Inject constructor(
      * thumbnail under `neweratt.5278.cc/attachment/forum/threadcover/{aa}/{bb}/{tid}.jpg`)
      * is the only source. The {aa}/{bb} segments are unpredictable from tid
      * alone, so we can't reconstruct the URL — must remember what we saw on
-     * the listing. Cold-start (e.g. opening from history) misses; same
-     * best-effort design as the slug cache in EmbeddedHlsSource.
+     * the listing. Cold-start (e.g. opening from history) misses.
+     *
+     * Bounded LRU (1000) — without the cap this map grew forever as users browse
+     * more threads. Eviction means a covered card might lose its image until the
+     * user revisits the listing, which is acceptable.
      */
-    private val coverCache = ConcurrentHashMap<Long, String>()
+    private val coverCacheCapacity = 1000
+    private val coverCache: MutableMap<Long, String> =
+        java.util.Collections.synchronizedMap(
+            object : LinkedHashMap<Long, String>(coverCacheCapacity, 0.75f, /* accessOrder = */ true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>?): Boolean =
+                    size > coverCacheCapacity
+            }
+        )
 
     /** Forums we surface. typeId = Discuz forum number. */
     override suspend fun fetchCategories(): List<Category> = listOf(

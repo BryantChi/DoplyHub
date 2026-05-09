@@ -8,7 +8,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Base class for sites where the detail page directly embeds an HLS m3u8 URL via a
@@ -56,9 +55,28 @@ abstract class EmbeddedHlsSource(
     // but Vod.id is Long. We hash the slug into a stable Long and remember the reverse
     // mapping so detailUrlFor() can reconstruct the URL. Cache lives for the process —
     // first list visit re-populates it after cold start (history/favorite are best-effort).
+    //
+    // Bounded LRU (2000 entries each) — previously unbounded ConcurrentHashMap would grow
+    // forever as users browse more vods. 2000 fits ~10 deep-paged lists per source while
+    // capping memory at ~140KB/map. Eviction means a stale slug recomputes the same id
+    // (deterministic hash), so no correctness issue — only "soft cold start" for the
+    // evicted slug if user opens it from history.
 
-    protected val slugToId = ConcurrentHashMap<String, Long>()
-    protected val idToSlug = ConcurrentHashMap<Long, String>()
+    private val slugCacheCapacity = 2000
+    protected val slugToId: MutableMap<String, Long> =
+        java.util.Collections.synchronizedMap(
+            object : LinkedHashMap<String, Long>(slugCacheCapacity, 0.75f, /* accessOrder = */ true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean =
+                    size > slugCacheCapacity
+            }
+        )
+    protected val idToSlug: MutableMap<Long, String> =
+        java.util.Collections.synchronizedMap(
+            object : LinkedHashMap<Long, String>(slugCacheCapacity, 0.75f, true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>?): Boolean =
+                    size > slugCacheCapacity
+            }
+        )
 
     protected fun stableId(slug: String): Long = slugToId.getOrPut(slug) {
         val id = stableHashLong(slug)

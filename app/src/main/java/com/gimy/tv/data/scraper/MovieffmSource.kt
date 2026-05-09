@@ -12,7 +12,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 class MovieffmSource @Inject constructor(
@@ -24,10 +23,33 @@ class MovieffmSource @Inject constructor(
     override val sourceType = SourceType.MOVIEFFM
     override val baseUrl: String get() = endpointResolver.getBaseUrl(sourceType)
 
-    // Bidirectional slug <-> ID mapping (in-memory cache, backed by Room)
-    private val slugToId = ConcurrentHashMap<String, Long>()
-    private val idToSlug = ConcurrentHashMap<Long, String>()
-    private val idToContentType = ConcurrentHashMap<Long, String>()
+    // Bidirectional slug <-> ID mapping (in-memory cache, backed by Room).
+    // Bounded LRU (2000 each) — without the cap these maps grew forever as users
+    // browse, leaking memory in long sessions. Eviction is safe: registerSlug recomputes
+    // an evicted slug to the same id (deterministic hash), and `idToSlug` falls back to
+    // the Room slugDao at the call site (line ~87).
+    private val slugCacheCapacity = 2000
+    private val slugToId: MutableMap<String, Long> =
+        java.util.Collections.synchronizedMap(
+            object : LinkedHashMap<String, Long>(slugCacheCapacity, 0.75f, /* accessOrder = */ true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean =
+                    size > slugCacheCapacity
+            }
+        )
+    private val idToSlug: MutableMap<Long, String> =
+        java.util.Collections.synchronizedMap(
+            object : LinkedHashMap<Long, String>(slugCacheCapacity, 0.75f, true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>?): Boolean =
+                    size > slugCacheCapacity
+            }
+        )
+    private val idToContentType: MutableMap<Long, String> =
+        java.util.Collections.synchronizedMap(
+            object : LinkedHashMap<Long, String>(slugCacheCapacity, 0.75f, true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>?): Boolean =
+                    size > slugCacheCapacity
+            }
+        )
 
     private fun registerSlug(slug: String, contentType: String): Long {
         return slugToId.getOrPut(slug) {
