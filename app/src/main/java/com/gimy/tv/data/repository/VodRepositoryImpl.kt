@@ -446,6 +446,10 @@ class VodRepositoryImpl @Inject constructor(
         val gimySecondary = listOf("騰訊", "藍光", "4K", "優質", "非凡")
 
         fun tierOf(group: EpisodeGroup): Int {
+            // Prefer scraper-supplied tier when present — that path is robust to
+            // upstream rename of line names. Fall through to the substring heuristic
+            // for groups whose scraper hasn't migrated yet.
+            group.linePriority?.let { return it }
             val name = group.sourceName
             return when {
                 !name.contains("雲") && gimyTopSources.any { name.contains(it) } ->

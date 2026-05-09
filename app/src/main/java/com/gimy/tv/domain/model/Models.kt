@@ -47,17 +47,34 @@ data class VodDetail(
     val relatedVods: List<Vod> = emptyList()
 )
 
+/**
+ * One play line of a vod from one scraper. Naming clarification:
+ *
+ *   - **SourceType / SiteSource** = the website/scraper (GimyTv / Imaple / 5278 / …).
+ *   - **EpisodeGroup** = one play line within a site (順暢 / 無盡 / 卧龍雲 / …).
+ *
+ * After cross-source enrichment, a single VodDetail.episodes list holds groups from
+ * MULTIPLE sites — each one carrying its own `sourceType` so PlayerViewModel can route
+ * playUrl resolution back to the right scraper.
+ */
 data class EpisodeGroup(
+    /** Display name for the play line (e.g. "順暢", "[GimyMax] 無盡"). */
     val sourceName: String,
+    /** Stable line id within a vod. Primary lines = positive (assigned by the scraper);
+     *  secondary lines from cross-source enrichment = encoded as negative
+     *  (-(sourceType.ordinal*100 + lineId + 1)) so they're unique across all sites. */
     val sourceId: Int,
     val episodes: List<Episode>,
     /** Actual scraper SourceType for cross-source enriched groups. When null, callers
-     *  should fall back to the VodDetail's primary sourceType — that path is the
-     *  backward-compat for primary's own groups, which were emitted before this field
-     *  existed. Without this, PlayerViewModel routed every fallback line through the
-     *  PRIMARY scraper's getPlayerData(), which couldn't decode secondary playUrls
-     *  (e.g. EnyTV's slug→m3u8 logic doesn't match GimyTV's). */
+     *  fall back to the VodDetail's primary sourceType (backward-compat for primary's
+     *  own groups). */
     val sourceType: SourceType? = null,
+    /** Optional per-line tier hint set by the scraper. Lower = more preferred. When
+     *  null, ranking falls back to the substring-pattern heuristic in
+     *  VodRepositoryImpl.rankEpisodeGroups. Scrapers that know which of their internal
+     *  lines are stable should populate this so we don't depend on display-string
+     *  matching that breaks if upstream renames a line. */
+    val linePriority: Int? = null,
 )
 
 data class Episode(

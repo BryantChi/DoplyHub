@@ -472,9 +472,18 @@ class MovieffmSource @Inject constructor(
                 val obj = innerArr.optJSONObject(j) ?: continue
                 val url = obj.optString("url", "").replace("\\/", "/")
                 if (url.isBlank()) continue
-                val name = obj.optString("name", "${j + 1}")
-                val epNum = Regex("\\d+").find(name)?.value?.toIntOrNull() ?: (j + 1)
-                episodes.add(Episode(epNum, "第${epNum}集", url))
+                val nameRaw = obj.optString("name", "${j + 1}")
+                val epNum = Regex("\\d+").find(nameRaw)?.value?.toIntOrNull() ?: (j + 1)
+                // Preserve named-arc labels ("OAD"/"番外篇 1"/"特別篇") instead of
+                // overwriting them with "第N集". When name is just a number ("01" /
+                // "  3 ") we still normalize to the standard "第N集" form for
+                // consistency with parseFlatVideoUrls.
+                val displayTitle = if (Regex("^\\s*\\d+\\s*\$").matches(nameRaw)) {
+                    "第${epNum}集"
+                } else {
+                    nameRaw
+                }
+                episodes.add(Episode(epNum, displayTitle, url))
             }
             if (episodes.isNotEmpty()) {
                 groups.add(EpisodeGroup("線路 ${i + 1}", i + 1000, episodes.sortedBy { it.number }))
