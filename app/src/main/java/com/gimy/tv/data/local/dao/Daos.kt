@@ -94,4 +94,13 @@ interface MovieffmSlugDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(slugs: List<MovieffmSlugEntity>)
+
+    @Query("SELECT COUNT(*) FROM movieffm_slugs")
+    suspend fun count(): Int
+
+    /** Drop slug rows whose cachedAt is older than [thresholdMs]. Used by a future
+     *  periodic prune so this table doesn't grow without bound. Returns the
+     *  number of rows removed. */
+    @Query("DELETE FROM movieffm_slugs WHERE cachedAt < :thresholdMs")
+    suspend fun pruneOlderThan(thresholdMs: Long): Int
 }

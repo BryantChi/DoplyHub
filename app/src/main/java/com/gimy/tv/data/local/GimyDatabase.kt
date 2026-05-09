@@ -13,7 +13,7 @@ import com.gimy.tv.data.local.entity.*
         SearchHistoryEntity::class,
         MovieffmSlugEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class GimyDatabase : RoomDatabase() {

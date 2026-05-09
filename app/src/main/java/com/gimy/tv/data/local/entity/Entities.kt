@@ -22,6 +22,8 @@ data class FavoriteEntity(
 data class WatchHistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val vodId: Long,
+    /** Primary scraper the user came from (the list/detail entry point). Stays
+     *  the same regardless of which line actually played. */
     val sourceType: String,
     val title: String,
     val coverUrl: String,
@@ -33,6 +35,15 @@ data class WatchHistoryEntity(
     val updatedAt: Long = System.currentTimeMillis(),
     /** v2.3.0+ : split adult records from main flow. Migrated rows default to false. */
     val isAdult: Boolean = false,
+    /** v2.5.2+ : The actual scraper whose line played, recorded so a "繼續觀看"
+     *  flow can re-route to the same line on next visit (e.g. user came from
+     *  GimyTv but watched on EnyTV's enriched line). Null = primary line was
+     *  played; legacy rows pre-migration use null. */
+    val playedSourceType: String? = null,
+    /** v2.5.2+ : Episode kind marker (OAD/番外/特別篇/null=main). Null = main
+     *  episode; legacy rows pre-migration use null. Once parsers populate this,
+     *  watch progress for OAD won't collide with main episode at same number. */
+    val episodeKind: String? = null,
 )
 
 @Entity(tableName = "vod_cache")
@@ -52,5 +63,10 @@ data class SearchHistoryEntity(
 data class MovieffmSlugEntity(
     @PrimaryKey val vodId: Long,
     val slug: String,
-    val contentType: String // "movies" or "drama"
+    val contentType: String, // "movies" or "drama"
+    /** v2.5.2+ : When the row was last (re)inserted. Lets us prune entries that
+     *  haven't been touched in a long time so this table doesn't grow forever
+     *  for users who browse heavily. Migrated rows default to 0 (treated as
+     *  ancient by any prune query). */
+    val cachedAt: Long = System.currentTimeMillis(),
 )
