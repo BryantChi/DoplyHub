@@ -49,6 +49,12 @@ class WatchHistoryRepositoryImpl @Inject constructor(
                 positionMs = entry.positionMs,
                 durationMs = entry.durationMs,
                 isAdult = entry.sourceType in adultOnlySources,
+                // Only record playedSourceType when it differs from primary —
+                // null is the "no special routing needed" marker. Saves a DB
+                // string + simplifies the read path's null check.
+                playedSourceType = entry.playedSourceType
+                    ?.takeIf { it != entry.sourceType }
+                    ?.name,
             )
         )
     }
@@ -75,6 +81,8 @@ class WatchHistoryRepositoryImpl @Inject constructor(
         sourceId = sourceId,
         positionMs = positionMs,
         durationMs = durationMs,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        playedSourceType = playedSourceType
+            ?.let { name -> runCatching { SourceType.valueOf(name) }.getOrNull() },
     )
 }

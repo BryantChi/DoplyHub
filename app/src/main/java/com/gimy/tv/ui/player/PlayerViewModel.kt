@@ -28,6 +28,10 @@ data class PlayerUiState(
     val totalEpisodes: Int = 0,
     val error: String? = null,
     val isFullscreen: Boolean = false,
+    /** Actual scraper used by the currently-playing line. Tracked so saveProgress can
+     *  persist it for cross-source 「繼續觀看」 routing. Defaults to null until the first
+     *  successful play, treated as "same as primary sourceType" downstream. */
+    val playedSourceType: SourceType? = null,
 )
 
 @HiltViewModel
@@ -66,13 +70,22 @@ class PlayerViewModel @Inject constructor(
                 val primary = vodRepository.getVodDetail(sourceType, id)
                 vodDetail = primary
 
+                // Read watch progress early — used to decide whether enrichment is
+                // needed up front (so 「繼續觀看」 can route back to a cross-source line)
+                // and later for resumeMs.
+                val progress = watchHistoryRepository.getProgress(id, sourceType)
+                val historyOnDifferentSource = progress?.playedSourceType != null &&
+                    progress.playedSourceType != sourceType
+
                 // Primary may return zero playable lines (parser broke, page 404'd to a
-                // templated "not found" body, the thread no longer embeds a player, …).
-                // DetailScreen's Phase 2 enrichment usually has those — without folding it
-                // in here, we'd surface "此影片暫無可用播放線路" while the detail page just
-                // showed the user that other lines exist. Fall through to enrichment first.
-                val detail = if (primary.episodes.isEmpty()) {
-                    _uiState.update { it.copy(loadingMessage = "主來源暫無線路，搜尋其他來源中…") }
+                // templated "not found" body, …) — fall through to enrichment.
+                // OR: history says the user's last play was on a cross-source enriched
+                // line, which lives only in the enriched detail; fetch enriched up front
+                // so 「繼續觀看」 lands on the right line instead of primary's first.
+                val detail = if (primary.episodes.isEmpty() || historyOnDifferentSource) {
+                    val msg = if (primary.episodes.isEmpty()) "主來源暫無線路，搜尋其他來源中…"
+                        else "從上次的線路繼續，搜尋來源中…"
+                    _uiState.update { it.copy(loadingMessage = msg) }
                     val enriched = try {
                         vodRepository.getEnrichedVodDetail(sourceType, id, cachedPrimary = primary)
                     } catch (_: Exception) { primary }
@@ -94,7 +107,6 @@ class PlayerViewModel @Inject constructor(
 
                 // Resume position only honored when we land on the exact (source, episode)
                 // pair the user came from. Fallback sources or different episodes restart at 0.
-                val progress = watchHistoryRepository.getProgress(id, sourceType)
                 val resumeMs = if (progress != null && firstEp != null &&
                     progress.episodeNum == firstEp.number &&
                     progress.sourceId == firstSource.sourceId
@@ -178,6 +190,7 @@ class PlayerViewModel @Inject constructor(
                         sourceName = src.sourceName,
                         totalEpisodes = src.episodes.size,
                         resumePositionMs = if (i == 0) resumeMs else 0L,
+                        playedSourceType = effectiveSourceType,
                     )
                 }
                 return null
@@ -224,7 +237,10 @@ class PlayerViewModel @Inject constructor(
                     episodeTitle = state.episodeTitle,
                     sourceId = state.sourceId,
                     positionMs = positionMs,
-                    durationMs = durationMs
+                    durationMs = durationMs,
+                    // Persist the actual scraper that played so future "繼續觀看"
+                    // can route the user back to the same enriched line.
+                    playedSourceType = state.playedSourceType,
                 )
             )
         }

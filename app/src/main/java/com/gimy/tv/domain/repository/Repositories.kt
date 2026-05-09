@@ -58,6 +58,7 @@ interface WatchHistoryRepository {
 
 data class WatchHistoryEntry(
     val vodId: Long,
+    /** Primary scraper the user came from (where they entered detail/list). */
     val sourceType: SourceType,
     val title: String,
     val coverUrl: String,
@@ -66,7 +67,12 @@ data class WatchHistoryEntry(
     val sourceId: Int,
     val positionMs: Long,
     val durationMs: Long,
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    /** Actual scraper whose line played (may differ from [sourceType] when fallback /
+     *  user-switch lands on a cross-source enriched line). null = primary line played
+     *  or pre-v2.5.3 row that never recorded this. Used by 「繼續觀看」 to route back to
+     *  the right line on next visit. */
+    val playedSourceType: SourceType? = null,
 )
 
 interface SearchHistoryRepository {
