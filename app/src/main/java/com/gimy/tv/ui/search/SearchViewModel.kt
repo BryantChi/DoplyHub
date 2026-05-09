@@ -47,6 +47,17 @@ class SearchViewModel @Inject constructor(
         _uiState.update { it.copy(query = query) }
     }
 
+    /** Drop a single keyword from "最近搜尋". Long-press on the chip triggers this. */
+    fun removeRecentSearch(keyword: String) {
+        viewModelScope.launch { searchHistoryRepository.removeSearch(keyword) }
+    }
+
+    /** Wipe all recorded recent search keywords. Wired to the 「清除」 button next to
+     *  the "最近搜尋" header. */
+    fun clearRecentSearches() {
+        viewModelScope.launch { searchHistoryRepository.clearSearches() }
+    }
+
     fun search(query: String = _uiState.value.query) {
         val q = query.trim()
         if (q.isBlank()) return

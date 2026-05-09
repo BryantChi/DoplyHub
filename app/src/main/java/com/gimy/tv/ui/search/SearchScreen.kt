@@ -292,7 +292,19 @@ fun SearchScreen(
             else -> {
                 // Recent searches
                 if (uiState.recentSearches.isNotEmpty()) {
-                    Text("最近搜尋", color = CinemaTextMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("最近搜尋", color = CinemaTextMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        // Clear-all action. The previous build had no way to remove
+                        // recent searches on phone (TV remote could long-press a chip
+                        // via Compose-TV defaults but that doesn't reach mobile users).
+                        // Surfacing a clear chip here covers both — touch users tap it,
+                        // remote users focus → click.
+                        FocusableChip("清除") { viewModel.clearRecentSearches() }
+                    }
                     Spacer(Modifier.height(10.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(uiState.recentSearches) { kw ->
