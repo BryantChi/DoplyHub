@@ -351,15 +351,26 @@ private fun DetailInfo(
         textAlign = titleAlign, modifier = widthMod)
 
     Spacer(Modifier.height(8.dp))
-    // Status badge — combine raw status text with cross-source max episode count.
-    // The static `vod.status` from the primary scraper still carries useful UX cues
-    // ("完結" / "HD" / "預告" / "中字") that pure count loses; the count is added on
-    // top so users know how many episodes the union of all lines reached.
-    val maxEpisodeCount = d.episodes.maxOfOrNull { it.episodes.size } ?: 0
+    // Status badge — pick from the TOP-RANKED line (★) only, not cross-source max.
+    //
+    // Why not max(episodes.size) across all lines:
+    //   one cross-source line may carry continuous numbering across seasons (e.g.
+    //   S1+S2 merged 1..67) which is NOT the show's current episode count. The user
+    //   plays the ★ line by default; its latest episode number is what they expect.
+    //
+    // Why ep.number (max) instead of episodes.size (count):
+    //   if a parser drops a missing episode, [1,2,3,5,6] gives count=5 / max=6.
+    //   "更新至 6 集" matches the show's actual progress; count understates by 1.
+    //
+    // Single-episode (movie) lines fall through to the raw status text — "HD" /
+    // "中字" / "預告" carries more meaning than "更新至 1 集".
+    val topLine = d.episodes.firstOrNull()
+    val topLineSize = topLine?.episodes?.size ?: 0
+    val topLineLatestNumber = topLine?.episodes?.maxOfOrNull { it.number } ?: 0
     val rawStatus = d.vod.status
     val displayStatus = when {
-        maxEpisodeCount > 1 && rawStatus.contains("完結") -> "完結 · 共 $maxEpisodeCount 集"
-        maxEpisodeCount > 1 -> "更新至 $maxEpisodeCount 集"
+        topLineSize > 1 && rawStatus.contains("完結") -> "完結 · 共 $topLineLatestNumber 集"
+        topLineSize > 1 -> "更新至 $topLineLatestNumber 集"
         else -> rawStatus
     }
     Row(modifier = widthMod, horizontalArrangement = rowArrange) {
