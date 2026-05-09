@@ -61,12 +61,27 @@ class PlayerViewModel @Inject constructor(
                 return@launch
             }
             try {
-                val detail = vodRepository.getVodDetail(sourceType, id)
-                vodDetail = detail
+                val primary = vodRepository.getVodDetail(sourceType, id)
+                vodDetail = primary
 
-                if (detail.episodes.isEmpty()) {
-                    _uiState.update { it.copy(isLoading = false, error = "此影片暫無可用播放線路") }
-                    return@launch
+                // Primary may return zero playable lines (parser broke, page 404'd to a
+                // templated "not found" body, the thread no longer embeds a player, …).
+                // DetailScreen's Phase 2 enrichment usually has those — without folding it
+                // in here, we'd surface "此影片暫無可用播放線路" while the detail page just
+                // showed the user that other lines exist. Fall through to enrichment first.
+                val detail = if (primary.episodes.isEmpty()) {
+                    _uiState.update { it.copy(loadingMessage = "主來源暫無線路，搜尋其他來源中…") }
+                    val enriched = try {
+                        vodRepository.getEnrichedVodDetail(sourceType, id, cachedPrimary = primary)
+                    } catch (_: Exception) { primary }
+                    vodDetail = enriched
+                    if (enriched.episodes.isEmpty()) {
+                        _uiState.update { it.copy(isLoading = false, error = "此影片暫無可用播放線路") }
+                        return@launch
+                    }
+                    enriched
+                } else {
+                    primary
                 }
 
                 // Order: requested source first, then remaining sources as fallbacks.
