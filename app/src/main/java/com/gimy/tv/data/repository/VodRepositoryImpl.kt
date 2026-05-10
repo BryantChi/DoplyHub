@@ -557,43 +557,52 @@ class VodRepositoryImpl @Inject constructor(
                     it.vod.status.takeIf { s -> s.isNotBlank() }
                 }
                 ?: ""
+            val primaryFallbackStatus = parseEpisodeStatus(statusFallback)
 
             // Per-site metadata for v2.8.0 site-level UI: each scraper that
             // contributed episodes keeps its own Vod (with that site's status string
             // verbatim), so DetailScreen can flip the badge per chip selection.
+            // Primary entry uses the fallback-resolved status so aggregation and
+            // per-chip display agree on the primary's effective status string.
             val siteMetadata = buildMap {
-                put(primaryDetail.vod.sourceType, primaryDetail.vod)
+                put(
+                    primaryDetail.vod.sourceType,
+                    primaryDetail.vod.copy(status = statusFallback, siteStatus = primaryFallbackStatus),
+                )
                 for (md in matchedDetails) put(md.vod.sourceType, md.vod)
             }
 
             // Cross-site aggregated status. Picks highest "latest" across (a) every
             // site's own siteStatus and (b) max episode.number across all groups.
-            // Finished anywhere → finished total = max of declared & parsed.
             val crossSiteMaxEp = allGroups.maxOfOrNull { line ->
                 line.episodes.maxOfOrNull { it.number } ?: 0
             } ?: 0
-            val anyFinished = siteMetadata.values.any { it.siteStatus is EpisodeStatus.Finished } ||
-                primaryDetail.vod.siteStatus is EpisodeStatus.Finished
-            val highestSiteDeclared = siteMetadata.values
-                .mapNotNull { (it.siteStatus as? EpisodeStatus.InProgress)?.latest }
-                .maxOrNull() ?: 0
+            val anyFinished = siteMetadata.values.any { it.siteStatus is EpisodeStatus.Finished }
+            val highestSiteDeclared = siteMetadata.values.maxOfOrNull {
+                when (val st = it.siteStatus) {
+                    is EpisodeStatus.InProgress -> st.latest
+                    is EpisodeStatus.Finished -> st.total
+                    else -> 0
+                }
+            } ?: 0
 
             val aggregatedStatus: EpisodeStatus = when {
-                anyFinished && (crossSiteMaxEp > 0 || highestSiteDeclared > 0) ->
-                    EpisodeStatus.Finished(maxOf(crossSiteMaxEp, highestSiteDeclared))
+                // Any site declares finished → trust that. Total = max of declared
+                // and parsed (some scrapers know the count even when episodes failed
+                // to parse; this preserves the count in that case).
+                anyFinished -> EpisodeStatus.Finished(
+                    total = maxOf(crossSiteMaxEp, highestSiteDeclared),
+                )
                 crossSiteMaxEp > 1 || highestSiteDeclared > 1 -> EpisodeStatus.InProgress(
                     latest = maxOf(crossSiteMaxEp, highestSiteDeclared),
                     confidence = Confidence.CrossSiteMax,
                 )
-                primaryDetail.vod.siteStatus !is EpisodeStatus.Empty -> primaryDetail.vod.siteStatus
+                primaryFallbackStatus !is EpisodeStatus.Empty -> primaryFallbackStatus
                 else -> EpisodeStatus.Empty
             }
 
             val enriched = primaryDetail.copy(
-                vod = primaryDetail.vod.copy(
-                    status = statusFallback,
-                    siteStatus = parseEpisodeStatus(statusFallback),
-                ),
+                vod = siteMetadata.getValue(primaryDetail.vod.sourceType),
                 episodes = allGroups,
                 seriesVods = mergedSeries,
                 relatedVods = filteredRelated,
