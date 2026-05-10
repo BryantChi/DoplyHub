@@ -111,13 +111,8 @@ fun HomeScreen(
                     // ── Continue watching ──
                     if (uiState.continueWatching.isNotEmpty()) {
                         item {
-                            val continueVods = remember(uiState.continueWatching) {
-                                uiState.continueWatching.map { e ->
-                                    Vod(e.vodId, e.sourceType, e.title, e.coverUrl, "", 0, "第${e.episodeNum}集")
-                                }
-                            }
-                            ContentRow("繼續觀看", 0, SourceType.GIMYTV,
-                                continueVods,
+                            ContinueWatchingRow(
+                                entries = uiState.continueWatching,
                                 onItemClick = { onVodClick(it.sourceType, it.id) },
                                 onMoreClick = { onHistoryClick() }
                             )
@@ -403,6 +398,68 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
             items.forEachIndexed { i, _ ->
                 Box(Modifier.size(if (i == idx) 24.dp else 5.dp, 4.dp).clip(RoundedCornerShape(2.dp))
                     .background(if (i == idx) CinemaRed else Color.White.copy(0.25f)))
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+// Continue watching row
+// ═══════════════════════════════════════
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun ContinueWatchingRow(
+    entries: List<com.gimy.tv.domain.repository.WatchHistoryEntry>,
+    onItemClick: (Vod) -> Unit,
+    onMoreClick: () -> Unit,
+) {
+    val dims = LocalDimensions.current
+
+    Column(Modifier.padding(top = 20.dp)) {
+        Row(Modifier.padding(start = dims.screenHorizontalPadding, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(3.dp).height(16.dp).clip(RoundedCornerShape(2.dp)).background(CinemaRed))
+            Spacer(Modifier.width(10.dp))
+            Text("繼續觀看", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CinemaTextPrimary, letterSpacing = 0.3.sp)
+        }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = dims.screenHorizontalPadding),
+            horizontalArrangement = Arrangement.spacedBy(dims.cardSpacing)
+        ) {
+            items(entries, key = { "${it.sourceType}_${it.vodId}" }) { entry ->
+                // Build Vod with empty status — the show's site release stage is NOT
+                // stored in WatchHistoryEntry, so we leave siteStatus = Empty and status = "".
+                // The red top-right badge will be blank (correct: we don't know the current
+                // site status from history alone).
+                val vod = remember(entry) {
+                    Vod(entry.vodId, entry.sourceType, entry.title, entry.coverUrl, "", 0, "")
+                }
+                Box {
+                    VodCard(vod = vod, onClick = { onItemClick(vod) })
+                    // Watch-progress hint: bottom-end, dark background, NOT the red status badge.
+                    // Visually distinct from the top-right red badge so users don't mistake
+                    // their own progress ("看到第N集") for the show's release stage.
+                    if (entry.episodeNum > 0) {
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(4.dp)
+                                .background(Color(0xCC000000), RoundedCornerShape(3.dp))
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                "看到第${entry.episodeNum}集",
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+            // "More" card at the end of the row
+            item(key = "more_continue") {
+                MoreCard(onClick = onMoreClick)
             }
         }
     }
