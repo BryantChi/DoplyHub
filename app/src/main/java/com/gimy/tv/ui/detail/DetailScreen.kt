@@ -351,32 +351,30 @@ private fun DetailInfo(
         textAlign = titleAlign, modifier = widthMod)
 
     Spacer(Modifier.height(8.dp))
-    // Status badge — robust to single-line outliers via median across lines.
+    // Status badge — restricted to PRIMARY-source lines (where the user came from)
+    // so cross-source enrichment with different season interpretations can't pollute
+    // the count. e.g. user clicks「鬼滅之刃 第二季」 from GimyTv and primary lines all
+    // agree on 24 eps; an enriched mirror serving a 50-ep S1+S2 merge would push the
+    // median across all lines to 50 (wrong). Filtering to primary scopes the count
+    // to "the show as user is viewing it".
     //
-    // Earlier versions used the top-ranked line's max ep.number, which broke when:
-    //   1. The top line had a parser-misread number (e.g. 預告 with year 2026 became
-    //      ep.number = 2026, badge displayed「更新至 2026 集」).
-    //   2. The top line was actually a cross-season-merged line (1..67 covering S1+S2)
-    //      while the show truly only ran 30 episodes.
+    // Per-line sanity (kept from v2.6.7): max ep.number > episodes.size + 30 indicates
+    // the parser misread a date/year as an episode number, fall back to size.
     //
-    // Per-line sanity: if a line's max ep.number is wildly above its episode count
-    // (size + 30), trust the count instead — bogus high numbers come from parsers
-    // misreading dates/years embedded in episode titles.
+    // Cross-line median (kept from v2.6.7): tolerates one stale line in the cluster.
     //
-    // Cross-line: take the median of sane per-line counts. Outliers get filtered
-    // automatically; if 4 lines say 30 and 1 says 67, median is 30 (correct).
-    //
-    // Single-episode lines (movies) fall through to raw status text — "HD" /
-    // "中字" / "預告" carries more UX value than「更新至 1 集」.
-    val saneCounts = d.episodes
-        .map { line ->
-            val maxNum = line.episodes.maxOfOrNull { it.number } ?: 0
-            val size = line.episodes.size
-            if (maxNum > size + 30) size else maxNum
-        }
+    // Final fallback: if no primary lines parsed, use ALL lines' median rather than 0.
+    fun perLineSane(line: com.gimy.tv.domain.model.EpisodeGroup): Int {
+        val maxNum = line.episodes.maxOfOrNull { it.number } ?: 0
+        val size = line.episodes.size
+        return if (maxNum > size + 30) size else maxNum
+    }
+    val primaryLines = d.episodes.filter { it.sourceType == null || it.sourceType == d.vod.sourceType }
+    val countPool = (if (primaryLines.isNotEmpty()) primaryLines else d.episodes)
+        .map(::perLineSane)
         .filter { it > 0 }
         .sorted()
-    val displayCount = if (saneCounts.isNotEmpty()) saneCounts[saneCounts.size / 2] else 0
+    val displayCount = if (countPool.isNotEmpty()) countPool[countPool.size / 2] else 0
     val isSeries = (d.episodes.firstOrNull()?.episodes?.size ?: 0) > 1
     val rawStatus = d.vod.status
     val displayStatus = when {
