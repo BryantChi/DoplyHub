@@ -2,7 +2,6 @@ package com.gimy.tv.data.scraper
 
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.domain.model.*
-import com.gimy.tv.domain.util.parseEpisodeStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -103,8 +102,7 @@ class Forum5278Source @Inject constructor(
             val ep = Episode(1, title, "embed:$vodId")
             val group = EpisodeGroup(sourceType.displayName, 1, listOf(ep))
             VodDetail(
-                Vod(vodId, sourceType, title, cover, "", 0, "",
-                    siteStatus = parseEpisodeStatus("")),
+                Vod(vodId, sourceType, title, cover, "", 0, ""),
                 "", emptyList(), "", listOf(group),
             )
         }
@@ -184,8 +182,7 @@ class Forum5278Source @Inject constructor(
 
             // Remember the threadcover URL for the detail page — see coverCache docstring.
             coverCache.put(threadId, cover)
-            items.add(Vod(threadId, sourceType, title, cover, "", 0, "",
-                siteStatus = parseEpisodeStatus("")))
+            items.add(Vod(threadId, sourceType, title, cover, "", 0, ""))
         }
         return items
     }

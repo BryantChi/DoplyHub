@@ -524,8 +524,7 @@ class MovieffmSource @Inject constructor(
             val cover = img.attr("data-lazy-src").ifBlank { img.attr("src") }.let { resolveUrl(it) }
 
             val vodId = registerSlug(slug, contentType)
-            items.add(Vod(vodId, sourceType, title, cover, "", 0, "",
-                siteStatus = parseEpisodeStatus("")))
+            items.add(Vod(vodId, sourceType, title, cover, "", 0, ""))
             outSlugs.add(MovieffmSlugEntity(vodId, slug, contentType))
         }
         return items
@@ -556,8 +555,7 @@ class MovieffmSource @Inject constructor(
             val cover = img.attr("data-lazy-src").ifBlank { img.attr("src") }.let { resolveUrl(it) }
 
             val vodId = registerSlug(slug, contentType)
-            items.add(Vod(vodId, sourceType, title, cover, "", 0, "",
-                siteStatus = parseEpisodeStatus("")))
+            items.add(Vod(vodId, sourceType, title, cover, "", 0, ""))
             outSlugs.add(MovieffmSlugEntity(vodId, slug, contentType))
         }
         return items

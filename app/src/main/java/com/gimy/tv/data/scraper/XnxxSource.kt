@@ -3,7 +3,6 @@ package com.gimy.tv.data.scraper
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
-import com.gimy.tv.domain.util.parseEpisodeStatus
 import okhttp3.OkHttpClient
 import org.jsoup.nodes.Document
 import javax.inject.Inject
@@ -111,8 +110,7 @@ class XnxxSource @Inject constructor(
             }
 
             val id = stableId(key)
-            items.add(Vod(id, sourceType, title, cover, "", 0, "",
-                siteStatus = parseEpisodeStatus("")))
+            items.add(Vod(id, sourceType, title, cover, "", 0, ""))
         }
         val unique = items.distinctBy { it.id }
         // Diagnostic — tag XnxxScrape. Drop once cover regression is known-good in the wild.
