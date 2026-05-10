@@ -2,6 +2,7 @@ package com.gimy.tv.data.scraper
 
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.domain.model.*
+import com.gimy.tv.domain.util.parseEpisodeStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -78,8 +79,9 @@ class GimyTvSource @Inject constructor(
             val id = Regex("/vod/(\\d+)\\.html").find(card.attr("href"))
                 ?.groupValues?.get(1)?.toLongOrNull() ?: continue
             val title = card.attr("title").trim(); if (title.isBlank()) continue
+            val cardStatus = card.selectFirst("span.note")?.text()?.trim() ?: ""
             items.add(Vod(id, sourceType, title, resolveUrl(card.attr("data-original")),
-                "", 0, card.selectFirst("span.note")?.text()?.trim() ?: ""))
+                "", 0, cardStatus, siteStatus = parseEpisodeStatus(cardStatus)))
         }
         val unique = items.distinctBy { it.id }
         val hasNext = doc.select("a:contains(下一頁), a[title=下一頁]").isNotEmpty()
@@ -118,7 +120,8 @@ class GimyTvSource @Inject constructor(
             val i = stabilityOrder.indexOfFirst { g.sourceName.contains(it) }; if (i >= 0) stabilityOrder.size - i else -1
         })
 
-        return VodDetail(Vod(vodId, sourceType, title, cover, category, year, status), director, actors, synopsis, sorted,
+        return VodDetail(Vod(vodId, sourceType, title, cover, category, year, status,
+            siteStatus = parseEpisodeStatus(status)), director, actors, synopsis, sorted,
             seriesVods = parseSeriesVods(doc))
     }
 
@@ -138,7 +141,8 @@ class GimyTvSource @Inject constructor(
             if (cardTitle.isBlank()) continue
             val cardCover = resolveUrl(card.attr("data-background"))
             val cardStatus = card.selectFirst("span.note")?.text()?.trim() ?: ""
-            items.add(Vod(id, sourceType, cardTitle, cardCover, "", 0, cardStatus))
+            items.add(Vod(id, sourceType, cardTitle, cardCover, "", 0, cardStatus,
+                siteStatus = parseEpisodeStatus(cardStatus)))
         }
         return items
     }
