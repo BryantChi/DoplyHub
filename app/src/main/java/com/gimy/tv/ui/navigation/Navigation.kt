@@ -19,10 +19,16 @@ sealed class Screen(val route: String) {
     data object Settings : Screen("settings")
     data object AdultZone : Screen("adult_zone")
     data object AdultPlus : Screen("adult_plus")
-    /** AdultPlus per-row「查看更多」整頁。path & title 經 URL-encode 以容納 / 與空白。 */
+    /** AdultPlus per-row「查看更多」整頁。path & title 經 URL-encode 以容納 / 與空白。
+     *
+     *  Compose Navigation 2.8 在 segment 比對前會把 %2F decode 回 /，導致原本要傳的
+     *  「categories/uniform」變成「categories」「uniform」兩段，{path} placeholder 只吞到第
+     *  一段，URL 就被截斷成「/categories/」這種沒有影片的索引頁，user 看到「暫無內容」。
+     *  解法：先把 / 換成 ~~ sentinel（URL-safe，encode 不變），讀回時 ViewModel 端再還原。 */
     data object AdultPlusBrowse : Screen("adult_plus_browse/{sourceType}/{path}/{title}") {
         fun createRoute(sourceType: String, path: String, title: String): String {
-            val encPath = java.net.URLEncoder.encode(path, "UTF-8")
+            val safePath = path.replace("/", "~~")
+            val encPath = java.net.URLEncoder.encode(safePath, "UTF-8")
             val encTitle = java.net.URLEncoder.encode(title, "UTF-8")
             return "adult_plus_browse/$sourceType/$encPath/$encTitle"
         }

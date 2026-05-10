@@ -54,7 +54,10 @@ class AdultPlusBrowseViewModel @Inject constructor(
         val rawPath: String = savedStateHandle["path"] ?: ""
         val titleArg: String = savedStateHandle["title"] ?: ""
         val sourceType = runCatching { SourceType.valueOf(sourceTypeName) }.getOrNull()
+        // Restore the ~~ sentinel back to / — see Screen.AdultPlusBrowse KDoc for why
+        // we encode it that way around Compose Navigation's segment auto-decode.
         val path = runCatching { URLDecoder.decode(rawPath, "UTF-8") }.getOrDefault(rawPath)
+            .replace("~~", "/")
         val title = runCatching { URLDecoder.decode(titleArg, "UTF-8") }.getOrDefault(titleArg)
 
         _state.value = _state.value.copy(sourceType = sourceType, pathKey = path, title = title)
