@@ -30,6 +30,52 @@ import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Compute cross-site aggregated status from POST-normalize episodes and the
+ * already-fallback-applied per-site metadata. Extracted so the rule can be
+ * unit-tested independently of the full repository wiring.
+ *
+ * Inputs:
+ *   - normalizedMaxEp: max(episode.number) across all surviving lines after
+ *     EpisodeNormalizer ran. May be 0 when no lines parsed any episodes.
+ *   - siteMetadata: per-site Vods (primary entry MUST already carry
+ *     fallback-resolved status, see getEnrichedVodDetail).
+ *   - primaryFallbackStatus: parseEpisodeStatus(statusFallback) for the
+ *     "no other branch matched" fallthrough.
+ *
+ * Output principle: badge number can NEVER exceed normalizedMaxEp when
+ * normalizedMaxEp > 0 — the user can't play episodes we don't have. When all
+ * lines failed to parse (rare, scraper bug), trust the highest declared count.
+ *
+ * @VisibleForTesting — internal visibility so unit tests in the same package
+ * can call it directly without requiring full repository wiring.
+ */
+internal fun computeAggregatedStatus(
+    normalizedMaxEp: Int,
+    siteMetadata: Map<SourceType, Vod>,
+    primaryFallbackStatus: EpisodeStatus,
+): EpisodeStatus {
+    val anyFinished = siteMetadata.values.any { it.siteStatus is EpisodeStatus.Finished }
+    val highestSiteDeclared = siteMetadata.values.maxOfOrNull {
+        when (val st = it.siteStatus) {
+            is EpisodeStatus.InProgress -> st.latest
+            is EpisodeStatus.Finished -> st.total
+            else -> 0
+        }
+    } ?: 0
+    val winnerCount = if (normalizedMaxEp > 0) normalizedMaxEp else highestSiteDeclared
+
+    return when {
+        anyFinished -> EpisodeStatus.Finished(total = winnerCount)
+        winnerCount > 1 -> EpisodeStatus.InProgress(
+            latest = winnerCount,
+            confidence = Confidence.CrossSiteMax,
+        )
+        primaryFallbackStatus !is EpisodeStatus.Empty -> primaryFallbackStatus
+        else -> EpisodeStatus.Empty
+    }
+}
+
 @Singleton
 class VodRepositoryImpl @Inject constructor(
     private val gimyMaxSource: GimyMaxSource,
@@ -572,47 +618,34 @@ class VodRepositoryImpl @Inject constructor(
                 for (md in matchedDetails) put(md.vod.sourceType, md.vod)
             }
 
-            // Cross-site aggregated status. Picks highest "latest" across (a) every
-            // site's own siteStatus and (b) max episode.number across all groups.
-            val crossSiteMaxEp = allGroups.maxOfOrNull { line ->
-                line.episodes.maxOfOrNull { it.number } ?: 0
-            } ?: 0
-            val anyFinished = siteMetadata.values.any { it.siteStatus is EpisodeStatus.Finished }
-            val highestSiteDeclared = siteMetadata.values.maxOfOrNull {
-                when (val st = it.siteStatus) {
-                    is EpisodeStatus.InProgress -> st.latest
-                    is EpisodeStatus.Finished -> st.total
-                    else -> 0
-                }
-            } ?: 0
-
-            val aggregatedStatus: EpisodeStatus = when {
-                // Any site declares finished → trust that. Total = max of declared
-                // and parsed (some scrapers know the count even when episodes failed
-                // to parse; this preserves the count in that case).
-                anyFinished -> EpisodeStatus.Finished(
-                    total = maxOf(crossSiteMaxEp, highestSiteDeclared),
-                )
-                crossSiteMaxEp > 1 || highestSiteDeclared > 1 -> EpisodeStatus.InProgress(
-                    latest = maxOf(crossSiteMaxEp, highestSiteDeclared),
-                    confidence = Confidence.CrossSiteMax,
-                )
-                primaryFallbackStatus !is EpisodeStatus.Empty -> primaryFallbackStatus
-                else -> EpisodeStatus.Empty
-            }
-
-            val enriched = primaryDetail.copy(
+            // Build the merged detail BEFORE computing aggregatedStatus — final normalize
+            // may prune outlier secondary lines (cross-season merges, broken parsers), and
+            // reading max episode.number from PRE-prune lines would inflate the badge in
+            // exactly the way the v3.0.0 redesign aimed to eliminate.
+            val premergedEnriched = primaryDetail.copy(
                 vod = siteMetadata.getValue(primaryDetail.vod.sourceType),
                 episodes = allGroups,
                 seriesVods = mergedSeries,
                 relatedVods = filteredRelated,
                 siteMetadata = siteMetadata,
-                aggregatedStatus = aggregatedStatus,
             )
             // Final normalize across the merged groups (cluster median uses primary
             // lines; secondary outliers get pruned even though they survived
             // individual-scraper parsing).
-            EpisodeNormalizer.normalize(enriched).also { detailCachePut(cacheKey, it) }
+            val normalizedEnriched = EpisodeNormalizer.normalize(premergedEnriched)
+
+            // Now compute aggregatedStatus from POST-normalize episodes so the badge
+            // number cannot exceed what the grid can actually play.
+            val crossSiteMaxEp = normalizedEnriched.episodes.maxOfOrNull { line ->
+                line.episodes.maxOfOrNull { it.number } ?: 0
+            } ?: 0
+            val aggregatedStatus = computeAggregatedStatus(
+                normalizedMaxEp = crossSiteMaxEp,
+                siteMetadata = siteMetadata,
+                primaryFallbackStatus = primaryFallbackStatus,
+            )
+
+            normalizedEnriched.copy(aggregatedStatus = aggregatedStatus).also { detailCachePut(cacheKey, it) }
         }
     }
 

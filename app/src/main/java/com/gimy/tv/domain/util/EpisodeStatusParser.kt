@@ -5,8 +5,7 @@ import com.gimy.tv.domain.model.EpisodeStatus
 
 /**
  * Parses a scraper-emitted status string into a structured [EpisodeStatus].
- * Replaces the v2.x [prettifyVodStatus] regex pipeline; output is the SAME
- * canonical strings via [EpisodeStatus.display], plus a structured variant so
+ * Output is canonical via [EpisodeStatus.display], plus a structured variant so
  * downstream layers (Normalizer, Repository, UI) can make decisions without
  * re-parsing the string.
  *
