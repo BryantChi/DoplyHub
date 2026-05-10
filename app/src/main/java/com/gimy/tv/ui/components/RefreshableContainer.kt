@@ -19,10 +19,12 @@ import com.gimy.tv.ui.theme.LocalIsTelevision
  * On TV, returns a plain Box because the remote cannot trigger pull gestures —
  * use [RefreshIconButton] for TV-driven refresh instead.
  *
- * Pull threshold is intentionally larger than the Material3 default (80dp → 140dp)
- * to reduce accidental refreshes on long content rows. Caller can also pass
- * `enabled = false` to disable pull-to-refresh entirely (e.g. when the list is
- * scrolled away from the top).
+ * Pull threshold = 96dp. Slightly above Material3 default (~80dp) to reduce
+ * accidental refreshes, but not so high that users can't reach it on phones —
+ * the previous 140dp value (~17% of typical phone height) made adult-plus pages
+ * feel unresponsive because the down-drag space below the header was small. Caller
+ * can also pass `enabled = false` to disable pull-to-refresh entirely (e.g. when
+ * the list is scrolled away from the top).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +48,7 @@ fun RefreshableContainer(
                 isRefreshing = isRefreshing,
                 state = state,
                 enabled = enabled,
-                threshold = 140.dp,
+                threshold = 96.dp,
                 onRefresh = onRefresh,
             ),
     ) {

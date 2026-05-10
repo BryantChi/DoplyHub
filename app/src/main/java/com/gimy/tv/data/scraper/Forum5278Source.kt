@@ -96,9 +96,11 @@ class Forum5278Source @Inject constructor(
                     else -> "$baseUrl/${rawCover.trimStart('/')}"
                 }.also { if (it.isNotBlank()) coverCache.put(vodId, it) }
             }
-            // Single virtual episode — fetchPlayerData does the 2-layer extraction
+            // Single virtual episode — fetchPlayerData does the 2-layer extraction.
+            // Use the site's display name as the line label so the UI shows "5278"
+            // instead of the generic "HLS" tech term.
             val ep = Episode(1, title, "embed:$vodId")
-            val group = EpisodeGroup("HLS", 1, listOf(ep))
+            val group = EpisodeGroup(sourceType.displayName, 1, listOf(ep))
             VodDetail(
                 Vod(vodId, sourceType, title, cover, "", 0, ""),
                 "", emptyList(), "", listOf(group),

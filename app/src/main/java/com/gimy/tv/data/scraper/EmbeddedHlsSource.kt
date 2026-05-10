@@ -113,8 +113,10 @@ abstract class EmbeddedHlsSource(
             val (title, cover, year) = parseDetailMeta(doc, vodId)
             // Embed sites don't have multi-source episode lists — single virtual episode
             // points back at the same detail URL; PlayerData resolution happens in fetchPlayerData.
+            // Use the site's display name as the line label so the UI shows e.g. "Jable" or
+            // "XNXX" instead of the generic "HLS" tech term that confused users.
             val ep = Episode(1, title, "embed:$vodId")
-            val group = EpisodeGroup("HLS", 1, listOf(ep))
+            val group = EpisodeGroup(sourceType.displayName, 1, listOf(ep))
             VodDetail(
                 Vod(vodId, sourceType, title, cover, "", year, ""),
                 "", emptyList(), "", listOf(group),
