@@ -139,6 +139,6 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit)
-    testImplementation("com.google.truth:truth:1.4.4")
+    testImplementation(libs.truth)
     testImplementation(libs.coroutines.test)
 }
