@@ -23,7 +23,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import coil.compose.AsyncImage
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
-import com.gimy.tv.domain.util.prettifyVodStatus
+
 import com.gimy.tv.ui.theme.*
 
 /**
@@ -113,11 +113,19 @@ private fun VodCardContent(vod: Vod) {
         ) {
             Text(sourceTag, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
-        // Top-right: status badge — normalize via prettifyVodStatus so home/list
-        // grids don't show the source-specific hodgepodge ("更新至第33集" vs
-        // "38集全" vs "更新26" vs "HD") that the user reads as "the count is
-        // wrong even when the underlying number is correct.
-        val prettyStatus = remember(vod.status) { prettifyVodStatus(vod.status) }
+        // Top-right: status badge — read structured siteStatus.display so home/list
+        // grids share the canonical formatting with detail page (no source-specific
+        // hodgepodge "更新至第33集" vs "38集全" vs "更新26").
+        // v3.0.0: structured siteStatus is the single source of truth. The legacy
+        // status string fallback below is a defensive net — all in-tree scrapers
+        // populate siteStatus, so it should never fire. Suppression is on the
+        // remember-key list because Vod.status itself is @Deprecated.
+        @Suppress("DEPRECATION")
+        val prettyStatus = remember(vod.siteStatus, vod.status) {
+            val s = vod.siteStatus
+            if (s !is com.gimy.tv.domain.model.EpisodeStatus.Empty) s.display
+            else com.gimy.tv.domain.util.parseEpisodeStatus(vod.status).display
+        }
         if (prettyStatus.isNotBlank()) {
             Box(
                 Modifier

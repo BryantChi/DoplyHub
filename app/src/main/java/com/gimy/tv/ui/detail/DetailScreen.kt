@@ -406,55 +406,27 @@ private fun DetailInfo(
         textAlign = titleAlign, modifier = widthMod)
 
     Spacer(Modifier.height(8.dp))
-    // Status badge — v2.8.0 site-level: status / year / category come from the
-    // CURRENTLY-SELECTED site's own metadata, not the merged primary. Switching
-    // chips at the top flips this badge to that site's verbatim listing.
+    // v3.0.0: structured status is the single source of truth.
+    //   - 全部 mode (no chip): aggregatedStatus from repository (cross-site max).
+    //   - Per-site chip: that site's own siteStatus (the chip-flipping intent
+    //     of v2.8.0 is preserved — switch chip → switch the displayed string).
+    // Both are pre-formatted via EpisodeStatus.display; UI does no string parsing.
     //
-    // Order (unchanged from v2.7.0):
-    //   1. rawStatus contains "N 集" → verbatim site string
-    //   2. rawStatus says "完結" with no count → "完結 · 共 N 集"
-    //   3. Series with computed count → "更新至 N 集"
-    //   4. Movie / unknown → rawStatus as-is
-    //
-    // Compute count: cross-site max in 全部 mode, per-site max otherwise.
-    // EpisodeNormalizer at the repository layer already pruned outlier lines
-    // & out-of-range episodes, so max() represents the latest sane progress.
-    val displayCount = currentSiteEpisodes.maxOfOrNull { line ->
-        line.episodes.maxOfOrNull { it.number } ?: 0
-    } ?: 0
-    val isSeries = (currentSiteEpisodes.firstOrNull()?.episodes?.size ?: 0) > 1
-    // Detect 完結 from any site's listing (in 全部 mode); fall back to current
-    // site's status for per-site mode.
-    val anyFinished = if (selectedSourceType == null) {
-        d.siteMetadata.values.any {
-            it.status.contains("完結") || it.status.contains("全集") ||
-                Regex("\\d+\\s*集\\s*全").containsMatchIn(it.status) ||
-                Regex("全\\s*\\d+\\s*集").containsMatchIn(it.status)
-        } || currentSiteVod.status.contains("完結")
+    // Phase 2 enrichment may still upgrade aggregatedStatus from ParsedFromLines
+    // to CrossSiteMax — append "…" while that's in flight so the user reads the
+    // number as provisional instead of being surprised by it changing mid-view.
+    val baseStatus = if (selectedSourceType == null) {
+        d.aggregatedStatus.display
     } else {
-        currentSiteVod.status.contains("完結") ||
-            Regex("\\d+\\s*集\\s*全").containsMatchIn(currentSiteVod.status) ||
-            Regex("全\\s*\\d+\\s*集").containsMatchIn(currentSiteVod.status)
+        currentSiteVod.siteStatus.display
     }
-    val rawStatus = com.gimy.tv.domain.util.prettifyVodStatus(currentSiteVod.status)
-    val rawHasCount = Regex("\\d+\\s*集").containsMatchIn(rawStatus)
-    val displayStatus = when {
-        // 全部 mode: ALWAYS use computed cross-site max (badge represents
-        // 全部 semantics — latest progress across all sources). Don't trust
-        // any single site's verbatim string here, since it can be stale or
-        // mismatched with the actual EpisodeGrid below.
-        selectedSourceType == null && isSeries && anyFinished && displayCount > 0 ->
-            "完結 · 共 $displayCount 集"
-        selectedSourceType == null && isSeries && displayCount > 1 ->
-            "更新至 $displayCount 集"
-        // Per-site mode: prefer that site's own verbatim count (most
-        // authoritative for that specific site — e.g. GimyTv's listing
-        // says "更新至第26集" so the GimyTv chip should show 26 verbatim).
-        selectedSourceType != null && rawHasCount -> rawStatus
-        isSeries && rawStatus.contains("完結") -> "完結 · 共 $displayCount 集"
-        isSeries && displayCount > 1 -> "更新至 $displayCount 集"
-        else -> rawStatus
-    }
+    val isProvisional = uiState.isEnriching && selectedSourceType == null &&
+        run {
+            val s = d.aggregatedStatus
+            s !is com.gimy.tv.domain.model.EpisodeStatus.InProgress ||
+                s.confidence != com.gimy.tv.domain.model.Confidence.CrossSiteMax
+        }
+    val displayStatus = if (isProvisional && baseStatus.isNotBlank()) "$baseStatus …" else baseStatus
     Row(modifier = widthMod, horizontalArrangement = rowArrange) {
         if (displayStatus.isNotBlank()) InfoBadge(displayStatus, CinemaRed)
         val displayYear = currentSiteVod.year.takeIf { it > 0 } ?: d.vod.year

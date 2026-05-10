@@ -24,8 +24,8 @@ android {
         applicationId = "com.gimy.tv"
         minSdk = 28
         targetSdk = 35
-        versionCode = 283
-        versionName = "2.8.3"
+        versionCode = 300
+        versionName = "3.0.0"
     }
 
     signingConfigs {
@@ -139,5 +139,6 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.truth)
     testImplementation(libs.coroutines.test)
 }

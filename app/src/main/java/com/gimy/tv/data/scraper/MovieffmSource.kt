@@ -4,6 +4,7 @@ import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.data.local.dao.MovieffmSlugDao
 import com.gimy.tv.data.local.entity.MovieffmSlugEntity
 import com.gimy.tv.domain.model.*
+import com.gimy.tv.domain.util.parseEpisodeStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -186,7 +187,8 @@ class MovieffmSource @Inject constructor(
             val category = card.selectFirst(".dramaleixing")?.text()?.trim() ?: ""
 
             val vodId = registerSlug(slug, contentType)
-            items.add(Vod(vodId, sourceType, title, cover, category, year, status, rating))
+            items.add(Vod(vodId, sourceType, title, cover, category, year, status,
+                siteStatus = parseEpisodeStatus(status), rating = rating))
             slugEntities.add(MovieffmSlugEntity(vodId, slug, contentType))
         }
 
@@ -262,7 +264,8 @@ class MovieffmSource @Inject constructor(
             val typeBadge = card.selectFirst(".thumbnail span")?.text()?.trim() ?: ""
 
             val vodId = registerSlug(slug, contentType)
-            items.add(Vod(vodId, sourceType, title, cover, "", year, typeBadge, rating))
+            items.add(Vod(vodId, sourceType, title, cover, "", year, typeBadge,
+                siteStatus = parseEpisodeStatus(typeBadge), rating = rating))
             slugEntities.add(MovieffmSlugEntity(vodId, slug, contentType))
         }
 
@@ -367,7 +370,8 @@ class MovieffmSource @Inject constructor(
         val relatedVods = parseRelatedVods(doc, relatedSlugs)
 
         return VodDetail(
-            Vod(vodId, sourceType, title, cover, category, year, status, rating),
+            Vod(vodId, sourceType, title, cover, category, year, status,
+                siteStatus = parseEpisodeStatus(status), rating = rating),
             director, actors, synopsis, episodeGroups, seriesVods, relatedVods
         )
     }

@@ -2,6 +2,7 @@ package com.gimy.tv.data.scraper
 
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.domain.model.*
+import com.gimy.tv.domain.util.parseEpisodeStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -93,7 +94,8 @@ class GimyMaxSource @Inject constructor(
             if (title.isBlank()) continue
             val cover = resolveUrl(card.attr("data-original"))
             val status = card.selectFirst("span.note")?.text()?.trim() ?: ""
-            items.add(Vod(id, sourceType, title, cover, "", 0, status))
+            items.add(Vod(id, sourceType, title, cover, "", 0, status,
+                siteStatus = parseEpisodeStatus(status)))
         }
         val unique = items.distinctBy { it.id }
 
@@ -137,7 +139,8 @@ class GimyMaxSource @Inject constructor(
         val relatedVods = parseRelatedVods(doc)
 
         return VodDetail(
-            Vod(vodId, sourceType, title, cover, category, year, status),
+            Vod(vodId, sourceType, title, cover, category, year, status,
+                siteStatus = parseEpisodeStatus(status)),
             director, actors, synopsis, sorted, seriesVods, relatedVods
         )
     }
@@ -161,7 +164,8 @@ class GimyMaxSource @Inject constructor(
             if (cardTitle.isBlank()) continue
             val cardCover = resolveUrl(card.attr("data-background"))
             val cardStatus = card.selectFirst("span.note")?.text()?.trim() ?: ""
-            items.add(Vod(id, sourceType, cardTitle, cardCover, "", 0, cardStatus))
+            items.add(Vod(id, sourceType, cardTitle, cardCover, "", 0, cardStatus,
+                siteStatus = parseEpisodeStatus(cardStatus)))
         }
         return items
     }
@@ -182,7 +186,8 @@ class GimyMaxSource @Inject constructor(
             if (cardTitle.isBlank()) continue
             val cardCover = resolveUrl(card.attr("data-background"))
             val cardStatus = card.selectFirst("span.note")?.text()?.trim() ?: ""
-            items.add(Vod(id, sourceType, cardTitle, cardCover, "", 0, cardStatus))
+            items.add(Vod(id, sourceType, cardTitle, cardCover, "", 0, cardStatus,
+                siteStatus = parseEpisodeStatus(cardStatus)))
         }
         return items
     }
