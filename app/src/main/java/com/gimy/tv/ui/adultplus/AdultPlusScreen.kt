@@ -25,6 +25,7 @@ import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import com.gimy.tv.ui.components.RefreshableContainer
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.favorites.PageHeader
+import com.gimy.tv.ui.components.FocusableChip
 import com.gimy.tv.ui.theme.*
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -34,6 +35,8 @@ fun AdultPlusScreen(
     onBack: () -> Unit,
     /** Navigate to the per-row「查看更多」full-grid page. Receives (sourceType, pathKey, title). */
     onMoreClick: (SourceType, String, String) -> Unit = { _, _, _ -> },
+    /** Navigate to the standalone「全部分類」index screen. */
+    onCategoriesClick: () -> Unit = {},
     vm: AdultPlusViewModel = hiltViewModel(),
 ) {
     val dims = LocalDimensions.current
@@ -48,6 +51,18 @@ fun AdultPlusScreen(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
     ) {
         PageHeader("進階", onBack)
+
+        // Entry to the「全部分類」index. Sits above the refresh container so it's
+        // always reachable; the refresh gesture only consumes pulls from the
+        // scrollable area below.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = dims.screenHorizontalPadding, vertical = 4.dp),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            FocusableChip("📂 全部分類") { onCategoriesClick() }
+        }
 
         val isRefreshing by vm.isRefreshing.collectAsState()
         RefreshableContainer(

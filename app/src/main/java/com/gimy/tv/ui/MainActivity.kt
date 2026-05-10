@@ -154,6 +154,9 @@ class MainActivity : ComponentActivity() {
                                     Screen.AdultPlusBrowse.createRoute(sourceType.name, path, title)
                                 )
                             },
+                            onCategoriesClick = {
+                                navController.navigate(Screen.AdultPlusCategories.route)
+                            },
                         )
                     }
 
@@ -169,6 +172,17 @@ class MainActivity : ComponentActivity() {
                             onVodClick = { sourceType, vodId ->
                                 navController.navigate(
                                     Screen.Detail.createRoute(sourceType.name, vodId)
+                                )
+                            },
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
+
+                    composable(Screen.AdultPlusCategories.route) {
+                        com.gimy.tv.ui.adultplus.AdultPlusCategoriesScreen(
+                            onCategoryClick = { sourceType, path, title ->
+                                navController.navigate(
+                                    Screen.AdultPlusBrowse.createRoute(sourceType.name, path, title)
                                 )
                             },
                             onBack = { navController.popBackStack() },

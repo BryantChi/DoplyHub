@@ -27,4 +27,6 @@ sealed class Screen(val route: String) {
             return "adult_plus_browse/$sourceType/$encPath/$encTitle"
         }
     }
+    /** AdultPlus「全部分類」入口頁 — 顯示所有 jable / xnxx / 5278 分類，點擊後導向 AdultPlusBrowse。 */
+    data object AdultPlusCategories : Screen("adult_plus_categories")
 }
