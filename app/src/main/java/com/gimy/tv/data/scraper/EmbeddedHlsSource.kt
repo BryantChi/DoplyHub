@@ -2,6 +2,7 @@ package com.gimy.tv.data.scraper
 
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.domain.model.*
+import com.gimy.tv.domain.util.parseEpisodeStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -118,7 +119,8 @@ abstract class EmbeddedHlsSource(
             val ep = Episode(1, title, "embed:$vodId")
             val group = EpisodeGroup(sourceType.displayName, 1, listOf(ep))
             VodDetail(
-                Vod(vodId, sourceType, title, cover, "", year, ""),
+                Vod(vodId, sourceType, title, cover, "", year, "",
+                    siteStatus = parseEpisodeStatus("")),
                 "", emptyList(), "", listOf(group),
             )
         }
