@@ -93,16 +93,18 @@ class EpisodeNormalizerTest {
                 Episode(2026, "預告 2026", "u3"),  // year mis-read as episode number
             ),
         )
-        // Need 3+ lines for the line-level pass to engage; pad with two clean lines.
+        // siteStatus latest=1 (≤1 → falls through to median). Median over the
+        // three padded lines (after Pass 1 prunes 2026 from broken: 2; clean A: 2;
+        // clean B: 2) = 2. Broken line size becomes 2 → deviation 0 → kept.
+        // We assert BOTH Pass 1 stripped 2026 AND the line survived Pass 2.
         val d = detail(
             siteStatus = EpisodeStatus.InProgress(2, Confidence.SiteDeclared),
             lines = listOf(brokenLine, line("正常 A", 2), line("正常 B", 2)),
         )
         val out = EpisodeNormalizer.normalize(d)
         val brokenAfter = out.episodes.firstOrNull { it.sourceName == "broken" }
-        // Episode 2026 must be removed by Pass 1 regardless of whether the line survives Pass 2.
-        if (brokenAfter != null) {
-            assertThat(brokenAfter.episodes.map { it.number }).doesNotContain(2026)
-        }
+        assertThat(brokenAfter).isNotNull()
+        assertThat(brokenAfter!!.episodes.map { it.number }).doesNotContain(2026)
+        assertThat(brokenAfter.episodes.map { it.number }).containsExactly(1, 2)
     }
 }

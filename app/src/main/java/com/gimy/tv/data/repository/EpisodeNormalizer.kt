@@ -111,13 +111,17 @@ object EpisodeNormalizer {
         cleanedEpisodes: List<EpisodeGroup>,
         primarySourceType: SourceType,
     ): Int {
-        if (siteStatus is EpisodeStatus.InProgress && siteStatus.latest > 1) {
-            return siteStatus.latest
+        // The `> 1` guards reject baseline = 1 cases. A first-week show declares
+        // "更新至第 1 集" → siteStatus.latest = 1; using that as the prune
+        // baseline would drop any line that managed to parse 2 episodes (a stale
+        // parser quirk we want kept, not discarded). Falls through to median,
+        // and if median is also 1 the all-singletons short-circuit upstream
+        // already returned without pruning.
+        when (siteStatus) {
+            is EpisodeStatus.InProgress -> if (siteStatus.latest > 1) return siteStatus.latest
+            is EpisodeStatus.Finished -> if (siteStatus.total > 1) return siteStatus.total
+            else -> {}
         }
-        if (siteStatus is EpisodeStatus.Finished && siteStatus.total > 1) {
-            return siteStatus.total
-        }
-        // Legacy median fallback.
         val primaryLines = cleanedEpisodes.filter {
             it.sourceType == null || it.sourceType == primarySourceType
         }
