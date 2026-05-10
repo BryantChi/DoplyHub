@@ -351,19 +351,22 @@ private fun DetailInfo(
         textAlign = titleAlign, modifier = widthMod)
 
     Spacer(Modifier.height(8.dp))
-    // Status badge — restricted to PRIMARY-source lines (where the user came from)
-    // so cross-source enrichment with different season interpretations can't pollute
-    // the count. e.g. user clicks「鬼滅之刃 第二季」 from GimyTv and primary lines all
-    // agree on 24 eps; an enriched mirror serving a 50-ep S1+S2 merge would push the
-    // median across all lines to 50 (wrong). Filtering to primary scopes the count
-    // to "the show as user is viewing it".
+    // Status badge — trust the source's own status text first, only compute when
+    // it doesn't tell us. Why: even after merging, our own counting can be off if
+    // some scraper happens to under-/over-count for a specific show. The site's
+    // listing-page status is what users see on the source itself, so reproducing
+    // it stays consistent with their expectation.
     //
-    // Per-line sanity (kept from v2.6.7): max ep.number > episodes.size + 30 indicates
-    // the parser misread a date/year as an episode number, fall back to size.
+    // Order:
+    //   1. rawStatus contains "N 集" → use rawStatus verbatim (most authoritative)
+    //   2. rawStatus says "完結" with no count → "完結 · 共 N 集" (we add count)
+    //   3. Series with computed count → "更新至 N 集"
+    //   4. Movie / unknown → rawStatus as-is
     //
-    // Cross-line median (kept from v2.6.7): tolerates one stale line in the cluster.
-    //
-    // Final fallback: if no primary lines parsed, use ALL lines' median rather than 0.
+    // displayCount itself uses primary-source lines only (filters cross-source
+    // enriched lines that may carry a different season interpretation), with
+    // per-line sanity (max number > size + 30 = parser misread, fallback to size)
+    // and median across the primary cluster.
     fun perLineSane(line: com.gimy.tv.domain.model.EpisodeGroup): Int {
         val maxNum = line.episodes.maxOfOrNull { it.number } ?: 0
         val size = line.episodes.size
@@ -377,9 +380,11 @@ private fun DetailInfo(
     val displayCount = if (countPool.isNotEmpty()) countPool[countPool.size / 2] else 0
     val isSeries = (d.episodes.firstOrNull()?.episodes?.size ?: 0) > 1
     val rawStatus = d.vod.status
+    val rawHasCount = Regex("\\d+\\s*集").containsMatchIn(rawStatus)
     val displayStatus = when {
+        rawHasCount -> rawStatus
         isSeries && rawStatus.contains("完結") -> "完結 · 共 $displayCount 集"
-        isSeries -> "更新至 $displayCount 集"
+        isSeries && displayCount > 1 -> "更新至 $displayCount 集"
         else -> rawStatus
     }
     Row(modifier = widthMod, horizontalArrangement = rowArrange) {
