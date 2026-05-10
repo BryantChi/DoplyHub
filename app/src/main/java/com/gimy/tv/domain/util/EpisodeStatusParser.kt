@@ -41,14 +41,6 @@ fun parseEpisodeStatus(raw: String): EpisodeStatus {
         return EpisodeStatus.InProgress(it.groupValues[1].toInt(), Confidence.SiteDeclared)
     }
 
-    // Bare "第 N 集" / "N 集" — only when status is essentially the count alone
-    // (avoid mangling "預告 第3集" / "OAD 5集" labels that should stay Raw).
-    Regex("(?:第)?\\s*(\\d+)\\s*集").find(s)?.let { match ->
-        if (match.value.length >= s.length - 1) {
-            return EpisodeStatus.InProgress(match.groupValues[1].toInt(), Confidence.SiteDeclared)
-        }
-    }
-
     // Quality / language tags that movieffm uses for movies.
     if (s.equals("HD", ignoreCase = true) || s == "中字" || s == "藍光" || s == "4K") {
         return EpisodeStatus.Movie(s)

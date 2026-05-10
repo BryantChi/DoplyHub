@@ -91,14 +91,17 @@ class EpisodeStatusParserTest {
 
     // ── Bare counts ──
 
-    @Test fun `第N集 should yield InProgress`() {
-        val s = parseEpisodeStatus("第5集") as EpisodeStatus.InProgress
-        assertThat(s.latest).isEqualTo(5)
+    @Test fun `bare 第N集 should yield Raw (no progress claim)`() {
+        // Legacy prettifyVodStatus passed bare counts verbatim. We preserve that:
+        // a scraper emitting "第5集" as status is more likely a parsing mishap than
+        // a real release-stage statement, so don't promote to InProgress.
+        val s = parseEpisodeStatus("第5集") as EpisodeStatus.Raw
+        assertThat(s.text).isEqualTo("第5集")
     }
 
-    @Test fun `N集 should yield InProgress`() {
-        val s = parseEpisodeStatus("12集") as EpisodeStatus.InProgress
-        assertThat(s.latest).isEqualTo(12)
+    @Test fun `bare N集 should yield Raw (no progress claim)`() {
+        val s = parseEpisodeStatus("12集") as EpisodeStatus.Raw
+        assertThat(s.text).isEqualTo("12集")
     }
 
     // ── Empty / blank ──
@@ -117,6 +120,14 @@ class EpisodeStatusParserTest {
 
     @Test fun `預告 第3集 should keep verbatim`() {
         val s = parseEpisodeStatus("預告 第3集")
+        assertThat(s).isInstanceOf(EpisodeStatus.Raw::class.java)
+    }
+
+    @Test fun `full-width digits fall through to Raw (current behavior pinning)`() {
+        // Document gap: \d in regex doesn't match full-width digits. If a scraper
+        // ever emits "更新至第１２集" we'll classify as Raw rather than InProgress.
+        // Add normalisation only when a real source is found emitting these.
+        val s = parseEpisodeStatus("更新至第１２集")
         assertThat(s).isInstanceOf(EpisodeStatus.Raw::class.java)
     }
 }

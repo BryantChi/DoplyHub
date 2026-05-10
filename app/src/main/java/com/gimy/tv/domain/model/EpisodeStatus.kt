@@ -17,28 +17,28 @@ sealed interface EpisodeStatus {
         val latest: Int,
         val confidence: Confidence,
     ) : EpisodeStatus {
-        override val display: String = "更新至 $latest 集"
+        override val display: String get() = "更新至 $latest 集"
     }
 
     /** Series finished — `total` is the final episode count. */
     data class Finished(val total: Int) : EpisodeStatus {
-        override val display: String = "完結 · 共 $total 集"
+        override val display: String get() = "完結 · 共 $total 集"
     }
 
     /** Movie (no episode count). `tag` carries quality / language label like "HD" / "中字". */
     data class Movie(val tag: String) : EpisodeStatus {
-        override val display: String = tag
+        override val display: String get() = tag
     }
 
     /** Status string was non-empty but couldn't be parsed into a count or movie tag.
      *  Pass-through (e.g. "預告" / "全集"). UI shows verbatim. */
     data class Raw(val text: String) : EpisodeStatus {
-        override val display: String = text
+        override val display: String get() = text
     }
 
     /** Status string was blank / null. UI shows nothing. */
     data object Empty : EpisodeStatus {
-        override val display: String = ""
+        override val display: String get() = ""
     }
 }
 
