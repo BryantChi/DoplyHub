@@ -34,6 +34,11 @@ data class Vod(
     val category: String,
     val year: Int,
     val status: String,
+    /** Structured status — single source of truth for badges (v3.0.0).
+     *  Defaults to [EpisodeStatus.Empty] for backward compat with constructors
+     *  that still only set [status]; scrapers SHOULD populate this directly so
+     *  downstream code stops parsing the string. */
+    val siteStatus: EpisodeStatus = EpisodeStatus.Empty,
     val rating: Double? = null
 )
 
@@ -51,6 +56,10 @@ data class VodDetail(
      *  single-site detail (UI falls back to [vod]).
      *  Always contains [vod.sourceType → vod] when non-empty. */
     val siteMetadata: Map<SourceType, Vod> = emptyMap(),
+    /** Cross-site aggregated status (v3.0.0). Computed by VodRepositoryImpl after
+     *  enrichment. Defaults to [vod.siteStatus] for single-site detail.
+     *  UI MUST prefer this over [vod.siteStatus] in 全部 mode (no chip selected). */
+    val aggregatedStatus: EpisodeStatus = vod.siteStatus,
 )
 
 /**
