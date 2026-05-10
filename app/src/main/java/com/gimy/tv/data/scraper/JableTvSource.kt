@@ -3,6 +3,7 @@ package com.gimy.tv.data.scraper
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
+import com.gimy.tv.domain.util.parseEpisodeStatus
 import okhttp3.OkHttpClient
 import org.jsoup.nodes.Document
 import javax.inject.Inject
@@ -93,7 +94,8 @@ class JableTvSource @Inject constructor(
         }
 
         return titleBySlug.entries.map { (slug, title) ->
-            Vod(stableId(slug), sourceType, title, coverBySlug[slug].orEmpty(), "", 0, "")
+            Vod(stableId(slug), sourceType, title, coverBySlug[slug].orEmpty(), "", 0, "",
+                siteStatus = parseEpisodeStatus(""))
         }
     }
 
