@@ -140,6 +140,17 @@ fun SearchScreen(
                 keyboardController?.hide()
                 focusManager.clearFocus()
             }
+            // Visible only after a search has run — clears the result grid back to
+            // the recent-searches/empty state. Touch users on phone previously had
+            // no way to do this without system back; TV's「返回」chip handled it.
+            if (uiState.hasSearched) {
+                Spacer(Modifier.width(4.dp))
+                FocusableChip("清除") {
+                    viewModel.clearResults()
+                    viewModel.onQueryChange("")
+                    inputFocusRequester.requestFocus()
+                }
+            }
             Spacer(Modifier.width(4.dp))
             RefreshIconButton(
                 isRefreshing = uiState.isRefreshing,

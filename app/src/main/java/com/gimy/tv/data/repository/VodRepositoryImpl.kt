@@ -555,25 +555,39 @@ class VodRepositoryImpl @Inject constructor(
      * The `!name.contains("雲")` guard prevents 「無盡雲」from matching gimyTop's「無盡」tag.
      */
     private fun rankEpisodeGroups(groups: List<EpisodeGroup>): List<EpisodeGroup> {
-        val gimyTopSources = listOf("順暢", "無盡", "極速", "高清")
-        val newSiteTopSources = listOf("卧龍雲", "索尼雲", "無盡雲", "閃電雲", "極速雲", "優質雲")
-        val gimySecondary = listOf("騰訊", "藍光", "4K", "優質", "非凡")
+        // Curated lists, ordered longer-first so e.g. "順暢雲" matches before "順暢".
+        // Names verified against live HTML on gimy01.tv / gimytv.ai / imaple.tv (2026-05).
+        // If sites rename their lines this list goes stale — scrapers can override
+        // priority via EpisodeGroup.linePriority instead of relying on this map.
+        val gimyMainLines = listOf(
+            // CDN-branded high-quality lines unique to gimyMax / gimyTv
+            "4K畫質線路", "高清線路", "騰訊線路", "奇藝線路", "愛奇異線路", "超清畫質線路",
+            "順暢雲", "無盡雲", "魔都雲", "非凡雲", "新浪雲",
+            // Legacy un-suffixed names that some older builds still emit
+            "順暢", "無盡",
+        )
+        // Shared third-party CDNs surfaced by the MacCMS-template sites
+        // (Imaple / Momovod / Kubo123 / GimyTw / Eyny).
+        val sharedCdnLines = listOf(
+            "卧龍雲", "索尼雲", "閃電雲", "極速雲", "優質雲",
+        )
 
         fun tierOf(group: EpisodeGroup): Int {
-            // Prefer scraper-supplied tier when present — that path is robust to
-            // upstream rename of line names. Fall through to the substring heuristic
-            // for groups whose scraper hasn't migrated yet.
+            // Prefer scraper-supplied tier when present — robust to upstream renames.
             group.linePriority?.let { return it }
             val name = group.sourceName
             return when {
-                !name.contains("雲") && gimyTopSources.any { name.contains(it) } ->
-                    gimyTopSources.indexOfFirst { name.contains(it) }
-                newSiteTopSources.any { name.contains(it) } ->
-                    4 + newSiteTopSources.indexOfFirst { name.contains(it) }
+                gimyMainLines.any { name.contains(it) } ->
+                    gimyMainLines.indexOfFirst { name.contains(it) }
+                sharedCdnLines.any { name.contains(it) } ->
+                    20 + sharedCdnLines.indexOfFirst { name.contains(it) }
+                // MovieFFM lines come back with sourceId in the 1000+ range
                 name.contains("MovieFFM") || (group.sourceId >= 1000 && group.sourceId > 0) ->
-                    15 + (group.sourceId % 10)
-                !name.contains("雲") && gimySecondary.any { name.contains(it) } ->
-                    25 + gimySecondary.indexOfFirst { name.contains(it) }
+                    40 + (group.sourceId % 10)
+                // Catch-all 雲 suffix that didn't match the curated lists — better
+                // than dumping into Tier 99 since cloud-tagged lines are usually
+                // newer / faster than no-tag fallbacks.
+                name.contains("雲") -> 60
                 else -> 99
             }
         }
