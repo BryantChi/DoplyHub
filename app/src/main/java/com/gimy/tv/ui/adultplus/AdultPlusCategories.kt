@@ -36,6 +36,16 @@ object AdultPlusCategories {
         AdultPlusCategory("多P群交", SourceType.JABLE_TV, "categories/groupsex"),
         AdultPlusCategory("絲襪美腿", SourceType.JABLE_TV, "categories/pantyhose"),
         AdultPlusCategory("女同歡愉", SourceType.JABLE_TV, "categories/lesbian"),
+        // Jable tags — popular themes, slugs verified at jable.tv/tags/
+        AdultPlusCategory("巨乳", SourceType.JABLE_TV, "tags/big-tits"),
+        AdultPlusCategory("中出", SourceType.JABLE_TV, "tags/creampie"),
+        AdultPlusCategory("口交", SourceType.JABLE_TV, "tags/blowjob"),
+        AdultPlusCategory("3P/4P", SourceType.JABLE_TV, "tags/3p"),
+        AdultPlusCategory("情侶", SourceType.JABLE_TV, "tags/couple"),
+        AdultPlusCategory("旗袍", SourceType.JABLE_TV, "tags/cheongsam"),
+        AdultPlusCategory("兔女郎", SourceType.JABLE_TV, "tags/bunny-girl"),
+        AdultPlusCategory("浴池", SourceType.JABLE_TV, "tags/bathing-place"),
+        AdultPlusCategory("綁縛", SourceType.JABLE_TV, "tags/bondage"),
         // ── XNXX ── (tags + best/* periods, all 200 OK)
         AdultPlusCategory("亞洲", SourceType.XNXX, "tags/asian"),
         AdultPlusCategory("日本", SourceType.XNXX, "tags/japanese"),

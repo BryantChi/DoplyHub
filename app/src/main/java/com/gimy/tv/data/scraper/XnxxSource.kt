@@ -66,7 +66,13 @@ class XnxxSource @Inject constructor(
         // Fix: pivot only on .thumb-block and reach INTO it for both pieces — the title
         // anchor (a.title under .thumb-under) and the img (under .thumb).
         for (block in doc.select("div.thumb-block")) {
-            val titleLink = block.selectFirst("a.title, p.title a, .video-title a") ?: continue
+            // /best/* pages use <a class="title" href="...">; /tags/* and search pages
+            // use the bare <a href="/video-..." title="..."> form inside <p> instead.
+            // Match the broader `a[href*=/video-][title]` first so both structures
+            // resolve to the same Vod row, then fall back to legacy class selectors.
+            val titleLink = block.selectFirst(
+                "a[href*=/video-][title], a.title, p.title a, .video-title a"
+            ) ?: continue
             val href = titleLink.attr("href")
             val match = Regex("/video-([a-zA-Z0-9]+)/([^/?\"#]+)").find(href) ?: continue
             val videoId = match.groupValues[1]

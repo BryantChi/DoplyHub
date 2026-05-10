@@ -351,26 +351,37 @@ private fun DetailInfo(
         textAlign = titleAlign, modifier = widthMod)
 
     Spacer(Modifier.height(8.dp))
-    // Status badge — pick from the TOP-RANKED line (★) only, not cross-source max.
+    // Status badge — robust to single-line outliers via median across lines.
     //
-    // Why not max(episodes.size) across all lines:
-    //   one cross-source line may carry continuous numbering across seasons (e.g.
-    //   S1+S2 merged 1..67) which is NOT the show's current episode count. The user
-    //   plays the ★ line by default; its latest episode number is what they expect.
+    // Earlier versions used the top-ranked line's max ep.number, which broke when:
+    //   1. The top line had a parser-misread number (e.g. 預告 with year 2026 became
+    //      ep.number = 2026, badge displayed「更新至 2026 集」).
+    //   2. The top line was actually a cross-season-merged line (1..67 covering S1+S2)
+    //      while the show truly only ran 30 episodes.
     //
-    // Why ep.number (max) instead of episodes.size (count):
-    //   if a parser drops a missing episode, [1,2,3,5,6] gives count=5 / max=6.
-    //   "更新至 6 集" matches the show's actual progress; count understates by 1.
+    // Per-line sanity: if a line's max ep.number is wildly above its episode count
+    // (size + 30), trust the count instead — bogus high numbers come from parsers
+    // misreading dates/years embedded in episode titles.
     //
-    // Single-episode (movie) lines fall through to the raw status text — "HD" /
-    // "中字" / "預告" carries more meaning than "更新至 1 集".
-    val topLine = d.episodes.firstOrNull()
-    val topLineSize = topLine?.episodes?.size ?: 0
-    val topLineLatestNumber = topLine?.episodes?.maxOfOrNull { it.number } ?: 0
+    // Cross-line: take the median of sane per-line counts. Outliers get filtered
+    // automatically; if 4 lines say 30 and 1 says 67, median is 30 (correct).
+    //
+    // Single-episode lines (movies) fall through to raw status text — "HD" /
+    // "中字" / "預告" carries more UX value than「更新至 1 集」.
+    val saneCounts = d.episodes
+        .map { line ->
+            val maxNum = line.episodes.maxOfOrNull { it.number } ?: 0
+            val size = line.episodes.size
+            if (maxNum > size + 30) size else maxNum
+        }
+        .filter { it > 0 }
+        .sorted()
+    val displayCount = if (saneCounts.isNotEmpty()) saneCounts[saneCounts.size / 2] else 0
+    val isSeries = (d.episodes.firstOrNull()?.episodes?.size ?: 0) > 1
     val rawStatus = d.vod.status
     val displayStatus = when {
-        topLineSize > 1 && rawStatus.contains("完結") -> "完結 · 共 $topLineLatestNumber 集"
-        topLineSize > 1 -> "更新至 $topLineLatestNumber 集"
+        isSeries && rawStatus.contains("完結") -> "完結 · 共 $displayCount 集"
+        isSeries -> "更新至 $displayCount 集"
         else -> rawStatus
     }
     Row(modifier = widthMod, horizontalArrangement = rowArrange) {
