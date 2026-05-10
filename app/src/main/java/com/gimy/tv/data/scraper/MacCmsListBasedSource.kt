@@ -2,6 +2,7 @@ package com.gimy.tv.data.scraper
 
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.domain.model.*
+import com.gimy.tv.domain.util.parseEpisodeStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -168,7 +169,8 @@ abstract class MacCmsListBasedSource(
             if (title.isBlank()) continue
             val cover = resolveUrl(card.attr("data-original").ifBlank { card.attr("data-src") })
             val status = card.selectFirst("span.pic-text, span.note")?.text()?.trim() ?: ""
-            items.add(Vod(id, sourceType, title, cover, "", 0, status))
+            items.add(Vod(id, sourceType, title, cover, "", 0, status,
+                siteStatus = parseEpisodeStatus(status)))
         }
         val unique = items.distinctBy { it.id }
         val hasNext = doc.select("a:contains(下一頁), a:contains(下一页), a.next, a[title=下一頁]")
@@ -212,7 +214,8 @@ abstract class MacCmsListBasedSource(
         })
 
         return VodDetail(
-            Vod(vodId, sourceType, title, cover, category, year, status),
+            Vod(vodId, sourceType, title, cover, category, year, status,
+                siteStatus = parseEpisodeStatus(status)),
             director, actors, synopsis, sorted
         )
     }
