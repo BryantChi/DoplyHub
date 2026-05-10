@@ -60,22 +60,6 @@ class DetailViewModel @Inject constructor(
         loadDetail(isRefresh = true)
     }
 
-    /**
-     * Drop episodes whose [Episode.number] is wildly outside the line's own size —
-     * those are parser mis-reads (e.g. "預告 2026" got `2026` as episode number).
-     * Tolerance = size + 5 to allow small parser gaps. Without this, the EpisodeGrid
-     * shows buttons that can never play, and the badge inflates 「更新至 2026 集」.
-     */
-    private fun cleanEpisodeNumbers(detail: VodDetail): VodDetail {
-        val cleaned = detail.episodes.map { line ->
-            val size = line.episodes.size
-            val cap = size + 5
-            val filtered = line.episodes.filter { it.number in 1..cap }
-            if (filtered.size == line.episodes.size) line else line.copy(episodes = filtered)
-        }
-        return detail.copy(episodes = cleaned)
-    }
-
     private fun loadDetail(isRefresh: Boolean) {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
@@ -92,8 +76,8 @@ class DetailViewModel @Inject constructor(
             }
             try {
                 // Phase 1: Load primary source detail (fast — show immediately).
-                val rawDetail = vodRepository.getVodDetail(sourceType, id)
-                val detail = cleanEpisodeNumbers(rawDetail)
+                // Cleanup happens at repository layer via EpisodeNormalizer.
+                val detail = vodRepository.getVodDetail(sourceType, id)
                 if (!isActive) return@launch  // refresh() cancelled us mid-fetch
                 _uiState.update {
                     it.copy(isLoading = false, isRefreshing = false, isEnriching = true, detail = detail)
@@ -119,11 +103,11 @@ class DetailViewModel @Inject constructor(
                 }
 
                 // Phase 2: enrich with cross-source data (non-blocking).
+                // Cleanup happens at repository layer via EpisodeNormalizer.
                 try {
-                    val rawEnriched = vodRepository.getEnrichedVodDetail(
+                    val enriched = vodRepository.getEnrichedVodDetail(
                         sourceType, id, cachedPrimary = detail, forceRefresh = isRefresh,
                     )
-                    val enriched = cleanEpisodeNumbers(rawEnriched)
                     if (!isActive) return@launch
                     _uiState.update { state ->
                         // Preserve series from Phase 1.5 if enriched doesn't have any.

@@ -238,30 +238,26 @@ fun DetailScreen(
                     // ── Source tabs ──
                     if (filteredEpisodes.size > 1) {
                         item {
-                            // Stale-line marker: a line whose episode count is meaningfully
-                            // behind the freshest line is flagged with "N集⚠".
+                            // Confidence marker: EpisodeNormalizer at the repository layer
+                            // tags each surviving line with a confidence score in [0, 1]
+                            // based on how its episode count compares to the cluster
+                            // median. Lines with confidence < 0.7 still appear (so the
+                            // user has a fallback when the freshest line is broken) but
+                            // are flagged「N集⚠」so the user knows their count differs.
                             //
-                            // Reference is the GLOBAL max across all sources (d.episodes),
-                            // not the filtered subset — otherwise picking a single source
-                            // family hides the cross-family laggards we want to flag.
-                            //
-                            // Threshold = max(3, min(20, max*30%)). The 20-cap protects
-                            // long anime (1000 ep × 30% = 300 was too lenient — a line
-                            // missing 200 episodes wouldn't get flagged). The 3-floor
-                            // protects short shows (10 ep) from over-flagging.
+                            // Lines with confidence == null (movies, single-line vods,
+                            // 18+ sources) skip the marker — clustering doesn't apply.
                             val globalMax = d.episodes.maxOfOrNull { it.episodes.size } ?: 0
-                            val staleThreshold = maxOf(3, minOf(20, globalMax * 30 / 100))
                             Column(Modifier.padding(horizontal = dims.screenHorizontalPadding)) {
                                 Text("播放線路", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.height(8.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     items(filteredEpisodes.size) { i ->
                                         val g = filteredEpisodes[i]; val sel = i == safeSrcIdx
-                                        val isStale = g.episodes.size < globalMax &&
-                                            (globalMax - g.episodes.size) > staleThreshold
+                                        val isLowConfidence = g.confidence != null && g.confidence < 0.7f
                                         val label = buildString {
                                             if (i == 0) append("${g.sourceName} ★") else append(g.sourceName)
-                                            if (isStale) append(" ${g.episodes.size}集⚠")
+                                            if (isLowConfidence) append(" ${g.episodes.size}集⚠")
                                         }
                                         var f by remember { mutableStateOf(false) }
                                         if (isTV) {
@@ -351,33 +347,25 @@ private fun DetailInfo(
         textAlign = titleAlign, modifier = widthMod)
 
     Spacer(Modifier.height(8.dp))
-    // Status badge — trust the source's own status text first, only compute when
-    // it doesn't tell us. Why: even after merging, our own counting can be off if
-    // some scraper happens to under-/over-count for a specific show. The site's
-    // listing-page status is what users see on the source itself, so reproducing
-    // it stays consistent with their expectation.
+    // Status badge. The repository's EpisodeNormalizer has already pruned outlier
+    // lines & out-of-range episodes by the time we get here, so the count is no
+    // longer a "best of bad data" guess — but the site's own status string is
+    // still the most authoritative source for "更新至 N 集" wording, so we keep
+    // it as the primary signal.
     //
     // Order:
-    //   1. rawStatus contains "N 集" → use rawStatus verbatim (most authoritative)
-    //   2. rawStatus says "完結" with no count → "完結 · 共 N 集" (we add count)
+    //   1. rawStatus contains "N 集" → verbatim site string
+    //   2. rawStatus says "完結" with no count → "完結 · 共 N 集"
     //   3. Series with computed count → "更新至 N 集"
     //   4. Movie / unknown → rawStatus as-is
     //
-    // displayCount itself uses primary-source lines only (filters cross-source
-    // enriched lines that may carry a different season interpretation), with
-    // per-line sanity (max number > size + 30 = parser misread, fallback to size)
-    // and median across the primary cluster.
-    fun perLineSane(line: com.gimy.tv.domain.model.EpisodeGroup): Int {
-        val maxNum = line.episodes.maxOfOrNull { it.number } ?: 0
-        val size = line.episodes.size
-        return if (maxNum > size + 30) size else maxNum
-    }
+    // Compute (3): primary-source lines' max sane count. Outliers gone via
+    // EpisodeNormalizer; max captures the freshest progress across the cluster.
     val primaryLines = d.episodes.filter { it.sourceType == null || it.sourceType == d.vod.sourceType }
-    val countPool = (if (primaryLines.isNotEmpty()) primaryLines else d.episodes)
-        .map(::perLineSane)
-        .filter { it > 0 }
-        .sorted()
-    val displayCount = if (countPool.isNotEmpty()) countPool[countPool.size / 2] else 0
+    val computeFrom = if (primaryLines.isNotEmpty()) primaryLines else d.episodes
+    val displayCount = computeFrom.maxOfOrNull { line ->
+        line.episodes.maxOfOrNull { it.number } ?: 0
+    } ?: 0
     val isSeries = (d.episodes.firstOrNull()?.episodes?.size ?: 0) > 1
     val rawStatus = d.vod.status
     val rawHasCount = Regex("\\d+\\s*集").containsMatchIn(rawStatus)

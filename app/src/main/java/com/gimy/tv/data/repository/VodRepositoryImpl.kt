@@ -99,7 +99,10 @@ class VodRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getVodDetail(sourceType: SourceType, vodId: Long): VodDetail {
-        return getSource(sourceType).fetchVodDetail(vodId)
+        // Centralised cleanup before any caller (DetailViewModel / PlayerViewModel)
+        // sees the data — drops parser-misread episode numbers and outlier lines,
+        // tags survivors with EpisodeGroup.confidence. See EpisodeNormalizer KDoc.
+        return EpisodeNormalizer.normalize(getSource(sourceType).fetchVodDetail(vodId))
     }
 
     override suspend fun getPlayerData(sourceType: SourceType, episodeUrl: String): PlayerData {
@@ -528,11 +531,26 @@ class VodRepositoryImpl @Inject constructor(
             val seriesIds = mergedSeries.map { it.id }.toSet()
             val filteredRelated = mergedRelated.filter { it.id !in seriesIds }
 
-            primaryDetail.copy(
+            // Cross-source vod.status fallback: when primary's listing didn't carry a
+            // status string (e.g. parser missed it on that page) but a matched secondary
+            // has one, surface the secondary's so the badge can still display authoritative
+            // text instead of falling through to our own count compute.
+            val statusFallback = primaryDetail.vod.status.takeIf { it.isNotBlank() }
+                ?: matchedDetails.firstNotNullOfOrNull {
+                    it.vod.status.takeIf { s -> s.isNotBlank() }
+                }
+                ?: ""
+
+            val enriched = primaryDetail.copy(
+                vod = primaryDetail.vod.copy(status = statusFallback),
                 episodes = allGroups,
                 seriesVods = mergedSeries,
                 relatedVods = filteredRelated,
-            ).also { detailCachePut(cacheKey, it) }
+            )
+            // Final normalize across the merged groups (cluster median uses primary
+            // lines; secondary outliers get pruned even though they survived
+            // individual-scraper parsing).
+            EpisodeNormalizer.normalize(enriched).also { detailCachePut(cacheKey, it) }
         }
     }
 

@@ -83,6 +83,15 @@ data class EpisodeGroup(
      *  here; this field is purely additive — gives later code a clear handle to the
      *  un-encoded id without re-implementing the `-(ordinal*100 + lineId + 1)` math. */
     val lineId: Int? = null,
+    /** Episode-count confidence relative to the cluster of lines for this vod.
+     *  Set by EpisodeNormalizer in the repository layer. Range `[0, 1]`:
+     *    1.0 = count matches cluster median exactly
+     *    0.7~0.9 = within 30% of median (treated as reliable)
+     *    < 0.7 = noticeably divergent (UI flags with ⚠ icon)
+     *    < 0.4 = filtered out before this field surfaces (line gets dropped)
+     *  Null means clustering wasn't possible (single-line vod, movie, etc.) and
+     *  callers should treat the line as full-confidence. */
+    val confidence: Float? = null,
 )
 
 data class Episode(
