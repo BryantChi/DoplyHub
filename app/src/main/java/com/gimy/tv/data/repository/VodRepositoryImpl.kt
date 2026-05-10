@@ -17,7 +17,10 @@ import com.gimy.tv.data.scraper.MovieffmSource
 import com.gimy.tv.data.scraper.SiteSource
 import com.gimy.tv.data.scraper.XnxxSource
 import com.gimy.tv.domain.model.*
+import com.gimy.tv.domain.model.Confidence
+import com.gimy.tv.domain.model.EpisodeStatus
 import com.gimy.tv.domain.repository.HomeRowData
+import com.gimy.tv.domain.util.parseEpisodeStatus
 import com.gimy.tv.domain.repository.VodRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -102,7 +105,21 @@ class VodRepositoryImpl @Inject constructor(
         // Centralised cleanup before any caller (DetailViewModel / PlayerViewModel)
         // sees the data — drops parser-misread episode numbers and outlier lines,
         // tags survivors with EpisodeGroup.confidence. See EpisodeNormalizer KDoc.
-        return EpisodeNormalizer.normalize(getSource(sourceType).fetchVodDetail(vodId))
+        val raw = EpisodeNormalizer.normalize(getSource(sourceType).fetchVodDetail(vodId))
+        val parsedMaxEp = raw.episodes.maxOfOrNull { line ->
+            line.episodes.maxOfOrNull { ep -> ep.number } ?: 0
+        } ?: 0
+        val singleSiteAggregated: EpisodeStatus = when (val s = raw.vod.siteStatus) {
+            is EpisodeStatus.Finished -> s
+            is EpisodeStatus.InProgress -> if (parsedMaxEp > s.latest) {
+                EpisodeStatus.InProgress(parsedMaxEp, Confidence.ParsedFromLines)
+            } else s
+            is EpisodeStatus.Movie, is EpisodeStatus.Raw -> s
+            EpisodeStatus.Empty -> if (parsedMaxEp > 1) {
+                EpisodeStatus.InProgress(parsedMaxEp, Confidence.ParsedFromLines)
+            } else EpisodeStatus.Empty
+        }
+        return raw.copy(aggregatedStatus = singleSiteAggregated)
     }
 
     override suspend fun getPlayerData(sourceType: SourceType, episodeUrl: String): PlayerData {
@@ -548,12 +565,40 @@ class VodRepositoryImpl @Inject constructor(
                 put(primaryDetail.vod.sourceType, primaryDetail.vod)
                 for (md in matchedDetails) put(md.vod.sourceType, md.vod)
             }
+
+            // Cross-site aggregated status. Picks highest "latest" across (a) every
+            // site's own siteStatus and (b) max episode.number across all groups.
+            // Finished anywhere → finished total = max of declared & parsed.
+            val crossSiteMaxEp = allGroups.maxOfOrNull { line ->
+                line.episodes.maxOfOrNull { it.number } ?: 0
+            } ?: 0
+            val anyFinished = siteMetadata.values.any { it.siteStatus is EpisodeStatus.Finished } ||
+                primaryDetail.vod.siteStatus is EpisodeStatus.Finished
+            val highestSiteDeclared = siteMetadata.values
+                .mapNotNull { (it.siteStatus as? EpisodeStatus.InProgress)?.latest }
+                .maxOrNull() ?: 0
+
+            val aggregatedStatus: EpisodeStatus = when {
+                anyFinished && (crossSiteMaxEp > 0 || highestSiteDeclared > 0) ->
+                    EpisodeStatus.Finished(maxOf(crossSiteMaxEp, highestSiteDeclared))
+                crossSiteMaxEp > 1 || highestSiteDeclared > 1 -> EpisodeStatus.InProgress(
+                    latest = maxOf(crossSiteMaxEp, highestSiteDeclared),
+                    confidence = Confidence.CrossSiteMax,
+                )
+                primaryDetail.vod.siteStatus !is EpisodeStatus.Empty -> primaryDetail.vod.siteStatus
+                else -> EpisodeStatus.Empty
+            }
+
             val enriched = primaryDetail.copy(
-                vod = primaryDetail.vod.copy(status = statusFallback),
+                vod = primaryDetail.vod.copy(
+                    status = statusFallback,
+                    siteStatus = parseEpisodeStatus(statusFallback),
+                ),
                 episodes = allGroups,
                 seriesVods = mergedSeries,
                 relatedVods = filteredRelated,
                 siteMetadata = siteMetadata,
+                aggregatedStatus = aggregatedStatus,
             )
             // Final normalize across the merged groups (cluster median uses primary
             // lines; secondary outliers get pruned even though they survived
