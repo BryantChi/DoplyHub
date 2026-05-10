@@ -299,8 +299,19 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Auto-advance fired by PlayerScreen on STATE_ENDED. Single-video sources
+     * (XNXX / Jable / 5278 — each vod is one video, episodes.size == 1) used to
+     * trigger 「所有線路均無法播放第 2 集」 because we blindly called
+     * switchEpisode(currentEp + 1) which doesn't exist anywhere. Guard by
+     * confirming at least one line in the merged detail carries the next number.
+     */
     fun nextEpisode() {
-        switchEpisode(_uiState.value.episodeNum + 1)
+        val detail = vodDetail ?: return
+        val nextNum = _uiState.value.episodeNum + 1
+        val hasNext = detail.episodes.any { line -> line.episodes.any { it.number == nextNum } }
+        if (!hasNext) return
+        switchEpisode(nextNum)
     }
 
     fun retryWithNextSource() {

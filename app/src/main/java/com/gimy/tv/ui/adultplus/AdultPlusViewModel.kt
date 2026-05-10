@@ -74,10 +74,22 @@ class AdultPlusViewModel @Inject constructor(
      *  temporary block) — we still surface them so the row reappears once the site recovers,
      *  but fetch() catches the empty result and reports "站方維護中，稍後重試". */
     val rows: List<AdultPlusRow> = listOf(
+        // Jable — paths verified against jable.tv/categories/ index
         AdultPlusRow("🔥 Jable 熱門", SourceType.JABLE_TV, "hot"),
-        AdultPlusRow("📈 XNXX 本週最佳", SourceType.XNXX, "best/this_week"),
         AdultPlusRow("🆕 Jable 最新", SourceType.JABLE_TV, "latest-updates"),
+        AdultPlusRow("🈲 Jable 無碼解放", SourceType.JABLE_TV, "categories/uncensored"),
+        AdultPlusRow("🈳 Jable 中文字幕", SourceType.JABLE_TV, "categories/chinese-subtitle"),
+        AdultPlusRow("🎭 Jable 角色劇情", SourceType.JABLE_TV, "categories/roleplay"),
+        AdultPlusRow("🎓 Jable 制服誘惑", SourceType.JABLE_TV, "categories/uniform"),
+        AdultPlusRow("👀 Jable 盜攝偷拍", SourceType.JABLE_TV, "categories/private-cam"),
+        // XNXX — /best/{period}, /tags/{slug}
+        AdultPlusRow("📈 XNXX 本週最佳", SourceType.XNXX, "best/this_week"),
         AdultPlusRow("🌏 XNXX 本月最佳", SourceType.XNXX, "best/this_month"),
+        AdultPlusRow("📅 XNXX 今日最佳", SourceType.XNXX, "best/today"),
+        AdultPlusRow("🌸 XNXX 亞洲", SourceType.XNXX, "tags/asian"),
+        AdultPlusRow("🎌 XNXX 日本", SourceType.XNXX, "tags/japanese"),
+        AdultPlusRow("👩 XNXX 中文", SourceType.XNXX, "tags/chinese"),
+        // 5278 — Discuz forums
         AdultPlusRow("💬 5278 成人線上", SourceType.FORUM5278, "forum:23"),
         AdultPlusRow("💬 5278 線上性感影片", SourceType.FORUM5278, "forum:42"),
     )
