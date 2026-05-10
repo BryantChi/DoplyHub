@@ -25,6 +25,30 @@ import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.ui.theme.*
 
+/**
+ * Per-source short tag + brand color for the top-left card badge.
+ *
+ * Tag = 2-4 char abbreviation (kept short so it fits the 9sp badge without
+ * truncation on portrait cards). Color = visually distinct hue per scraper so
+ * users can identify a card's origin at a glance in cross-source mixed grids.
+ *
+ * If a new SourceType is added, append a branch — Kotlin's exhaustive when
+ * will flag it.
+ */
+private fun sourceBadgeFor(sourceType: SourceType): Pair<String, Color> = when (sourceType) {
+    SourceType.GIMYTV -> "GTV" to Color(0xFF10B981)        // emerald
+    SourceType.GIMYMAX -> "GMX" to Color(0xFFF97316)       // orange
+    SourceType.MOVIEFFM -> "FFM" to Color(0xFF3B82F6)      // blue (legacy)
+    SourceType.GIMY_TW -> "Gimy" to Color(0xFF6366F1)      // indigo
+    SourceType.EYNY_TV -> "EY" to Color(0xFF06B6D4)        // cyan
+    SourceType.IMAPLE_TV -> "IMP" to Color(0xFF8B5CF6)     // violet
+    SourceType.MOMOVOD -> "MM" to Color(0xFFEC4899)        // pink
+    SourceType.KUBO123 -> "KB" to Color(0xFFEAB308)        // yellow
+    SourceType.JABLE_TV -> "JB" to Color(0xFFB91C1C)       // dark red
+    SourceType.XNXX -> "XN" to Color(0xFF78350F)           // amber-900
+    SourceType.FORUM5278 -> "5278" to Color(0xFFD97706)    // amber-600
+}
+
 @Composable
 private fun VodCardContent(vod: Vod) {
     Box {
@@ -73,17 +97,20 @@ private fun VodCardContent(vod: Vod) {
                 )
             }
         }
-        // Top-left: source badge for movieffm
-        if (vod.sourceType == SourceType.MOVIEFFM) {
-            Box(
-                Modifier
-                    .align(Alignment.TopStart)
-                    .padding(4.dp)
-                    .background(Color(0xFF3B82F6).copy(0.92f), RoundedCornerShape(3.dp))
-                    .padding(horizontal = 5.dp, vertical = 2.dp)
-            ) {
-                Text("FFM", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-            }
+        // Top-left: per-source badge — every scraper gets its own short tag +
+        // brand color so users can tell at a glance which site a card came from
+        // (matters when the same show appears across multiple sources in search /
+        // adult-plus mixed grids). Color pairs picked to be visually distinct
+        // without clashing against the red status badge in the top-right.
+        val (sourceTag, sourceColor) = sourceBadgeFor(vod.sourceType)
+        Box(
+            Modifier
+                .align(Alignment.TopStart)
+                .padding(4.dp)
+                .background(sourceColor.copy(0.92f), RoundedCornerShape(3.dp))
+                .padding(horizontal = 5.dp, vertical = 2.dp)
+        ) {
+            Text(sourceTag, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
         // Top-right: status badge
         if (vod.status.isNotBlank()) {
