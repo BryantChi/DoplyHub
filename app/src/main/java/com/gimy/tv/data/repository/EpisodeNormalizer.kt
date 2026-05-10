@@ -1,6 +1,7 @@
 package com.gimy.tv.data.repository
 
 import com.gimy.tv.domain.model.EpisodeGroup
+import com.gimy.tv.domain.model.EpisodeStatus
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.VodDetail
 import kotlin.math.abs
@@ -17,13 +18,21 @@ import kotlin.math.abs
  *   1. Episode-level — drop episodes whose `number` falls outside the line's
  *      sane range (`1..size + GAP_TOLERANCE`). These come from parsers that
  *      mis-read year/date strings as the episode index ("預告 2026" → number=2026).
- *   2. Line-level — compute a cluster median across primary-source lines, then
- *      drop lines whose count deviates >LINE_DEVIATION_THRESHOLD from that median.
- *      Catches cross-season-merged lines (S1+S2 stitched into one 100-ep listing
- *      while the show is actually 30 eps) and lines whose parser completely
- *      failed (size 1 when others have 25).
+ *   2. Line-level — compute a baseline episode count, then drop lines whose count
+ *      deviates >LINE_DEVIATION_THRESHOLD from that baseline. Catches
+ *      cross-season-merged lines (S1+S2 stitched into one 100-ep listing while the
+ *      show is actually 30 eps) and lines whose parser completely failed (size 1
+ *      when others have 25).
  *
- * Also computes [EpisodeGroup.confidence] = `1 - |size - median| / median`,
+ * Baseline selection ([pickBaseline]):
+ *   - If the site declares an in-progress episode count (siteStatus=InProgress),
+ *     that value is used as the authoritative baseline. This prevents median from
+ *     incorrectly dropping the newest, highest-count line (the 斗羅 2 regression).
+ *   - If the site declares a finished total (siteStatus=Finished), that is used.
+ *   - Otherwise, fall back to the cluster median of primary-source lines (legacy
+ *     v2.7.0 behaviour, triggered when siteStatus=Empty or Raw).
+ *
+ * Also computes [EpisodeGroup.confidence] = `1 - |size - baseline| / baseline`,
  * clamped to `[0, 1]`. UI uses this to mark suspect lines without dropping them
  * outright.
  */
@@ -34,7 +43,7 @@ object EpisodeNormalizer {
      *  missing from the source. */
     private const val GAP_TOLERANCE = 5
 
-    /** Lines whose count is more than this fraction off from the cluster median
+    /** Lines whose count is more than this fraction off from the cluster baseline
      *  are dropped. 0.6 = ±60%; tolerates stale (-30%) and small overshoots
      *  while excluding cross-season-merged outliers. */
     private const val LINE_DEVIATION_THRESHOLD = 0.6
@@ -57,14 +66,8 @@ object EpisodeNormalizer {
             return detail.copy(episodes = cleanedEpisodes.filter { it.episodes.isNotEmpty() })
         }
 
-        // Cluster median: prefer primary-source lines (the user's entry source).
-        // If primary has fewer than 2 lines, fall back to all lines.
-        val primaryLines = cleanedEpisodes.filter {
-            it.sourceType == null || it.sourceType == primarySourceType
-        }
-        val baseLines = if (primaryLines.size >= 2) primaryLines else cleanedEpisodes
-        val median = computeMedian(baseLines.map { it.episodes.size }.filter { it > 0 })
-        if (median <= 0) {
+        val baseline = pickBaseline(detail.vod.siteStatus, cleanedEpisodes, primarySourceType)
+        if (baseline <= 0) {
             return detail.copy(episodes = cleanedEpisodes.filter { it.episodes.isNotEmpty() })
         }
 
@@ -72,10 +75,10 @@ object EpisodeNormalizer {
         val survivors = cleanedEpisodes.mapNotNull { line ->
             val size = line.episodes.size
             if (size == 0) return@mapNotNull null
-            val deviation = abs(size - median).toDouble() / median
+            val deviation = abs(size - baseline).toDouble() / baseline
             if (deviation > LINE_DEVIATION_THRESHOLD) {
-                // Outlier: cross-season merge (size >> median) or broken parser
-                // (size << median). Drop entirely so it can't pollute count
+                // Outlier: cross-season merge (size >> baseline) or broken parser
+                // (size << baseline). Drop entirely so it can't pollute count
                 // calculation or appear as a misleading playback option.
                 null
             } else {
@@ -92,6 +95,34 @@ object EpisodeNormalizer {
             survivors
         }
         return detail.copy(episodes = finalEpisodes)
+    }
+
+    /**
+     * Determines the authoritative episode-count baseline for outlier detection.
+     *
+     * Priority:
+     * 1. Site-declared in-progress latest episode count (highest authority — the
+     *    site's own numbering prevents median from killing the newest line).
+     * 2. Site-declared finished total (equally authoritative for completed shows).
+     * 3. Median of primary-source lines (legacy fallback when site status is absent).
+     */
+    internal fun pickBaseline(
+        siteStatus: EpisodeStatus,
+        cleanedEpisodes: List<EpisodeGroup>,
+        primarySourceType: SourceType,
+    ): Int {
+        if (siteStatus is EpisodeStatus.InProgress && siteStatus.latest > 1) {
+            return siteStatus.latest
+        }
+        if (siteStatus is EpisodeStatus.Finished && siteStatus.total > 1) {
+            return siteStatus.total
+        }
+        // Legacy median fallback.
+        val primaryLines = cleanedEpisodes.filter {
+            it.sourceType == null || it.sourceType == primarySourceType
+        }
+        val baseLines = if (primaryLines.size >= 2) primaryLines else cleanedEpisodes
+        return computeMedian(baseLines.map { it.episodes.size }.filter { it > 0 })
     }
 
     private fun computeMedian(values: List<Int>): Int {
