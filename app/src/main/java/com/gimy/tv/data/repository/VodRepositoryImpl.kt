@@ -541,11 +541,19 @@ class VodRepositoryImpl @Inject constructor(
                 }
                 ?: ""
 
+            // Per-site metadata for v2.8.0 site-level UI: each scraper that
+            // contributed episodes keeps its own Vod (with that site's status string
+            // verbatim), so DetailScreen can flip the badge per chip selection.
+            val siteMetadata = buildMap {
+                put(primaryDetail.vod.sourceType, primaryDetail.vod)
+                for (md in matchedDetails) put(md.vod.sourceType, md.vod)
+            }
             val enriched = primaryDetail.copy(
                 vod = primaryDetail.vod.copy(status = statusFallback),
                 episodes = allGroups,
                 seriesVods = mergedSeries,
                 relatedVods = filteredRelated,
+                siteMetadata = siteMetadata,
             )
             // Final normalize across the merged groups (cluster median uses primary
             // lines; secondary outliers get pruned even though they survived

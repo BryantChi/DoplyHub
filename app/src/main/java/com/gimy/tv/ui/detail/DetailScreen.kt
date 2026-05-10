@@ -94,21 +94,43 @@ fun DetailScreen(
                 val coverH = if (isLandscapeCover) (coverW.value * 9f / 16f).dp
                     else dims.coverHeight
 
-                // Cross-source filter (Phase 3.3): user can narrow episodes to a single source.
-                // Source labels are parsed from the [Prefix] in EpisodeGroup.sourceName that
-                // VodRepositoryImpl.getEnrichedVodDetail injects for secondary sources.
-                val primaryDisplayName = d.vod.sourceType.displayName
-                val sourceLabels = remember(d.episodes, primaryDisplayName) {
-                    d.episodes.map { extractGroupSource(it.sourceName, primaryDisplayName) }.distinct()
+                // Site-level UI (v2.8.0): chips at top split episodes by scraper.
+                // Default = primary (NOT 全部) — each site shows its own status &
+                // line list independently, so the badge "更新至 N 集" matches that
+                // site's own listing instead of the cross-source merged max.
+                val primarySourceType = d.vod.sourceType
+                val groupSourceTypes = remember(d.episodes, primarySourceType) {
+                    val out = mutableListOf<SourceType>()
+                    for (g in d.episodes) {
+                        val st = g.sourceType ?: primarySourceType
+                        if (st !in out) out.add(st)
+                    }
+                    out
                 }
-                var selectedSourceLabel by remember(d.vod.id) { mutableStateOf<String?>(null) }
-                val filteredEpisodes = remember(d.episodes, selectedSourceLabel, primaryDisplayName) {
-                    if (selectedSourceLabel == null) d.episodes
-                    else d.episodes.filter { extractGroupSource(it.sourceName, primaryDisplayName) == selectedSourceLabel }
+                // null = 全部. Initialize to primary so user lands on the same site
+                // they navigated in from. Re-key on vod.id so opening a different
+                // detail resets selection.
+                var selectedSourceType by remember(d.vod.id) {
+                    mutableStateOf<SourceType?>(primarySourceType)
                 }
-                // Reset srcIdx when filter switches (so we don't point to a now-invisible group)
-                LaunchedEffect(selectedSourceLabel) { srcIdx = 0 }
+                // Phase-2 enrichment may swap d.episodes. If our selection no longer
+                // exists (e.g. enrichment dropped the only line for that site),
+                // fall back to primary.
+                LaunchedEffect(groupSourceTypes) {
+                    if (selectedSourceType != null && selectedSourceType !in groupSourceTypes) {
+                        selectedSourceType = primarySourceType.takeIf { it in groupSourceTypes }
+                    }
+                }
+                val filteredEpisodes = remember(d.episodes, selectedSourceType, primarySourceType) {
+                    if (selectedSourceType == null) d.episodes
+                    else d.episodes.filter { (it.sourceType ?: primarySourceType) == selectedSourceType }
+                }
+                // Reset srcIdx when filter switches
+                LaunchedEffect(selectedSourceType) { srcIdx = 0 }
                 val safeSrcIdx = if (filteredEpisodes.isNotEmpty()) srcIdx.coerceIn(0, filteredEpisodes.size - 1) else 0
+                // Per-site metadata lookup — falls back to primary's vod when
+                // enriched metadata isn't populated (single-site detail).
+                val currentSiteVod = selectedSourceType?.let { d.siteMetadata[it] } ?: d.vod
 
                 // Background hero: blurred cover behind a gradient. We bump both the
                 // bleed area and the alpha so the cover comes through more visibly while
@@ -168,6 +190,8 @@ fun DetailScreen(
                                 Column(Modifier.weight(1f)) {
                                     DetailInfo(
                                         d = d,
+                                        currentSiteVod = currentSiteVod,
+                                        currentSiteEpisodes = filteredEpisodes,
                                         uiState = uiState,
                                         onBack = onBack,
                                         onPlayClick = onPlayClick,
@@ -196,6 +220,8 @@ fun DetailScreen(
                                 Spacer(Modifier.height(12.dp))
                                 DetailInfo(
                                     d = d,
+                                    currentSiteVod = currentSiteVod,
+                                    currentSiteEpisodes = filteredEpisodes,
                                     uiState = uiState,
                                     onBack = onBack,
                                     onPlayClick = onPlayClick,
@@ -207,26 +233,38 @@ fun DetailScreen(
                         }
                     }
 
-                    // ── Source filter (Phase 3.3) ──
-                    if (sourceLabels.size > 1) {
+                    // ── Site chips (v2.8.0) ──
+                    // Each chip = one scraper that contributed episodes. Chip
+                    // count = number of LINES (not episodes) on that site, so
+                    // user can tell at a glance how rich each site's lineup is.
+                    // 「全部」appears at the END as an opt-in for power users
+                    // who want to compare lines across sites.
+                    if (groupSourceTypes.size > 1) {
                         item {
                             Column(Modifier.padding(horizontal = dims.screenHorizontalPadding)) {
                                 Text("選擇來源", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.height(8.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    items(groupSourceTypes.size, key = { "src_chip_${groupSourceTypes[it].name}" }) { i ->
+                                        val st = groupSourceTypes[i]
+                                        val lineCount = d.episodes.count { (it.sourceType ?: primarySourceType) == st }
+                                        val isPrimary = st == primarySourceType
+                                        val label = buildString {
+                                            append(st.displayName)
+                                            if (isPrimary) append(" ★")
+                                            append(" $lineCount")
+                                        }
+                                        DetailSourceChip(
+                                            label = label,
+                                            selected = selectedSourceType == st,
+                                            onClick = { selectedSourceType = st },
+                                        )
+                                    }
                                     item(key = "src_chip_all") {
                                         DetailSourceChip(
                                             label = "全部 ${d.episodes.size}",
-                                            selected = selectedSourceLabel == null,
-                                            onClick = { selectedSourceLabel = null },
-                                        )
-                                    }
-                                    items(sourceLabels, key = { "src_chip_$it" }) { lbl ->
-                                        val count = d.episodes.count { extractGroupSource(it.sourceName, primaryDisplayName) == lbl }
-                                        DetailSourceChip(
-                                            label = "$lbl $count",
-                                            selected = selectedSourceLabel == lbl,
-                                            onClick = { selectedSourceLabel = if (selectedSourceLabel == lbl) null else lbl },
+                                            selected = selectedSourceType == null,
+                                            onClick = { selectedSourceType = null },
                                         )
                                     }
                                 }
@@ -255,8 +293,15 @@ fun DetailScreen(
                                     items(filteredEpisodes.size) { i ->
                                         val g = filteredEpisodes[i]; val sel = i == safeSrcIdx
                                         val isLowConfidence = g.confidence != null && g.confidence < 0.7f
+                                        // When user has picked one site, strip the
+                                        // "[GimyMax] " prefix that VodRepositoryImpl
+                                        // injects for cross-source — redundant inside
+                                        // a single-site view.
+                                        val displayLineName = if (selectedSourceType != null) {
+                                            g.sourceName.replace(Regex("^\\[[^\\]]+\\]\\s*"), "")
+                                        } else g.sourceName
                                         val label = buildString {
-                                            if (i == 0) append("${g.sourceName} ★") else append(g.sourceName)
+                                            if (i == 0) append("$displayLineName ★") else append(displayLineName)
                                             if (isLowConfidence) append(" ${g.episodes.size}集⚠")
                                         }
                                         var f by remember { mutableStateOf(false) }
@@ -325,6 +370,13 @@ fun DetailScreen(
 @Composable
 private fun DetailInfo(
     d: VodDetail,
+    /** Site selected via the chip row. status / year / category come from this
+     *  Vod so badge text reflects the chosen site verbatim. Title remains [d.vod.title]
+     *  (identity is shared across all sites — they're the same show). When in
+     *  「全部」mode this is just [d.vod] (primary). */
+    currentSiteVod: Vod,
+    /** Episodes belonging to the currently-selected site (or all when 全部). */
+    currentSiteEpisodes: List<EpisodeGroup>,
     uiState: DetailUiState,
     onBack: () -> Unit,
     onPlayClick: (sourceType: String, vodId: Long, sourceId: Int, episodeNum: Int) -> Unit,
@@ -347,27 +399,24 @@ private fun DetailInfo(
         textAlign = titleAlign, modifier = widthMod)
 
     Spacer(Modifier.height(8.dp))
-    // Status badge. The repository's EpisodeNormalizer has already pruned outlier
-    // lines & out-of-range episodes by the time we get here, so the count is no
-    // longer a "best of bad data" guess — but the site's own status string is
-    // still the most authoritative source for "更新至 N 集" wording, so we keep
-    // it as the primary signal.
+    // Status badge — v2.8.0 site-level: status / year / category come from the
+    // CURRENTLY-SELECTED site's own metadata, not the merged primary. Switching
+    // chips at the top flips this badge to that site's verbatim listing.
     //
-    // Order:
+    // Order (unchanged from v2.7.0):
     //   1. rawStatus contains "N 集" → verbatim site string
     //   2. rawStatus says "完結" with no count → "完結 · 共 N 集"
     //   3. Series with computed count → "更新至 N 集"
     //   4. Movie / unknown → rawStatus as-is
     //
-    // Compute (3): primary-source lines' max sane count. Outliers gone via
-    // EpisodeNormalizer; max captures the freshest progress across the cluster.
-    val primaryLines = d.episodes.filter { it.sourceType == null || it.sourceType == d.vod.sourceType }
-    val computeFrom = if (primaryLines.isNotEmpty()) primaryLines else d.episodes
-    val displayCount = computeFrom.maxOfOrNull { line ->
+    // Compute (3): max sane count among the lines belonging to this site (or
+    // all lines in 全部 mode). EpisodeNormalizer at the repository layer
+    // already pruned outlier lines & out-of-range episodes.
+    val displayCount = currentSiteEpisodes.maxOfOrNull { line ->
         line.episodes.maxOfOrNull { it.number } ?: 0
     } ?: 0
-    val isSeries = (d.episodes.firstOrNull()?.episodes?.size ?: 0) > 1
-    val rawStatus = d.vod.status
+    val isSeries = (currentSiteEpisodes.firstOrNull()?.episodes?.size ?: 0) > 1
+    val rawStatus = currentSiteVod.status
     val rawHasCount = Regex("\\d+\\s*集").containsMatchIn(rawStatus)
     val displayStatus = when {
         rawHasCount -> rawStatus
@@ -377,8 +426,10 @@ private fun DetailInfo(
     }
     Row(modifier = widthMod, horizontalArrangement = rowArrange) {
         if (displayStatus.isNotBlank()) InfoBadge(displayStatus, CinemaRed)
-        if (d.vod.year > 0) InfoBadge(d.vod.year.toString(), CinemaSurface)
-        if (d.vod.category.isNotBlank()) InfoBadge(d.vod.category, CinemaSurface)
+        val displayYear = currentSiteVod.year.takeIf { it > 0 } ?: d.vod.year
+        if (displayYear > 0) InfoBadge(displayYear.toString(), CinemaSurface)
+        val displayCategory = currentSiteVod.category.ifBlank { d.vod.category }
+        if (displayCategory.isNotBlank()) InfoBadge(displayCategory, CinemaSurface)
     }
 
     Spacer(Modifier.height(12.dp))
@@ -591,17 +642,8 @@ private fun EpisodeGrid(
 }
 
 // ═══════════════════════════════════════
-// Cross-source filter (Phase 3.3)
+// Site chips (v2.8.0)
 // ═══════════════════════════════════════
-
-/** Extract the owner source label from EpisodeGroup.sourceName.
- *  Cross-source groups carry a "[SourceDisplayName] " prefix injected by
- *  VodRepositoryImpl.getEnrichedVodDetail. Primary groups have no prefix —
- *  for those we return the primary's own displayName so the chip can target them. */
-private fun extractGroupSource(sourceName: String, primaryDisplayName: String): String {
-    val match = Regex("^\\[([^\\]]+)\\]").find(sourceName)
-    return match?.groupValues?.get(1) ?: primaryDisplayName
-}
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable

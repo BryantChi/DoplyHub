@@ -44,7 +44,13 @@ data class VodDetail(
     val synopsis: String,
     val episodes: List<EpisodeGroup>,
     val seriesVods: List<Vod> = emptyList(),
-    val relatedVods: List<Vod> = emptyList()
+    val relatedVods: List<Vod> = emptyList(),
+    /** Per-site metadata for site-level UI (v2.8.0). Keys = scrapers that contributed
+     *  episodes; values = each scraper's own [Vod] (with that site's status / year /
+     *  category strings verbatim). Populated by getEnrichedVodDetail; empty for
+     *  single-site detail (UI falls back to [vod]).
+     *  Always contains [vod.sourceType → vod] when non-empty. */
+    val siteMetadata: Map<SourceType, Vod> = emptyMap(),
 )
 
 /**
