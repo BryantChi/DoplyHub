@@ -331,6 +331,8 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
                         if (vod.category.isNotBlank()) {
                             Text(vod.category, color = CinemaTextMuted, fontSize = dims.heroBannerMetaSize)
                         }
+                        // Same defensive fallback as VodCard — see comment there.
+                        @Suppress("DEPRECATION")
                         val prettyHeroStatus = remember(vod.siteStatus, vod.status) {
                             val s = vod.siteStatus
                             if (s !is com.gimy.tv.domain.model.EpisodeStatus.Empty) s.display
