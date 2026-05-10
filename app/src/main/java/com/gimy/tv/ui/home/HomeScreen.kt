@@ -336,8 +336,9 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
                         if (vod.category.isNotBlank()) {
                             Text(vod.category, color = CinemaTextMuted, fontSize = dims.heroBannerMetaSize)
                         }
-                        if (vod.status.isNotBlank()) {
-                            Text(vod.status, color = CinemaGold, fontSize = dims.heroBannerMetaSize, fontWeight = FontWeight.SemiBold)
+                        val prettyHeroStatus = remember(vod.status) { com.gimy.tv.domain.util.prettifyVodStatus(vod.status) }
+                        if (prettyHeroStatus.isNotBlank()) {
+                            Text(prettyHeroStatus, color = CinemaGold, fontSize = dims.heroBannerMetaSize, fontWeight = FontWeight.SemiBold)
                         }
                     }
                     // Phone: button inside text column to avoid overlap

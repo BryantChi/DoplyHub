@@ -23,6 +23,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import coil.compose.AsyncImage
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
+import com.gimy.tv.domain.util.prettifyVodStatus
 import com.gimy.tv.ui.theme.*
 
 /**
@@ -112,8 +113,12 @@ private fun VodCardContent(vod: Vod) {
         ) {
             Text(sourceTag, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
-        // Top-right: status badge
-        if (vod.status.isNotBlank()) {
+        // Top-right: status badge — normalize via prettifyVodStatus so home/list
+        // grids don't show the source-specific hodgepodge ("更新至第33集" vs
+        // "38集全" vs "更新26" vs "HD") that the user reads as "the count is
+        // wrong even when the underlying number is correct.
+        val prettyStatus = remember(vod.status) { prettifyVodStatus(vod.status) }
+        if (prettyStatus.isNotBlank()) {
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
@@ -121,7 +126,7 @@ private fun VodCardContent(vod: Vod) {
                     .background(CinemaRed.copy(0.92f), RoundedCornerShape(3.dp))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
-                Text(vod.status, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(prettyStatus, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

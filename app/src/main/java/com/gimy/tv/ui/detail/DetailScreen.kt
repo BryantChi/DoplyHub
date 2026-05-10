@@ -192,6 +192,7 @@ fun DetailScreen(
                                         d = d,
                                         currentSiteVod = currentSiteVod,
                                         currentSiteEpisodes = filteredEpisodes,
+                                        selectedSourceType = selectedSourceType,
                                         uiState = uiState,
                                         onBack = onBack,
                                         onPlayClick = onPlayClick,
@@ -222,6 +223,7 @@ fun DetailScreen(
                                     d = d,
                                     currentSiteVod = currentSiteVod,
                                     currentSiteEpisodes = filteredEpisodes,
+                                    selectedSourceType = selectedSourceType,
                                     uiState = uiState,
                                     onBack = onBack,
                                     onPlayClick = onPlayClick,
@@ -377,6 +379,11 @@ private fun DetailInfo(
     currentSiteVod: Vod,
     /** Episodes belonging to the currently-selected site (or all when 全部). */
     currentSiteEpisodes: List<EpisodeGroup>,
+    /** null = 「全部」mode (no site picked). Used to keep the badge count
+     *  coherent with the primary site even in 全部 mode — secondary outliers
+     *  surviving normalize shouldn't push the headline number above what the
+     *  primary listing actually says. */
+    selectedSourceType: SourceType?,
     uiState: DetailUiState,
     onBack: () -> Unit,
     onPlayClick: (sourceType: String, vodId: Long, sourceId: Int, episodeNum: Int) -> Unit,
@@ -409,14 +416,24 @@ private fun DetailInfo(
     //   3. Series with computed count → "更新至 N 集"
     //   4. Movie / unknown → rawStatus as-is
     //
-    // Compute (3): max sane count among the lines belonging to this site (or
-    // all lines in 全部 mode). EpisodeNormalizer at the repository layer
-    // already pruned outlier lines & out-of-range episodes.
-    val displayCount = currentSiteEpisodes.maxOfOrNull { line ->
+    // Compute (3): max sane count among the lines belonging to this site.
+    // In 全部 mode, restrict the count to the PRIMARY site's lines so the
+    // headline doesn't borrow a secondary's outlier total — that's what the
+    // primary chip would show, and what the user navigated in expecting.
+    // EpisodeNormalizer at the repository layer already pruned outlier lines
+    // & out-of-range episodes.
+    val countLines = if (selectedSourceType == null) {
+        // 全部 mode — pin to primary's own listing
+        currentSiteEpisodes.filter { (it.sourceType ?: d.vod.sourceType) == d.vod.sourceType }
+            .ifEmpty { currentSiteEpisodes }
+    } else currentSiteEpisodes
+    val displayCount = countLines.maxOfOrNull { line ->
         line.episodes.maxOfOrNull { it.number } ?: 0
     } ?: 0
-    val isSeries = (currentSiteEpisodes.firstOrNull()?.episodes?.size ?: 0) > 1
-    val rawStatus = currentSiteVod.status
+    val isSeries = (countLines.firstOrNull()?.episodes?.size ?: 0) > 1
+    // Prettify first so the verbatim site string isn't displayed as
+    // "更新至第33集" / "38集全" — same source-string normalization as VodCard.
+    val rawStatus = com.gimy.tv.domain.util.prettifyVodStatus(currentSiteVod.status)
     val rawHasCount = Regex("\\d+\\s*集").containsMatchIn(rawStatus)
     val displayStatus = when {
         rawHasCount -> rawStatus
