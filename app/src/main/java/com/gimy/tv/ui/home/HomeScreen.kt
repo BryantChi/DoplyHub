@@ -336,7 +336,11 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
                         if (vod.category.isNotBlank()) {
                             Text(vod.category, color = CinemaTextMuted, fontSize = dims.heroBannerMetaSize)
                         }
-                        val prettyHeroStatus = remember(vod.status) { com.gimy.tv.domain.util.prettifyVodStatus(vod.status) }
+                        val prettyHeroStatus = remember(vod.siteStatus, vod.status) {
+                            val s = vod.siteStatus
+                            if (s !is com.gimy.tv.domain.model.EpisodeStatus.Empty) s.display
+                            else com.gimy.tv.domain.util.parseEpisodeStatus(vod.status).display
+                        }
                         if (prettyHeroStatus.isNotBlank()) {
                             Text(prettyHeroStatus, color = CinemaGold, fontSize = dims.heroBannerMetaSize, fontWeight = FontWeight.SemiBold)
                         }
