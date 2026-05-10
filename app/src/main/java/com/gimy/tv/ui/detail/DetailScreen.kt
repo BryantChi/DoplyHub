@@ -411,11 +411,22 @@ private fun DetailInfo(
     //   - Per-site chip: that site's own siteStatus (the chip-flipping intent
     //     of v2.8.0 is preserved — switch chip → switch the displayed string).
     // Both are pre-formatted via EpisodeStatus.display; UI does no string parsing.
-    val displayStatus = if (selectedSourceType == null) {
+    //
+    // Phase 2 enrichment may still upgrade aggregatedStatus from ParsedFromLines
+    // to CrossSiteMax — append "…" while that's in flight so the user reads the
+    // number as provisional instead of being surprised by it changing mid-view.
+    val baseStatus = if (selectedSourceType == null) {
         d.aggregatedStatus.display
     } else {
         currentSiteVod.siteStatus.display
     }
+    val isProvisional = uiState.isEnriching && selectedSourceType == null &&
+        run {
+            val s = d.aggregatedStatus
+            s !is com.gimy.tv.domain.model.EpisodeStatus.InProgress ||
+                s.confidence != com.gimy.tv.domain.model.Confidence.CrossSiteMax
+        }
+    val displayStatus = if (isProvisional && baseStatus.isNotBlank()) "$baseStatus …" else baseStatus
     Row(modifier = widthMod, horizontalArrangement = rowArrange) {
         if (displayStatus.isNotBlank()) InfoBadge(displayStatus, CinemaRed)
         val displayYear = currentSiteVod.year.takeIf { it > 0 } ?: d.vod.year
