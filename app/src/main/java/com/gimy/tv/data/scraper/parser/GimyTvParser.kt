@@ -1,8 +1,11 @@
 package com.gimy.tv.data.scraper.parser
 
+import com.gimy.tv.domain.model.Episode
+import com.gimy.tv.domain.model.EpisodeGroup
 import com.gimy.tv.domain.model.PaginatedResult
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
+import com.gimy.tv.domain.model.VodDetail
 import com.gimy.tv.domain.util.parseEpisodeStatus
 import org.jsoup.nodes.Document
 
@@ -40,4 +43,47 @@ object GimyTvParser {
         url.startsWith("/") -> "$baseUrl$url"
         else -> url
     }
+
+    private val stabilityOrder = listOf("順暢", "無盡", "極速", "高清", "騰訊", "藍光", "4K", "優質", "非凡")
+    private val epRegex = Regex("/ep/\\d+-(\\d+)-(\\d+)\\.html")
+
+    fun parseVodDetail(doc: Document, vodId: Long, baseUrl: String): VodDetail {
+        val title = doc.selectFirst("h1")?.text()?.trim() ?: "Unknown"
+        val cover = doc.selectFirst("meta[property=og:image]")?.attr("content")
+            ?.let { resolveUrl(it, baseUrl) } ?: ""
+        val body = doc.body().text()
+        val director = extractMeta(body, "導演")
+        val actors = extractMeta(body, "主演").split(Regex("[,，/、]")).map { it.trim() }.filter { it.isNotBlank() }
+        val year = (extractMeta(body, "年代") + extractMeta(body, "年份")).filter { it.isDigit() }.take(4).toIntOrNull() ?: 0
+        val category = extractMeta(body, "類型").ifBlank { extractMeta(body, "分類") }
+        val status = extractMeta(body, "狀態")
+        val synopsis = doc.select("p").firstOrNull { it.text().length > 50 && !it.text().contains("導演") }?.text()?.trim() ?: ""
+
+        val groups = mutableListOf<EpisodeGroup>()
+        for (block in doc.select("div.playlist-block")) {
+            val name = block.selectFirst(".playlist-block__title")?.text()?.trim()
+                ?.replace(Regex("\\s*ᴴᴰ\\s*"), "")?.trim() ?: continue
+            val eps = mutableListOf<Episode>()
+            var sId = 0
+            for (link in block.select("a[href~=/ep/]")) {
+                val m = epRegex.find(link.attr("href")) ?: continue
+                sId = m.groupValues[1].toIntOrNull() ?: continue
+                val n = m.groupValues[2].toIntOrNull() ?: continue
+                eps.add(Episode(n, link.text().trim(), link.attr("href")))
+            }
+            if (eps.isNotEmpty() && name.isNotBlank())
+                groups.add(EpisodeGroup(name, sId, eps.sortedBy { it.number }))
+        }
+        val sorted = groups.sortedWith(compareByDescending { g ->
+            val i = stabilityOrder.indexOfFirst { g.sourceName.contains(it) }; if (i >= 0) stabilityOrder.size - i else -1
+        })
+        @Suppress("DEPRECATION")
+        return VodDetail(
+            Vod(vodId, SourceType.GIMYTV, title, cover, category, year, status,
+                siteStatus = parseEpisodeStatus(status)),
+            director, actors, synopsis, sorted)
+    }
+
+    private fun extractMeta(text: String, key: String): String =
+        Regex("$key[：:]\\s*(.+?)(?=\\s+\\S+[：:]|$)").find(text)?.groupValues?.get(1)?.trim() ?: ""
 }
