@@ -99,12 +99,12 @@ abstract class MacCmsListBasedSource(
             .map { (id, name) -> Category(id, name, sourceType) }
     }
 
-    override suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod> =
+    override open suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod> =
         withContext(Dispatchers.IO) {
             parseVodList(fetchDocument(buildListUrl(typeId, page)), page)
         }
 
-    override suspend fun fetchVodDetail(vodId: Long): VodDetail =
+    override open suspend fun fetchVodDetail(vodId: Long): VodDetail =
         withContext(Dispatchers.IO) {
             parseVodDetail(fetchDocument("$baseUrl$detailUrlPath/$vodId.html"), vodId)
         }
@@ -115,7 +115,7 @@ abstract class MacCmsListBasedSource(
             parsePlayerAaaa(fetchHtml(url))
         }
 
-    override suspend fun search(keyword: String, page: Int): PaginatedResult<Vod> =
+    override open suspend fun search(keyword: String, page: Int): PaginatedResult<Vod> =
         withContext(Dispatchers.IO) {
             parseVodList(fetchDocument(buildSearchUrl(keyword, page)), page)
         }
