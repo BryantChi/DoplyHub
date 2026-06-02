@@ -1,8 +1,8 @@
 package com.gimy.tv.data.scraper
 
 import com.gimy.tv.data.endpoint.EndpointResolver
+import com.gimy.tv.data.scraper.parser.GimyTvParser
 import com.gimy.tv.domain.model.*
-import com.gimy.tv.domain.util.parseEpisodeStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -19,7 +19,6 @@ class GimyTvSource @Inject constructor(
 
     override val sourceType = SourceType.GIMYTV
     override val baseUrl: String get() = endpointResolver.getBaseUrl(sourceType)
-    private val stabilityOrder = listOf("順暢", "無盡", "極速", "高清", "騰訊", "藍光", "4K", "優質", "非凡")
 
     override suspend fun fetchCategories(): List<Category> = listOf(
         Category(2, "電視劇", sourceType), Category(1, "電影", sourceType),
@@ -32,14 +31,13 @@ class GimyTvSource @Inject constructor(
 
     override suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod> =
         withContext(Dispatchers.IO) {
-            val url = if (page <= 1) "$baseUrl/type/$typeId.html"
-                else "$baseUrl/type/$typeId-$page.html"
-            parseVodList(fetchDocument(url), page)
+            val url = if (page <= 1) "$baseUrl/type/$typeId.html" else "$baseUrl/type/$typeId-$page.html"
+            GimyTvParser.parseVodList(fetchDocument(url), baseUrl, page)
         }
 
     override suspend fun fetchVodDetail(vodId: Long): VodDetail =
         withContext(Dispatchers.IO) {
-            parseVodDetail(fetchDocument("$baseUrl/vod/$vodId.html"), vodId)
+            GimyTvParser.parseVodDetail(fetchDocument("$baseUrl/vod/$vodId.html"), vodId, baseUrl)
         }
 
     override suspend fun fetchPlayerData(episodeUrl: String): PlayerData =
@@ -52,12 +50,15 @@ class GimyTvSource @Inject constructor(
         withContext(Dispatchers.IO) {
             val enc = java.net.URLEncoder.encode(keyword, "UTF-8")
             val doc = fetchDocument("$baseUrl/search/$enc----------$page---.html")
-            parseSearchResults(doc, page)
+            doc.select("#stickyside").remove()
+            GimyTvParser.parseVodList(doc, baseUrl, page)
         }
 
-    private fun parseSearchResults(doc: Document, page: Int): PaginatedResult<Vod> {
-        doc.select("#stickyside").remove()
-        return parseVodList(doc, page)
+    override suspend fun probeListCount(baseUrl: String): Int = withContext(Dispatchers.IO) {
+        runCatching {
+            val doc = Jsoup.parse(fetchHtml("$baseUrl/type/2.html"), baseUrl)
+            GimyTvParser.parseVodList(doc, baseUrl, 1).items.size
+        }.getOrDefault(0)
     }
 
     private fun fetchHtml(url: String): String {
@@ -69,83 +70,6 @@ class GimyTvSource @Inject constructor(
     }
 
     private fun fetchDocument(url: String): Document = Jsoup.parse(fetchHtml(url), url)
-
-    private fun parseVodList(doc: Document, page: Int): PaginatedResult<Vod> {
-        // Remove ranking sidebar
-        doc.select("#stickyside, .rankings, .rank-list").remove()
-        val items = mutableListOf<Vod>()
-        for (card in doc.select("a[class*=video-pic][data-original]")) {
-            if (!card.attr("href").contains("/vod/")) continue
-            val id = Regex("/vod/(\\d+)\\.html").find(card.attr("href"))
-                ?.groupValues?.get(1)?.toLongOrNull() ?: continue
-            val title = card.attr("title").trim(); if (title.isBlank()) continue
-            val cardStatus = card.selectFirst("span.note")?.text()?.trim() ?: ""
-            items.add(Vod(id, sourceType, title, resolveUrl(card.attr("data-original")),
-                "", 0, cardStatus, siteStatus = parseEpisodeStatus(cardStatus)))
-        }
-        val unique = items.distinctBy { it.id }
-        val hasNext = doc.select("a:contains(下一頁), a[title=下一頁]").isNotEmpty()
-        val totalPages = Regex("(\\d+)/(\\d+)").find(doc.select(".page, .stui-page").text())
-            ?.groupValues?.get(2)?.toIntOrNull() ?: if (hasNext) page + 1 else page
-        return PaginatedResult(unique, page, totalPages, hasNext || page < totalPages)
-    }
-
-    private fun parseVodDetail(doc: Document, vodId: Long): VodDetail {
-        val title = doc.selectFirst("h1")?.text()?.trim() ?: "Unknown"
-        val cover = doc.selectFirst("meta[property=og:image]")?.attr("content")?.let { resolveUrl(it) } ?: ""
-        val body = doc.body().text()
-        val director = extractMeta(body, "導演")
-        val actors = extractMeta(body, "主演").split(Regex("[,，/、]")).map { it.trim() }.filter { it.isNotBlank() }
-        val year = (extractMeta(body, "年代") + extractMeta(body, "年份")).filter { it.isDigit() }.take(4).toIntOrNull() ?: 0
-        val category = extractMeta(body, "類型").ifBlank { extractMeta(body, "分類") }
-        val status = extractMeta(body, "狀態")
-        val synopsis = doc.select("p").firstOrNull { it.text().length > 50 && !it.text().contains("導演") }?.text()?.trim() ?: ""
-
-        val groups = mutableListOf<EpisodeGroup>()
-        for (container in doc.select("div.playlist-mobile.playlist")) {
-            val gicoDiv = container.selectFirst("div.gico") ?: continue
-            val name = gicoDiv.text().trim().replace(" ᴴᴰ", "").replace("ᴴᴰ", "").trim()
-            val ul = container.selectFirst("ul[id^=con_playlist_]") ?: continue
-            val eps = mutableListOf<Episode>(); var sId = 0
-            for (link in ul.select("a[href~=/ep/]")) {
-                val m = Regex("/ep/\\d+-(\\d+)-(\\d+)\\.html").find(link.attr("href")) ?: continue
-                sId = m.groupValues[1].toIntOrNull() ?: continue
-                val n = m.groupValues[2].toIntOrNull() ?: continue
-                eps.add(Episode(n, link.text().trim(), link.attr("href")))
-            }
-            if (eps.isNotEmpty() && name.isNotBlank()) groups.add(EpisodeGroup(name, sId, eps.sortedBy { it.number }))
-        }
-
-        val sorted = groups.sortedWith(compareByDescending { g ->
-            val i = stabilityOrder.indexOfFirst { g.sourceName.contains(it) }; if (i >= 0) stabilityOrder.size - i else -1
-        })
-
-        return VodDetail(Vod(vodId, sourceType, title, cover, category, year, status,
-            siteStatus = parseEpisodeStatus(status)), director, actors, synopsis, sorted,
-            seriesVods = parseSeriesVods(doc))
-    }
-
-    /**
-     * Parse series vods from the 系列 section on detail pages.
-     * Uses .box-title:has(h3:contains(系列)) to locate the container.
-     */
-    private fun parseSeriesVods(doc: Document): List<Vod> {
-        val container = doc.selectFirst(".box-title:has(h3:contains(系列))")?.parent()
-            ?: return emptyList()
-        val items = mutableListOf<Vod>()
-        for (card in container.select("a[class*=video-pic][data-background]")) {
-            val href = card.attr("href")
-            val id = Regex("/vod/(\\d+)\\.html").find(href)
-                ?.groupValues?.get(1)?.toLongOrNull() ?: continue
-            val cardTitle = card.attr("title").trim()
-            if (cardTitle.isBlank()) continue
-            val cardCover = resolveUrl(card.attr("data-background"))
-            val cardStatus = card.selectFirst("span.note")?.text()?.trim() ?: ""
-            items.add(Vod(id, sourceType, cardTitle, cardCover, "", 0, cardStatus,
-                siteStatus = parseEpisodeStatus(cardStatus)))
-        }
-        return items
-    }
 
     private fun parsePlayerData(html: String): PlayerData {
         val idx = html.indexOf("player_data="); if (idx == -1) throw ScraperException("player_data not found")
@@ -163,11 +87,4 @@ class GimyTvSource @Inject constructor(
         if (url.isBlank()) throw ScraperException("Empty URL")
         return PlayerData(url, json.optInt("encrypt", 0), json.optString("from", ""))
     }
-
-    private fun resolveUrl(url: String): String = when {
-        url.isBlank() -> ""; url.startsWith("//") -> "https:$url"; url.startsWith("/") -> "$baseUrl$url"; else -> url
-    }
-
-    private fun extractMeta(text: String, key: String): String =
-        Regex("$key[：:]\\s*(.+?)(?=\\s+\\S+[：:]|$)").find(text)?.groupValues?.get(1)?.trim() ?: ""
 }
