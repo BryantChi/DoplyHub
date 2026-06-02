@@ -1,6 +1,7 @@
 package com.gimy.tv.data.scraper
 
 import com.gimy.tv.data.endpoint.EndpointResolver
+import com.gimy.tv.data.scraper.parser.MacCmsEpisodeParser
 import com.gimy.tv.domain.model.*
 import com.gimy.tv.domain.util.parseEpisodeStatus
 import kotlinx.coroutines.Dispatchers
@@ -221,55 +222,13 @@ abstract class MacCmsListBasedSource(
     }
 
     /**
-     * Episodes structure (myui template):
-     *   <a href="#playlistN" data-toggle="tab">線路中文名</a>     ← line tab
-     *   <div id="playlistN">
-     *     <ul><li><a href="{playUrlPath}/{vodId}-{lineIdx}-{epIdx}.html">第N集</a></li>...</ul>
-     *   </div>
+     * Episodes structure — delegates to [MacCmsEpisodeParser] which handles three variants:
+     *   1. data-toggle=tab + #playlistN  (original myui template)
+     *   2. div.playlist-mobile + div.gico + ul#con_playlist_N  (gimy.tw redesign)
+     *   3. Fallback: bucket by sourceId, generic "線路 N"
      */
-    protected open fun parseEpisodeGroups(doc: Document): List<EpisodeGroup> {
-        val groups = mutableListOf<EpisodeGroup>()
-        val tabIdRegex = Regex("#playlist(\\d+)")
-        val playLinkRegex = Regex("$playUrlPath/\\d+-(\\d+)-(\\d+)\\.html")
-
-        val tabs = doc.select("a[data-toggle=tab][href^=#playlist]")
-        for (tab in tabs) {
-            val tabId = tabIdRegex.find(tab.attr("href"))?.groupValues?.get(1) ?: continue
-            val name = tab.text().trim()
-                .replace(Regex("\\s*ᴴᴰ\\s*"), "")
-                .replace(Regex("\\s+"), "")
-            if (name.isBlank()) continue
-            val container = doc.getElementById("playlist$tabId") ?: continue
-            val episodes = mutableListOf<Episode>()
-            var sourceId = 0
-            for (link in container.select("a[href*=$playUrlPath/]")) {
-                val m = playLinkRegex.find(link.attr("href")) ?: continue
-                sourceId = m.groupValues[1].toIntOrNull() ?: continue
-                val epNum = m.groupValues[2].toIntOrNull() ?: continue
-                episodes.add(Episode(epNum, link.text().trim(), link.attr("href")))
-            }
-            if (episodes.isNotEmpty()) {
-                groups.add(EpisodeGroup(name, sourceId, episodes.sortedBy { it.number }))
-            }
-        }
-
-        // Fallback: bucket all play links by sourceId
-        if (groups.isEmpty()) {
-            val bySource = mutableMapOf<Int, MutableList<Episode>>()
-            for (link in doc.select("a[href*=$playUrlPath/]")) {
-                val m = playLinkRegex.find(link.attr("href")) ?: continue
-                val sId = m.groupValues[1].toIntOrNull() ?: continue
-                val ep = m.groupValues[2].toIntOrNull() ?: continue
-                bySource.getOrPut(sId) { mutableListOf() }
-                    .add(Episode(ep, link.text().trim(), link.attr("href")))
-            }
-            for ((sId, eps) in bySource) {
-                groups.add(EpisodeGroup("線路 $sId", sId, eps.sortedBy { it.number }))
-            }
-        }
-
-        return groups
-    }
+    protected open fun parseEpisodeGroups(doc: Document): List<EpisodeGroup> =
+        MacCmsEpisodeParser.parse(doc, playUrlPath)
 
     // ─── Player page parsing ───
 
