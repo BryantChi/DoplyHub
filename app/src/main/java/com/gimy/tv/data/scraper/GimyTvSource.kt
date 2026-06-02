@@ -54,6 +54,13 @@ class GimyTvSource @Inject constructor(
             GimyTvParser.parseVodList(doc, baseUrl, page)
         }
 
+    override suspend fun probeListCount(baseUrl: String): Int = withContext(Dispatchers.IO) {
+        runCatching {
+            val doc = Jsoup.parse(fetchHtml("$baseUrl/type/2.html"), baseUrl)
+            GimyTvParser.parseVodList(doc, baseUrl, 1).items.size
+        }.getOrDefault(0)
+    }
+
     private fun fetchHtml(url: String): String {
         val req = Request.Builder().url(url).build()
         return client.newCall(req).execute().use { r ->

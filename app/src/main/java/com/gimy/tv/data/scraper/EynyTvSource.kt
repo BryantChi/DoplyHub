@@ -35,4 +35,10 @@ class EynyTvSource @Inject constructor(
             doc.select("#stickyside").remove()
             EynyTvParser.parseVodList(doc, baseUrl, page)
         }
+
+    override suspend fun probeListCount(baseUrl: String): Int = withContext(Dispatchers.IO) {
+        runCatching {
+            EynyTvParser.parseVodList(fetchDocument("$baseUrl$listUrlPath/2.html"), baseUrl, 1).items.size
+        }.getOrDefault(0)
+    }
 }
