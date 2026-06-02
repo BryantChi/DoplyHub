@@ -36,6 +36,9 @@ class EynyTvSource @Inject constructor(
             EynyTvParser.parseVodList(doc, baseUrl, page)
         }
 
+    // eynytv.com uses the module template, NOT the base myui template. This source fully
+    // bypasses the base parser (fetchVodList/Detail/search above all delegate to EynyTvParser),
+    // so the probe must use EynyTvParser too — not the base's parseVodList. Keep both in sync.
     override suspend fun probeListCount(baseUrl: String): Int = withContext(Dispatchers.IO) {
         runCatching {
             EynyTvParser.parseVodList(fetchDocument("$baseUrl$listUrlPath/2.html"), baseUrl, 1).items.size
