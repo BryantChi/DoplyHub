@@ -48,6 +48,7 @@ private val Context.endpointDataStore: DataStore<Preferences> by preferencesData
 class EndpointResolver @Inject constructor(
     @ApplicationContext context: Context,
     private val okHttpClient: OkHttpClient,
+    private val sourcesProvider: javax.inject.Provider<Map<SourceType, @JvmSuppressWildcards com.gimy.tv.data.scraper.SiteSource>>,
 ) {
     companion object {
         private const val REMOTE_URL =
@@ -55,6 +56,8 @@ class EndpointResolver @Inject constructor(
         private const val CACHE_TTL_MS = 24L * 60 * 60 * 1000  // 24h
         private const val PROBE_TIMEOUT_MS = 3000L
         private const val FETCH_TIMEOUT_MS = 6000L
+        // A healthy list page returns at least this many parseable items; tune if false-positives arise.
+        private const val MIN_HEALTHY_ITEMS = 5
 
         // Hard-coded fallback for cold starts when remote JSON is unreachable.
         // Bump on each release so old installs still work.
@@ -133,7 +136,11 @@ class EndpointResolver @Inject constructor(
             val candidates = (remoteConfig?.get(type) ?: emptyList())
                 .ifEmpty { DEFAULTS[type] ?: emptyList() }
             if (candidates.isEmpty()) return@associateWith resolved[type] ?: ""
-            pickBestEndpoint(candidates) ?: candidates.first()
+            val source = sourcesProvider.get()[type]
+            val healthy = if (source != null)
+                pickHealthiest(candidates, MIN_HEALTHY_ITEMS) { url -> source.probeListCount(url) }
+            else null
+            healthy ?: pickBestEndpoint(candidates) ?: candidates.first()
         }
         resolved = newResolved
         lastRefreshAt = System.currentTimeMillis()
@@ -223,4 +230,19 @@ class EndpointResolver @Inject constructor(
         }.awaitAll().toSet()
         candidates.firstOrNull { it in successful }
     }
+}
+
+/** Pure selection: returns the first candidate (by priority order) whose probe count >= minItems;
+ *  null if none qualify. A probe returning -1 (unsupported) or 0 (broken) counts as unhealthy.
+ *  Extracted for unit testing. */
+internal suspend fun pickHealthiest(
+    candidates: List<String>,
+    minItems: Int,
+    probe: suspend (String) -> Int,
+): String? {
+    for (url in candidates) {
+        val count = runCatching { probe(url) }.getOrDefault(-1)
+        if (count >= minItems) return url
+    }
+    return null
 }
