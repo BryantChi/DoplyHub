@@ -64,8 +64,8 @@ class EndpointResolver @Inject constructor(
         // Note: gimymax.com is intentionally excluded — as of 2026-05 it became a
         // "redirect announcement" page that responds 200 OK but serves no real content.
         private val DEFAULTS: Map<SourceType, List<String>> = mapOf(
-            SourceType.GIMYMAX to listOf("https://gimy01.tv"),
-            SourceType.GIMYTV to listOf("https://gimytv.ai"),
+            SourceType.GIMYMAX to listOf("https://gimy01.co"),
+            SourceType.GIMYTV to listOf("https://gimyplus.com"),
             SourceType.MOVIEFFM to listOf("https://www.movieffm.net"),
             SourceType.GIMY_TW to listOf("https://gimy.tw"),
             SourceType.EYNY_TV to listOf("https://eynytv.com"),
