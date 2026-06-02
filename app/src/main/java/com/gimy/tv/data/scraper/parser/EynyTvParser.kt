@@ -1,8 +1,11 @@
 package com.gimy.tv.data.scraper.parser
 
+import com.gimy.tv.domain.model.Episode
+import com.gimy.tv.domain.model.EpisodeGroup
 import com.gimy.tv.domain.model.PaginatedResult
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
+import com.gimy.tv.domain.model.VodDetail
 import com.gimy.tv.domain.util.parseEpisodeStatus
 import org.jsoup.nodes.Document
 
@@ -33,6 +36,47 @@ object EynyTvParser {
             ?.groupValues?.get(2)?.toIntOrNull() ?: if (hasNext) page + 1 else page
         return PaginatedResult(unique, page, totalPages, hasNext || page < totalPages)
     }
+
+    private val playRegex = Regex("/vodplay/\\d+-(\\d+)-(\\d+)\\.html")
+
+    fun parseVodDetail(doc: Document, vodId: Long, baseUrl: String): VodDetail {
+        val title = doc.selectFirst("h1")?.text()?.trim() ?: "Unknown"
+        val cover = doc.selectFirst("meta[property=og:image]")?.attr("content")?.let { resolveUrl(it, baseUrl) } ?: ""
+        val body = doc.body().text()
+        val director = extractMeta(body, "導演")
+        val actors = extractMeta(body, "主演").split(Regex("[,，/、]")).map { it.trim() }.filter { it.isNotBlank() }
+        val year = (extractMeta(body, "年代") + extractMeta(body, "年份")).filter { it.isDigit() }.take(4).toIntOrNull() ?: 0
+        val category = extractMeta(body, "類型").ifBlank { extractMeta(body, "分類") }
+        val status = extractMeta(body, "狀態")
+        val synopsis = doc.select("p").firstOrNull { it.text().length > 50 && !it.text().contains("導演") }?.text()?.trim() ?: ""
+
+        val tabNames = doc.select(".module-tab.module-player-tab .module-tab-item")
+            .map { it.text().trim().replace(Regex("\\s*ᴴᴰ\\s*"), "").trim() }
+        val lists = doc.select(".module-list.module-player-list")
+        val groups = mutableListOf<EpisodeGroup>()
+        lists.forEachIndexed { idx, list ->
+            val eps = mutableListOf<Episode>()
+            var sid = idx + 1
+            for (link in list.select("a[href*=/vodplay/]")) {
+                val m = playRegex.find(link.attr("href")) ?: continue
+                sid = m.groupValues[1].toIntOrNull() ?: continue
+                val n = m.groupValues[2].toIntOrNull() ?: continue
+                eps.add(Episode(n, link.text().trim(), link.attr("href")))
+            }
+            if (eps.isNotEmpty()) {
+                val name = tabNames.getOrNull(idx)?.takeIf { it.isNotBlank() } ?: "線路 $sid"
+                groups.add(EpisodeGroup(name, sid, eps.sortedBy { it.number }))
+            }
+        }
+        @Suppress("DEPRECATION")
+        return VodDetail(
+            Vod(vodId, SourceType.EYNY_TV, title, cover, category, year, status,
+                siteStatus = parseEpisodeStatus(status)),
+            director, actors, synopsis, groups)
+    }
+
+    private fun extractMeta(text: String, key: String): String =
+        Regex("$key[：:]\\s*(.+?)(?=\\s+\\S+[：:]|$)").find(text)?.groupValues?.get(1)?.trim() ?: ""
 
     internal fun resolveUrl(url: String, baseUrl: String): String = when {
         url.isBlank() -> ""
