@@ -53,3 +53,15 @@ internal fun embedUserAgent(sourceType: SourceType, webViewUserAgent: String?): 
  */
 internal fun httpUserAgent(webViewUserAgent: String?): String =
     webViewUserAgent ?: FALLBACK_HTTP_USER_AGENT
+
+
+/** Interstitials the Gimy backends return when searches arrive too quickly (observed 2026-09-10). */
+private val RATE_LIMIT_MARKERS = listOf("搜尋太頻繁", "搜索太频繁")
+
+/**
+ * The rate-limit page comes back as HTTP 200, so the status line claims success and only the
+ * body gives it away. Aggregated search hits GimyTV and GimyMax — the same backend — at once,
+ * which is precisely what triggers it.
+ */
+internal fun isSearchRateLimited(body: String): Boolean =
+    RATE_LIMIT_MARKERS.any { body.contains(it) }

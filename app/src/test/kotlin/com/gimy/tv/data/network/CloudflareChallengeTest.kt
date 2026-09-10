@@ -70,4 +70,28 @@ class CloudflareChallengeTest {
     @Test fun `shared http client falls back when webview is unavailable`() {
         assertThat(httpUserAgent(null)).isEqualTo(FALLBACK_HTTP_USER_AGENT)
     }
+
+    // ── search rate limiting ──
+
+    /**
+     * Captured 2026-09-10 from gitube.tv: the site answers a too-frequent search with
+     * HTTP 200 whose body is an interstitial, not results. Status alone says "fine", so the
+     * body is the only signal — and the aggregated search fires GimyTV and GimyMax at the
+     * same backend simultaneously, which is exactly what trips it.
+     */
+    private val rateLimitedBody =
+        "<html><head><title>搜尋太頻繁，請稍候 3秒後再試</title></head><body></body></html>"
+
+    @Test fun `traditional rate-limit interstitial is detected`() {
+        assertThat(isSearchRateLimited(rateLimitedBody)).isTrue()
+    }
+
+    @Test fun `simplified rate-limit interstitial is detected`() {
+        assertThat(isSearchRateLimited("搜索太频繁，请稍候 3秒后再试")).isTrue()
+    }
+
+    @Test fun `a real result page is not treated as rate limited`() {
+        val results = """<article class="search-item"><a href="/vod/1.html" class="search-item__thumb"></a></article>"""
+        assertThat(isSearchRateLimited(results)).isFalse()
+    }
 }

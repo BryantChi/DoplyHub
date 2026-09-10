@@ -3,6 +3,7 @@ package com.gimy.tv.di
 import android.content.Context
 import com.gimy.tv.data.network.CfCookieStore
 import com.gimy.tv.data.network.CloudflareInterceptor
+import com.gimy.tv.data.network.SearchRateLimitInterceptor
 import com.gimy.tv.data.network.WebViewUserAgentProvider
 import com.gimy.tv.data.network.httpUserAgent
 import dagger.Module
@@ -26,6 +27,7 @@ object NetworkModule {
         @ApplicationContext context: Context,
         cookieStore: CfCookieStore,
         cloudflareInterceptor: CloudflareInterceptor,
+        searchRateLimitInterceptor: SearchRateLimitInterceptor,
         userAgentProvider: WebViewUserAgentProvider,
     ): OkHttpClient {
         val cacheDir = File(context.cacheDir, "http_cache")
@@ -47,6 +49,9 @@ object NetworkModule {
             // Added before the header interceptor so the retried request still passes
             // through it and carries the same User-Agent the challenge was solved with.
             .addInterceptor(cloudflareInterceptor)
+            // After the Cloudflare one: a challenge must clear before a 200 body
+            // can be inspected for the rate-limit interstitial.
+            .addInterceptor(searchRateLimitInterceptor)
             .addInterceptor { chain ->
                 // Only set defaults when caller hasn't supplied them. Without this guard, the
                 // interceptor overrides per-call headers — e.g. GitHub API expects
