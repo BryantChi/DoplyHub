@@ -7,8 +7,10 @@ import com.gimy.tv.data.scraper.parser.GimyPaths
 import com.gimy.tv.domain.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import javax.inject.Inject
@@ -34,10 +36,6 @@ class GimyTvSource @Inject constructor(
         mirrorCache = profile to built
         return built
     }
-
-    // Only the search path is challenged; list/detail/play are served normally.
-    override val cloudflareWarmUpUrl: String
-        get() = "$baseUrl/search/%E7%86%B1%E9%96%80----------1---.html"
 
     override suspend fun fetchCategories(): List<Category> = listOf(
         Category(2, "電視劇", sourceType), Category(1, "電影", sourceType),
@@ -68,15 +66,21 @@ class GimyTvSource @Inject constructor(
             parseGimyPlayerData(fetchHtml(url))
         }
 
+    /**
+     * 搜尋走 MacCMS 的 ajax/suggest JSON 端點，關鍵字放在 POST body。
+     *
+     * 站方的 Cloudflare 規則是看 query string 有沒有 wd 參數（`/type/20.html` 通、
+     * `/type/20.html?wd=X` 就回 Managed Challenge），所以只要不把關鍵字放進網址就完全
+     * 不會被擋，也不再需要背景 WebView 解 cf_clearance——那在電視盒上並不可靠，解不出來
+     * 時整組 Gimy 會從搜尋結果裡靜默消失。
+     */
     override suspend fun search(keyword: String, page: Int): PaginatedResult<Vod> =
         withContext(Dispatchers.IO) {
-            val enc = java.net.URLEncoder.encode(keyword, "UTF-8")
-            val (paths, parser) = mirror()
-            // Search path follows the mirror too — the poster mirror serves /find/.
-            val doc = fetchDocument("$baseUrl${paths.search}/$enc----------$page---.html")
-            doc.select("#stickyside").remove()
-            // Search pages use the search-item template, not the card template used by lists.
-            parser.parseSearchResults(doc, baseUrl, page)
+            // 這個端點沒有分頁：page / pg 都被忽略，永遠回第一頁。第二頁之後直接回空，
+            // 免得聚合搜尋的無限捲動一直拿到重複的第一頁。
+            if (page > 1) return@withContext PaginatedResult(emptyList(), page, 1, false)
+            val json = postForm("$baseUrl$GIMY_SUGGEST_PATH", gimySuggestForm(keyword))
+            PaginatedResult(parseGimySuggest(json, sourceType), page, 1, hasMore = false)
         }
 
     override suspend fun probeListCount(baseUrl: String, profile: String?): Int = withContext(Dispatchers.IO) {
@@ -87,6 +91,15 @@ class GimyTvSource @Inject constructor(
             val doc = Jsoup.parse(fetchHtml("$baseUrl${m.paths.list}/2.html"), baseUrl)
             probeParser.parseVodList(doc, baseUrl, 1).items.size
         }.getOrDefault(0)
+    }
+
+    private fun postForm(url: String, form: String): String {
+        val body = form.toRequestBody("application/x-www-form-urlencoded".toMediaType())
+        val req = Request.Builder().url(url).post(body).build()
+        return client.newCall(req).execute().use { r ->
+            if (!r.isSuccessful) throw ScraperException("HTTP ${r.code}: $url")
+            r.body?.string() ?: throw ScraperException("Empty: $url")
+        }
     }
 
     private fun fetchHtml(url: String): String {

@@ -141,4 +141,6 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.truth)
     testImplementation(libs.coroutines.test)
+    // android.jar 裡的 org.json 是會丟 "not mocked" 的 stub，JSON 解析的測試需要真實作。
+    testImplementation("org.json:json:20240303")
 }

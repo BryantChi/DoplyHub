@@ -25,7 +25,6 @@ data class GimyPaths(
     val episode: String,   // "/ep"    | "/watch"   | "/play"
     /** "/search" on most mirrors, "/find" on the poster one. Defaulted so existing
      *  construction sites keep working. */
-    val search: String = "/search",
 )
 
 /**
