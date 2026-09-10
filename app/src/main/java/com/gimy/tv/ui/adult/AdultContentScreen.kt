@@ -168,6 +168,19 @@ fun AdultContentScreen(
                                 color = CinemaTextMuted, fontSize = 13.sp)
                         }
                     }
+                    // Loaded fine but parsed nothing — same silent-failure shape the
+                    // general browse screen now reports.
+                    rowState.items.isEmpty() -> {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("這個來源沒有內容", color = CinemaTextPrimary,
+                                    fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(4.dp))
+                                Text("可連上該站，但解析不到影片，來源可能已改版。",
+                                    color = CinemaTextMuted, fontSize = 12.sp)
+                            }
+                        }
+                    }
                     else -> {
                         Column(Modifier.fillMaxSize()) {
                             LazyVerticalGrid(

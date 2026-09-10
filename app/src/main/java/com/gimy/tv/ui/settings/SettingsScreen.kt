@@ -46,6 +46,7 @@ fun SettingsScreen(
     val state by vm.state.collectAsState()
     val versionName = remember { currentVersionName(ctx) }
     val enabledSources by settingsVm.enabledSources.collectAsState()
+    val endpointHealth by settingsVm.endpointHealth.collectAsState()
     val adultEnabled by adultVm.enabled.collectAsState()
     val pinRequired by adultVm.pinRequired.collectAsState()
     val pinHash by adultVm.pinHash.collectAsState()
@@ -103,7 +104,7 @@ fun SettingsScreen(
             item {
                 SettingSection(title = "來源管理") {
                     Text(
-                        "停用的來源不會出現在搜尋、首頁更多來源、詳情頁的跨來源切換。",
+                        "停用的來源不會出現在搜尋、首頁更多來源、詳情頁的跨來源切換。標示「失效」代表該站可連線但已解析不到內容。",
                         color = CinemaTextMuted, fontSize = 12.sp,
                     )
                     Spacer(Modifier.height(8.dp))
@@ -112,6 +113,7 @@ fun SettingsScreen(
                             label = type.displayName,
                             enabled = type in enabledSources,
                             isPrimary = type == SourceType.GIMYTV,
+                            health = endpointHealth[type],
                             onToggle = { newValue ->
                                 // Guard: never let the user disable every source — block the
                                 // last toggle-off so search isn't bricked by a stray click.
@@ -283,6 +285,9 @@ private fun SourceToggleRow(
     label: String,
     enabled: Boolean,
     isPrimary: Boolean,
+    /** Only the source-management rows have a probe result; the adult toggles reuse this
+     *  row and pass nothing. */
+    health: com.gimy.tv.data.endpoint.EndpointHealth? = null,
     onToggle: (Boolean) -> Unit,
 ) {
     // 用 Modifier.toggleable 整合 click + focus + accessibility（Compose 為 row-level
@@ -316,6 +321,26 @@ private fun SourceToggleRow(
                         modifier = Modifier
                             .background(CinemaRed.copy(0.15f), RoundedCornerShape(3.dp))
                             .padding(horizontal = 5.dp, vertical = 1.dp))
+                }
+                // A broken endpoint answers HTTP 200 with an unparseable page, so without
+                // this the only symptom is an empty catalogue. Healthy sources show just the
+                // item count — a badge on every row would be noise.
+                health?.let { h ->
+                    Spacer(Modifier.width(8.dp))
+                    when {
+                        h.status.needsAttention -> {
+                            val tint = if (h.status == com.gimy.tv.data.endpoint.EndpointHealthStatus.BROKEN)
+                                CinemaRed else Color(0xFFF59E0B)
+                            Text(h.status.label, color = tint, fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .background(tint.copy(0.15f), RoundedCornerShape(3.dp))
+                                    .padding(horizontal = 5.dp, vertical = 1.dp))
+                        }
+                        h.status == com.gimy.tv.data.endpoint.EndpointHealthStatus.HEALTHY ->
+                            Text("${h.itemCount} 筆", color = CinemaTextMuted.copy(0.7f), fontSize = 10.sp)
+                        else -> Unit
+                    }
                 }
             }
         }

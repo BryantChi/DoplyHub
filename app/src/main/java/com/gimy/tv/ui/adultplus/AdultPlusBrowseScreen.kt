@@ -101,9 +101,17 @@ fun AdultPlusBrowseScreen(
                         }
                     }
                 }
+                // Loaded without error yet parsed nothing — the signature of a template
+                // change. Saying so beats an unexplained empty grid.
                 state.items.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("此分類暫無內容", color = CinemaTextMuted, fontSize = 13.sp)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("此分類暫無內容", color = CinemaTextPrimary,
+                                fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(4.dp))
+                            Text("可連上該站，但解析不到影片，來源可能已改版。",
+                                color = CinemaTextMuted, fontSize = 12.sp)
+                        }
                     }
                 }
                 else -> Column(Modifier.fillMaxSize()) {

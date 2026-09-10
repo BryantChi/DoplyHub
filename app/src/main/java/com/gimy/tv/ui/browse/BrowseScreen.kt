@@ -114,6 +114,28 @@ fun BrowseScreen(
                     }
                 }
             }
+            // Loaded fine but parsed nothing. Without this the screen shows an empty grid,
+            // which is exactly how the 2026-09 template change stayed invisible — the site
+            // answered 200, the parser matched zero cards, and it just looked like an empty
+            // category.
+            !uiState.isLoading && uiState.items.isEmpty() -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("這個分類沒有內容", color = CinemaTextPrimary,
+                            fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text("可連上該站，但解析不到影片，來源可能已改版。",
+                            color = CinemaTextMuted, fontSize = 13.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text("可到「設定 → 來源管理」查看各來源狀態。",
+                            color = CinemaTextMuted.copy(0.7f), fontSize = 12.sp)
+                        Spacer(Modifier.height(16.dp))
+                        DoplyButton(onClick = { vm.refresh() }, containerColor = CinemaRed) {
+                            Text("重新整理", color = Color.White)
+                        }
+                    }
+                }
+            }
             else -> {
                 RefreshableContainer(
                     isRefreshing = uiState.isRefreshing,

@@ -102,6 +102,11 @@ class EndpointResolver @Inject constructor(
     @Volatile
     private var updateConfig: UpdateConfig = UpdateConfig.DEFAULT
 
+    /** Last probe result per source. Settings reads this so a silently broken endpoint is
+     *  visible instead of just looking like an empty catalogue. */
+    private val _health = kotlinx.coroutines.flow.MutableStateFlow<Map<SourceType, EndpointHealth>>(emptyMap())
+    val health: kotlinx.coroutines.flow.StateFlow<Map<SourceType, EndpointHealth>> = _health
+
     fun getBaseUrl(sourceType: SourceType): String =
         (resolved[sourceType] ?: DEFAULTS[sourceType]!!.first()).url
 
@@ -146,6 +151,7 @@ class EndpointResolver @Inject constructor(
 
     private suspend fun refresh() = refreshMutex.withLock {
         val remoteConfig = fetchRemoteConfig()
+        val healthReport = mutableMapOf<SourceType, EndpointHealth>()
         val newResolved = SourceType.values().associateWith { type ->
             val candidates = (remoteConfig?.get(type) ?: emptyList())
                 .ifEmpty { DEFAULTS[type] ?: emptyList() }
@@ -155,12 +161,26 @@ class EndpointResolver @Inject constructor(
             val source = sourcesProvider.get()[type]
             // The probe must use the candidate's own profile: a poster-layout mirror probed
             // with card paths returns zero items and would be discarded as unhealthy.
+            val probed = mutableMapOf<String, Int>()
             val healthy = if (source != null)
-                pickHealthiest(candidates, MIN_HEALTHY_ITEMS) { c -> source.probeListCount(c.url, c.profile) }
+                pickHealthiest(candidates, MIN_HEALTHY_ITEMS) { c ->
+                    source.probeListCount(c.url, c.profile).also { probed[c.url] = it }
+                }
             else null
-            healthy ?: pickBestEndpoint(candidates) ?: candidates.first()
+            val chosen = healthy ?: pickBestEndpoint(candidates) ?: candidates.first()
+            val count = probed[chosen.url] ?: -1
+            healthReport[type] = EndpointHealth(
+                sourceType = type,
+                url = chosen.url,
+                profile = chosen.profile,
+                itemCount = count,
+                status = healthStatusOf(count, MIN_HEALTHY_ITEMS),
+                checkedAt = System.currentTimeMillis(),
+            )
+            chosen
         }
         resolved = newResolved
+        _health.value = healthReport
         lastRefreshAt = System.currentTimeMillis()
         runCatching {
             dataStore.edit { prefs ->
