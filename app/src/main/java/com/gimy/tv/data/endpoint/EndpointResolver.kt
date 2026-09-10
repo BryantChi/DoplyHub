@@ -17,12 +17,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -127,11 +129,32 @@ class EndpointResolver @Inject constructor(
         runCatching { refresh() }
     }
 
+    @Volatile
+    private var refreshJob: Job? = null
+
+    /** 啟動一輪重新探測；已經有一輪在跑就沿用同一個 Job，不排隊重跑。
+     *
+     *  跑在 internalScope 而不是呼叫端的 scope：呼叫端等到不耐煩放棄（或畫面被關掉）
+     *  時，探測要繼續跑完，下一次取用才拿得到新網址。 */
+    @Synchronized
+    private fun refreshInBackground(): Job =
+        refreshJob?.takeIf { it.isActive }
+            ?: internalScope.launch { runCatching { refresh() } }.also { refreshJob = it }
+
     /** Fire-and-forget refresh. Pull-to-refresh paths use this — current call uses cached URL,
      *  the next call sees the new URL once probing finishes. */
     fun forceRefreshAsync() {
-        internalScope.launch { runCatching { refresh() } }
+        refreshInBackground()
     }
+
+    /**
+     * 等這一輪重新探測結束，最多等 [budgetMs]；回傳是否等到。
+     *
+     * 「載入失敗」的重試需要這一次就換到活的鏡像，只丟 [forceRefreshAsync] 的話當次
+     * 仍用舊網址，使用者得按第二次才會生效。逾時只是放棄等待，不會取消探測。
+     */
+    suspend fun awaitRefresh(budgetMs: Long): Boolean =
+        withTimeoutOrNull(budgetMs) { refreshInBackground().join(); true } ?: false
 
     private suspend fun loadCache() {
         if (cacheLoaded) return
@@ -151,34 +174,16 @@ class EndpointResolver @Inject constructor(
 
     private suspend fun refresh() = refreshMutex.withLock {
         val remoteConfig = fetchRemoteConfig()
-        val healthReport = mutableMapOf<SourceType, EndpointHealth>()
-        val newResolved = SourceType.values().associateWith { type ->
-            val candidates = (remoteConfig?.get(type) ?: emptyList())
-                .ifEmpty { DEFAULTS[type] ?: emptyList() }
-            if (candidates.isEmpty()) {
-                return@associateWith resolved[type] ?: DEFAULTS[type]!!.first()
-            }
-            val source = sourcesProvider.get()[type]
-            // The probe must use the candidate's own profile: a poster-layout mirror probed
-            // with card paths returns zero items and would be discarded as unhealthy.
-            val probed = mutableMapOf<String, Int>()
-            val healthy = if (source != null)
-                pickHealthiest(candidates, MIN_HEALTHY_ITEMS) { c ->
-                    source.probeListCount(c.url, c.profile).also { probed[c.url] = it }
-                }
-            else null
-            val chosen = healthy ?: pickBestEndpoint(candidates) ?: candidates.first()
-            val count = probed[chosen.url] ?: -1
-            healthReport[type] = EndpointHealth(
-                sourceType = type,
-                url = chosen.url,
-                profile = chosen.profile,
-                itemCount = count,
-                status = healthStatusOf(count, MIN_HEALTHY_ITEMS),
-                checkedAt = System.currentTimeMillis(),
-            )
-            chosen
+        // 各來源同時探測。原本是 associateWith 逐個跑，整輪耗時等於所有來源的加總
+        // （每個候選最多 PROBE_TIMEOUT_MS × 11 個來源），久到錯誤畫面按重試根本等不完，
+        // 只能做成 fire-and-forget、當次仍用舊網址。改成並行後整輪只等最慢的那一個。
+        val results = coroutineScope {
+            SourceType.values().map { type -> async { type to resolveOne(type, remoteConfig) } }.awaitAll()
         }
+        val newResolved = results.associate { (type, outcome) -> type to outcome.candidate }
+        val healthReport = results.mapNotNull { (type, outcome) ->
+            outcome.health?.let { type to it }
+        }.toMap()
         resolved = newResolved
         _health.value = healthReport
         lastRefreshAt = System.currentTimeMillis()
@@ -192,6 +197,42 @@ class EndpointResolver @Inject constructor(
                 prefs[LAST_REFRESH_KEY] = lastRefreshAt
             }
         }
+    }
+
+    private class ProbeOutcome(val candidate: EndpointCandidate, val health: EndpointHealth?)
+
+    /** 探測單一來源的候選清單並選出要用的那一個。沒有候選可探時沿用現值、不產生健康資料。 */
+    private suspend fun resolveOne(
+        type: SourceType,
+        remoteConfig: Map<SourceType, List<EndpointCandidate>>?,
+    ): ProbeOutcome {
+        val candidates = (remoteConfig?.get(type) ?: emptyList())
+            .ifEmpty { DEFAULTS[type] ?: emptyList() }
+        if (candidates.isEmpty()) {
+            return ProbeOutcome(resolved[type] ?: DEFAULTS[type]!!.first(), health = null)
+        }
+        val source = sourcesProvider.get()[type]
+        // The probe must use the candidate's own profile: a poster-layout mirror probed
+        // with card paths returns zero items and would be discarded as unhealthy.
+        val probed = mutableMapOf<String, Int>()
+        val healthy = if (source != null)
+            pickHealthiest(candidates, MIN_HEALTHY_ITEMS) { c ->
+                source.probeListCount(c.url, c.profile).also { probed[c.url] = it }
+            }
+        else null
+        val chosen = healthy ?: pickBestEndpoint(candidates) ?: candidates.first()
+        val count = probed[chosen.url] ?: -1
+        return ProbeOutcome(
+            candidate = chosen,
+            health = EndpointHealth(
+                sourceType = type,
+                url = chosen.url,
+                profile = chosen.profile,
+                itemCount = count,
+                status = healthStatusOf(count, MIN_HEALTHY_ITEMS),
+                checkedAt = System.currentTimeMillis(),
+            ),
+        )
     }
 
     private suspend fun fetchRemoteConfig(): Map<SourceType, List<EndpointCandidate>>? = withContext(Dispatchers.IO) {
