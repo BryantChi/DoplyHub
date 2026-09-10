@@ -21,6 +21,12 @@ interface FavoriteDao {
 
     @Query("DELETE FROM favorites WHERE vodId = :vodId AND sourceType = :sourceType")
     suspend fun delete(vodId: Long, sourceType: String)
+
+    @Query("SELECT * FROM favorites WHERE sourceType = :sourceType")
+    suspend fun getBySource(sourceType: String): List<FavoriteEntity>
+
+    @Query("UPDATE favorites SET title = :title WHERE vodId = :vodId AND sourceType = :sourceType")
+    suspend fun updateTitle(vodId: Long, sourceType: String, title: String): Int
 }
 
 @Dao
@@ -40,6 +46,12 @@ interface WatchHistoryDao {
 
     @Query("SELECT * FROM watch_history WHERE vodId = :vodId AND sourceType = :sourceType LIMIT 1")
     suspend fun getByVod(vodId: Long, sourceType: String): WatchHistoryEntity?
+
+    @Query("SELECT * FROM watch_history WHERE sourceType = :sourceType")
+    suspend fun getBySource(sourceType: String): List<WatchHistoryEntity>
+
+    @Query("UPDATE watch_history SET title = :title WHERE vodId = :vodId AND sourceType = :sourceType")
+    suspend fun updateTitle(vodId: Long, sourceType: String, title: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(history: WatchHistoryEntity)

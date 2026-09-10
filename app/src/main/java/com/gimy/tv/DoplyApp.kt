@@ -29,6 +29,8 @@ class DoplyApp : Application(), ImageLoaderFactory {
 
     @Inject lateinit var embedSlugDao: com.gimy.tv.data.local.dao.EmbedSlugDao
 
+    @Inject lateinit var jableTitleRepair: com.gimy.tv.data.repair.JableTitleRepair
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -46,6 +48,9 @@ class DoplyApp : Application(), ImageLoaderFactory {
                 cloudflareGateway.warmUp(
                     siteSources.get().values.mapNotNull { it.cloudflareWarmUpUrl }
                 )
+                // After the warm-up: jable is behind Cloudflare, so a repair attempted
+                // before the clearance exists would fail every row and achieve nothing.
+                jableTitleRepair.repairOnce()
             }
         }
 
