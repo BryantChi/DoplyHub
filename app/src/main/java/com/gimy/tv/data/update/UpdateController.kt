@@ -117,14 +117,25 @@ class UpdateController @Inject constructor(
         return true
     }
 
-    /** Open system settings so the user can grant "install unknown apps" for this app.
-     *  Required once on Android 8+; persists per-app afterwards. */
-    fun requestInstallPermission() {
-        val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-            data = Uri.parse("package:${context.packageName}")
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+    /** 開啟系統設定讓使用者授予「安裝未知應用程式」。Android 8+ 只需授予一次。
+     *
+     *  回傳 false 代表這台機器上找不到任何可開的設定頁。ACTION_MANAGE_UNKNOWN_APP_SOURCES
+     *  在不少 Android TV（Leanback 設定）上根本沒有對應的 Activity，原本無條件
+     *  startActivity 會直接丟 ActivityNotFoundException 讓 App 掛掉，所以逐個 fallback
+     *  並讓呼叫端能把「請自己去設定裡開」講給使用者聽。 */
+    fun requestInstallPermission(): Boolean {
+        val candidates = listOf(
+            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                .setData(Uri.parse("package:${context.packageName}")),
+            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES),
+            Intent(Settings.ACTION_SECURITY_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+        for (intent in candidates) {
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            if (runCatching { context.startActivity(intent) }.isSuccess) return true
         }
-        context.startActivity(intent)
+        return false
     }
 
     private suspend fun downloadApk(

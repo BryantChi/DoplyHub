@@ -19,6 +19,6 @@ class UpdateViewModel @Inject constructor(
     fun startDownload() = controller.startDownload()
     fun cancelDownload() = controller.cancelDownload()
     fun launchInstaller(): Boolean = controller.launchInstaller()
-    fun requestInstallPermission() = controller.requestInstallPermission()
+    fun requestInstallPermission(): Boolean = controller.requestInstallPermission()
     fun dismiss() = controller.dismiss()
 }

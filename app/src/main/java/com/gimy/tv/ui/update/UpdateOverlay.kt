@@ -32,6 +32,9 @@ import com.gimy.tv.ui.theme.*
 fun UpdateOverlay(viewModel: UpdateViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsState()
     var needsInstallPermission by remember { mutableStateOf(false) }
+    // 「重試安裝」按下去卻還是沒權限時，要讓畫面有反應——否則按鈕看起來完全沒作用。
+    var retryFailed by remember { mutableStateOf(false) }
+    var settingsUnavailable by remember { mutableStateOf(false) }
 
     // Cold-start check — fires once per Activity lifetime. Silent so a first-launch network
     // hiccup doesn't greet the user with an error dialog. Controller dedupes if already running.
@@ -62,17 +65,27 @@ fun UpdateOverlay(viewModel: UpdateViewModel = hiltViewModel()) {
         is UpdateState.ReadyToInstall -> if (needsInstallPermission) {
             PermissionDialog(
                 onGrant = {
-                    viewModel.requestInstallPermission()
-                    needsInstallPermission = false
-                    // Don't dismiss state — user returns to app, taps install again, retries launch
+                    // 這裡刻意不把 needsInstallPermission 設回 false：state 仍是 ReadyToInstall，
+                    // 而自動安裝的 LaunchedEffect 只以 state 當 key，不會因為旗標變動重跑。
+                    // 一旦把對話框收掉就會落到下面的 no-op 分支，使用者從設定頁回來後既沒有
+                    // 對話框也沒有安裝動作，更新就永久卡死。
+                    settingsUnavailable = !viewModel.requestInstallPermission()
+                    retryFailed = false
                 },
                 onLater = if (s.info.isMandatory) null else ({
                     needsInstallPermission = false
                     viewModel.dismiss()
                 }),
                 onRetry = {
-                    if (viewModel.launchInstaller()) needsInstallPermission = false
+                    if (viewModel.launchInstaller()) {
+                        needsInstallPermission = false
+                        retryFailed = false
+                    } else {
+                        retryFailed = true
+                    }
                 },
+                retryFailed = retryFailed,
+                settingsUnavailable = settingsUnavailable,
             )
         } else {
             // Installer launched successfully — state will return to Idle on next launchInstaller()
@@ -199,6 +212,8 @@ private fun PermissionDialog(
     onGrant: () -> Unit,
     onLater: (() -> Unit)?,
     onRetry: () -> Unit,
+    retryFailed: Boolean = false,
+    settingsUnavailable: Boolean = false,
 ) {
     AlertDialog(
         onDismissRequest = { onLater?.invoke() },
@@ -206,12 +221,31 @@ private fun PermissionDialog(
         shape = RoundedCornerShape(12.dp),
         title = { Text("需要授予安裝權限", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
         text = {
-            Text(
-                "請於系統設定中允許 Doply Hub 安裝應用程式，授予後返回此畫面再次點擊「重試安裝」。",
-                color = CinemaTextPrimary.copy(0.85f),
-                fontSize = 13.sp,
-                lineHeight = 20.sp,
-            )
+            Column {
+                Text(
+                    "請於系統設定中允許 Doply Hub 安裝應用程式，授予後返回此畫面再次點擊「重試安裝」。",
+                    color = CinemaTextPrimary.copy(0.85f),
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp,
+                )
+                if (settingsUnavailable) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "這台裝置找不到對應的設定頁，請手動到「設定 → 安全性 / 應用程式 → 安裝未知應用程式」開啟。",
+                        color = CinemaRed,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    )
+                } else if (retryFailed) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "尚未取得安裝權限，請先點「前往設定」授予後再回來重試。",
+                        color = CinemaRed,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
+            }
         },
         confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
