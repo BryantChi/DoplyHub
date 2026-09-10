@@ -240,28 +240,34 @@ class VodRepositoryImpl @Inject constructor(
         val result = coroutineScope {
             val deferreds = sources.map { src ->
                 async {
+                    // null 代表這個來源整個失敗（逾時／連不上／解析不到），跟「有回應但沒有
+                    // 符合的片」要分開，否則無法判斷這次搜尋值不值得放進快取。
                     try {
                         withTimeout(5_000) { src.search(keyword, page) }
                     } catch (_: Exception) {
-                        PaginatedResult(emptyList<Vod>(), page, 0, false)
+                        null
                     }
                 }
             }
             val results = deferreds.map { it.await() }
+            val answered = results.filterNotNull()
 
             // Merge in priority order, dedupe across sources, drop adult content
             var merged = emptyList<Vod>()
-            for (r in results) merged = mergeSearchResults(merged, r.items.filterNot { looksAdult(it) })
+            for (r in answered) merged = mergeSearchResults(merged, r.items.filterNot { looksAdult(it) })
 
-            PaginatedResult(
+            answered.isNotEmpty() to PaginatedResult(
                 items = merged,
                 currentPage = page,
-                totalPages = results.maxOfOrNull { it.totalPages } ?: 0,
-                hasMore = results.any { it.hasMore },
+                totalPages = answered.maxOfOrNull { it.totalPages } ?: 0,
+                hasMore = answered.any { it.hasMore },
             )
         }
-        searchCachePut(cacheKey, result)
-        return result
+        val (anySourceAnswered, searchResult) = result
+        // 全部來源都失敗時不進快取。斷網或鏡像掛掉那一刻的空結果若被存進 60 秒快取，
+        // 使用者按重試會立刻拿到同一份空結果，看起來就是按了完全沒作用。
+        if (anySourceAnswered) searchCachePut(cacheKey, searchResult)
+        return searchResult
     }
 
     private fun mergeSearchResults(primary: List<Vod>, secondary: List<Vod>): List<Vod> {
