@@ -75,4 +75,23 @@ class EndpointCandidateTest {
     @Test fun `profile matching ignores case`() {
         assertThat(gimyMirrorFor("POSTER").layout).isEqualTo(GimyLayout.POSTER)
     }
+
+    /**
+     * Search paths differ per mirror too: gimyai.tw serves /find/ while the others use
+     * /search/. The first version of GimyPaths omitted this field because both mirrors then
+     * in use shared /search/ — adding gimyai.tw as a fallback made that assumption wrong, and
+     * a hardcoded /search/ would hit a dead path the moment the resolver switched to it.
+     */
+    @Test fun `card and browse mirrors search under slash-search`() {
+        assertThat(gimyMirrorFor("card").paths.search).isEqualTo("/search")
+        assertThat(gimyMirrorFor("browse").paths.search).isEqualTo("/search")
+    }
+
+    @Test fun `poster mirror searches under slash-find`() {
+        assertThat(gimyMirrorFor("poster").paths.search).isEqualTo("/find")
+    }
+
+    @Test fun `unknown profile falls back to slash-search`() {
+        assertThat(gimyMirrorFor(null).paths.search).isEqualTo("/search")
+    }
 }

@@ -31,7 +31,7 @@ data class GimyMirror(val paths: GimyPaths, val layout: GimyLayout)
  * be worse than trying the most common template.
  */
 internal fun gimyMirrorFor(profile: String?): GimyMirror = when (profile?.trim()?.lowercase()) {
-    "poster" -> GimyMirror(GimyPaths(list = "/genre", detail = "/detail", episode = "/play"), GimyLayout.POSTER)
-    "browse" -> GimyMirror(GimyPaths(list = "/browse", detail = "/title", episode = "/watch"), GimyLayout.CARD)
-    else -> GimyMirror(GimyPaths(list = "/type", detail = "/vod", episode = "/ep"), GimyLayout.CARD)
+    "poster" -> GimyMirror(GimyPaths(list = "/genre", detail = "/detail", episode = "/play", search = "/find"), GimyLayout.POSTER)
+    "browse" -> GimyMirror(GimyPaths(list = "/browse", detail = "/title", episode = "/watch", search = "/search"), GimyLayout.CARD)
+    else -> GimyMirror(GimyPaths(list = "/type", detail = "/vod", episode = "/ep", search = "/search"), GimyLayout.CARD)
 }

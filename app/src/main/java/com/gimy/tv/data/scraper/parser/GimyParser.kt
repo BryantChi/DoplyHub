@@ -20,9 +20,12 @@ import org.jsoup.nodes.Document
  * [list] is used by the Source to build URLs; the parser only needs [detail] and [episode].
  */
 data class GimyPaths(
-    val list: String,      // "/type"  | "/browse"
-    val detail: String,    // "/vod"   | "/title"
-    val episode: String,   // "/ep"    | "/watch"
+    val list: String,      // "/type"  | "/browse" | "/genre"
+    val detail: String,    // "/vod"   | "/title"   | "/detail"
+    val episode: String,   // "/ep"    | "/watch"   | "/play"
+    /** "/search" on most mirrors, "/find" on the poster one. Defaulted so existing
+     *  construction sites keep working. */
+    val search: String = "/search",
 )
 
 /**

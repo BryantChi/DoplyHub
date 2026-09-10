@@ -71,10 +71,12 @@ class GimyTvSource @Inject constructor(
     override suspend fun search(keyword: String, page: Int): PaginatedResult<Vod> =
         withContext(Dispatchers.IO) {
             val enc = java.net.URLEncoder.encode(keyword, "UTF-8")
-            val doc = fetchDocument("$baseUrl/search/$enc----------$page---.html")
+            val (paths, parser) = mirror()
+            // Search path follows the mirror too — the poster mirror serves /find/.
+            val doc = fetchDocument("$baseUrl${paths.search}/$enc----------$page---.html")
             doc.select("#stickyside").remove()
             // Search pages use the search-item template, not the card template used by lists.
-            mirror().second.parseSearchResults(doc, baseUrl, page)
+            parser.parseSearchResults(doc, baseUrl, page)
         }
 
     override suspend fun probeListCount(baseUrl: String, profile: String?): Int = withContext(Dispatchers.IO) {
