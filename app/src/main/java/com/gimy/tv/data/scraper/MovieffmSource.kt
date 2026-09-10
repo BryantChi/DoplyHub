@@ -145,6 +145,27 @@ class MovieffmSource @Inject constructor(
      *   <div class="data"><h3><a href="/movies/SLUG/">TITLE</a></h3><span>2017/11/02</span></div>
      * </article>
      */
+    /**
+     * 健康探測。原本沒實作，吃介面預設的 -1，等於健康機制對 MovieFFM 完全是盲的：
+     * 站方改版或這台機器連不到 movieffm.net 時，首頁只會安靜地少掉整組 FFM 列，
+     * 設定頁的來源管理也看不出任何異狀。
+     *
+     * 刻意不走 parseVodList：那條路徑會把 slug 寫進 Room，而探測用的是「候選」網址，
+     * 不該讓一個還沒被採用的網域污染 slug 對照表。條件必須與 parseVodList 的接受條件
+     * 一致（卡片 → 連結 → slug → 標題），否則探測會說健康、實際解析卻是 0 筆。
+     */
+    override suspend fun probeListCount(baseUrl: String, profile: String?): Int = withContext(Dispatchers.IO) {
+        runCatching {
+            val doc = Jsoup.parse(fetchHtml("$baseUrl/movies/"), baseUrl)
+            doc.select("article.item").count { card ->
+                val linkEl = card.selectFirst("h3 a") ?: card.selectFirst(".poster a")
+                val href = linkEl?.attr("abs:href")?.ifBlank { linkEl.attr("href") } ?: ""
+                Regex("/(movies|drama|tvshows)/([^/]+)/?$").containsMatchIn(href) &&
+                    !card.selectFirst("h3 a")?.text()?.trim().isNullOrBlank()
+            }
+        }.getOrDefault(0)
+    }
+
     private suspend fun parseVodList(doc: Document, page: Int): PaginatedResult<Vod> {
         val items = mutableListOf<Vod>()
         val slugEntities = mutableListOf<MovieffmSlugEntity>()
