@@ -32,6 +32,9 @@ interface VodRepository {
     ): VodDetail
     suspend fun getGimyHomeRows(forceRefresh: Boolean = false): List<HomeRowData>
     suspend fun getMovieffmHomeRows(forceRefresh: Boolean = false): List<HomeRowData>
+
+    /** 丟掉記憶體內的首頁／搜尋／詳情快取。清除快取與重試路徑用，讓下一次取用真的重打。 */
+    fun clearMemoryCaches()
 }
 
 interface FavoriteRepository {

@@ -47,6 +47,8 @@ fun SettingsScreen(
     val versionName = remember { currentVersionName(ctx) }
     val enabledSources by settingsVm.enabledSources.collectAsState()
     val endpointHealth by settingsVm.endpointHealth.collectAsState()
+    val cacheClearing by settingsVm.cacheClearing.collectAsState()
+    val cacheClearResult by settingsVm.cacheClearResult.collectAsState()
     val adultEnabled by adultVm.enabled.collectAsState()
     val pinRequired by adultVm.pinRequired.collectAsState()
     val pinHash by adultVm.pinHash.collectAsState()
@@ -97,6 +99,33 @@ fun SettingsScreen(
                                 fontSize = 13.sp,
                             )
                         }
+                    }
+                }
+            }
+
+            item {
+                SettingSection(title = "儲存空間") {
+                    Text(
+                        "清除網頁回應、封面圖與暫存的清單資料，並重新檢查各站可用網址。" +
+                            "站方改版或換網址後若出現內容不更新、一直載入失敗，先清一次快取。" +
+                            "收藏與觀看紀錄不受影響。",
+                        color = CinemaTextMuted, fontSize = 12.sp, lineHeight = 18.sp,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    DoplyButton(
+                        onClick = { settingsVm.clearCache() },
+                        enabled = !cacheClearing,
+                        containerColor = CinemaRed,
+                        shape = RoundedCornerShape(6.dp),
+                    ) {
+                        Text(
+                            if (cacheClearing) "清除中…" else "清除快取",
+                            color = Color.White, fontSize = 13.sp,
+                        )
+                    }
+                    cacheClearResult?.let { msg ->
+                        Spacer(Modifier.height(10.dp))
+                        Text(msg, color = CinemaTextMuted, fontSize = 12.sp, lineHeight = 18.sp)
                     }
                 }
             }

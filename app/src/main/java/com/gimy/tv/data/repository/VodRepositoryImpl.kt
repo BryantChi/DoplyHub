@@ -719,6 +719,15 @@ class VodRepositoryImpl @Inject constructor(
         205 to 4, 207 to 14, 208 to 15, 206 to 29
     )
 
+    override fun clearMemoryCaches() {
+        gimyHomeCache = null
+        gimyHomeCacheTime = 0L
+        movieffmHomeCache = null
+        movieffmHomeCacheTime = 0L
+        searchCache.clear()
+        detailCache.clear()
+    }
+
     override suspend fun getGimyHomeRows(forceRefresh: Boolean): List<HomeRowData> {
         // Return memory cache if fresh, unless forceRefresh bypasses it
         if (!forceRefresh) {
