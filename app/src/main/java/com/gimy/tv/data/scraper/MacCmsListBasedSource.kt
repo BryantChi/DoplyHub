@@ -53,10 +53,11 @@ abstract class MacCmsListBasedSource(
         else "$baseUrl$listUrlPath/$typeId-$page.html"
 
     /** Search URL. Default: form GET style with wd query param. */
-    protected open fun buildSearchUrl(keyword: String, page: Int): String {
-        val enc = URLEncoder.encode(keyword, "UTF-8")
-        return "$baseUrl/vodsearch/-------------.html?wd=$enc"
-    }
+    /** Search endpoint shape. Sites that rename list/detail paths usually rename this too. */
+    protected open val searchStyle: MacCmsSearchStyle = MacCmsSearchStyle.VODSEARCH
+
+    protected open fun buildSearchUrl(keyword: String, page: Int): String =
+        macCmsSearchUrl(baseUrl, keyword, searchStyle)
 
     /**
      * Stability order by Chinese line name. Lower index = more preferred.

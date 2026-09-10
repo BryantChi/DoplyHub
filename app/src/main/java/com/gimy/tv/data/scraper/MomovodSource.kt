@@ -14,6 +14,8 @@ class MomovodSource @Inject constructor(
     override val detailUrlPath = "/vod"
     override val playUrlPath = "/play"
     override val listUrlPath = "/type"   // momovod uses /type/{id}.html, not /vodtype/
+    // Same renaming applies to search: /search.html?wd=, not /vodsearch/.
+    override val searchStyle = MacCmsSearchStyle.SEARCH_HTML
 
     /** Path-based search: /search/{keyword}.html (verified 200 OK) */
     override fun buildSearchUrl(keyword: String, page: Int): String =
