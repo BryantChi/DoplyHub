@@ -12,6 +12,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -47,6 +48,10 @@ class CloudflareGateway @Inject constructor(
      *  and without this each would spawn its own WebView for the same challenge. */
     private val hostLocks = ConcurrentHashMap<String, Mutex>()
 
+    /** Outlives any single request so a solve abandoned by one can finish for the next. */
+    private val backgroundScope =
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+
     /** Hosts currently being solved. The search screen reads this to say "verifying" instead
      *  of silently returning fewer sources. */
     private val _solvingHosts = MutableStateFlow<Set<String>>(emptySet())
@@ -63,6 +68,11 @@ class CloudflareGateway @Inject constructor(
         targets
             .map { url -> async { runCatching { url.toHttpUrlOrNull()?.let { u -> solve(u) } } } }
             .awaitAll()
+    }
+
+    /** Solve without blocking the caller — used when a foreground request runs out of budget. */
+    fun solveInBackground(url: HttpUrl) {
+        backgroundScope.launch { runCatching { solve(url) } }
     }
 
     suspend fun solve(url: HttpUrl): Boolean {
@@ -157,7 +167,16 @@ class CloudflareInterceptor @Inject constructor(
         val preview = runCatching { response.peekBody(PEEK_BYTES).string() }.getOrDefault("")
         if (!isCloudflareChallenge(response.code, preview)) return response
 
-        val solved = runBlocking { gateway.solve(request.url) }
+        // Bounded wait: search gives each source 5s, and a blocked thread also holds an
+        // OkHttp dispatcher slot. Exceeding the budget hands the request back while the
+        // solve continues in the background for the next one.
+        val solved = runBlocking {
+            awaitSolveWithin(
+                budgetMs = FOREGROUND_SOLVE_BUDGET_MS,
+                solve = { gateway.solve(request.url) },
+                continueInBackground = { gateway.solveInBackground(request.url) },
+            )
+        }
         if (!solved) return response
 
         response.close()
