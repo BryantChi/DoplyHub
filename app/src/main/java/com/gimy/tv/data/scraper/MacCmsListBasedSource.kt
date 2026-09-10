@@ -121,7 +121,7 @@ abstract class MacCmsListBasedSource(
             parseVodList(fetchDocument(buildSearchUrl(keyword, page)), page)
         }
 
-    override suspend fun probeListCount(baseUrl: String): Int = withContext(Dispatchers.IO) {
+    override suspend fun probeListCount(baseUrl: String, profile: String?): Int = withContext(Dispatchers.IO) {
         runCatching {
             val url = "$baseUrl$listUrlPath/2.html"
             parseVodList(Jsoup.parse(fetchHtml(url), url), 1).items.size

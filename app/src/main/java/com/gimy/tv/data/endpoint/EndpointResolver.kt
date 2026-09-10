@@ -65,21 +65,27 @@ class EndpointResolver @Inject constructor(
         // gimy01.tv → gimy01.co → gitube.tv. Excluded on purpose: gimymax.com (2026-05
         // redirect-announcement page, 200 OK with no content) and gimyplus.com (2026-09
         // turned into a link-index tool with no /vod/ pages).
-        private val DEFAULTS: Map<SourceType, List<String>> = mapOf(
-            SourceType.GIMYMAX to listOf("https://gitube.tv"),
-            SourceType.GIMYTV to listOf("https://gimytv.me"),
-            SourceType.MOVIEFFM to listOf("https://www.movieffm.net"),
-            SourceType.GIMY_TW to listOf("https://gimy.tw"),
-            SourceType.EYNY_TV to listOf("https://eynytv.com"),
-            SourceType.IMAPLE_TV to listOf("https://imaple.tv"),
-            SourceType.MOMOVOD to listOf("https://momovod.app"),
-            SourceType.KUBO123 to listOf("https://123kubo.net"),
-            SourceType.JABLE_TV to listOf("https://jable.tv"),
-            SourceType.XNXX to listOf("https://www.xnxx.com"),
-            SourceType.FORUM5278 to listOf("https://5278.cc"),
+        private val DEFAULTS: Map<SourceType, List<EndpointCandidate>> = mapOf(
+            SourceType.GIMYMAX to listOf(EndpointCandidate("https://gitube.tv", "browse")),
+            // gimyai.tw mirrors gimytv.me's catalogue with identical ids (same id opens the
+            // same title on both), so it is a genuine fallback rather than a separate site.
+            SourceType.GIMYTV to listOf(
+                EndpointCandidate("https://gimytv.me", "card"),
+                EndpointCandidate("https://gimyai.tw", "poster"),
+            ),
+            SourceType.MOVIEFFM to listOf(EndpointCandidate("https://www.movieffm.net", null)),
+            SourceType.GIMY_TW to listOf(EndpointCandidate("https://gimy.tw", null)),
+            SourceType.EYNY_TV to listOf(EndpointCandidate("https://eynytv.com", null)),
+            SourceType.IMAPLE_TV to listOf(EndpointCandidate("https://imaple.tv", null)),
+            SourceType.MOMOVOD to listOf(EndpointCandidate("https://momovod.app", null)),
+            SourceType.KUBO123 to listOf(EndpointCandidate("https://123kubo.net", null)),
+            SourceType.JABLE_TV to listOf(EndpointCandidate("https://jable.tv", null)),
+            SourceType.XNXX to listOf(EndpointCandidate("https://www.xnxx.com", null)),
+            SourceType.FORUM5278 to listOf(EndpointCandidate("https://5278.cc", null)),
         )
 
         private fun keyFor(type: SourceType) = stringPreferencesKey("url_${type.name}")
+        private fun profileKeyFor(type: SourceType) = stringPreferencesKey("profile_${type.name}")
         private val LAST_REFRESH_KEY = longPreferencesKey("last_refresh_at")
     }
 
@@ -88,7 +94,7 @@ class EndpointResolver @Inject constructor(
     private val internalScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
-    private var resolved: Map<SourceType, String> = DEFAULTS.mapValues { it.value.first() }
+    private var resolved: Map<SourceType, EndpointCandidate> = DEFAULTS.mapValues { it.value.first() }
     @Volatile
     private var lastRefreshAt: Long = 0L
     @Volatile
@@ -97,7 +103,11 @@ class EndpointResolver @Inject constructor(
     private var updateConfig: UpdateConfig = UpdateConfig.DEFAULT
 
     fun getBaseUrl(sourceType: SourceType): String =
-        resolved[sourceType] ?: DEFAULTS[sourceType]!!.first()
+        (resolved[sourceType] ?: DEFAULTS[sourceType]!!.first()).url
+
+    /** Which template the currently selected mirror serves; null means the source default. */
+    fun getProfile(sourceType: SourceType): String? =
+        (resolved[sourceType] ?: DEFAULTS[sourceType]!!.first()).profile
 
     fun getUpdateConfig(): UpdateConfig = updateConfig
 
@@ -124,7 +134,9 @@ class EndpointResolver @Inject constructor(
             val prefs = dataStore.data.first()
             val updated = resolved.toMutableMap()
             SourceType.values().forEach { type ->
-                prefs[keyFor(type)]?.takeIf { it.isNotBlank() }?.let { updated[type] = it }
+                prefs[keyFor(type)]?.takeIf { it.isNotBlank() }?.let { url ->
+                    updated[type] = EndpointCandidate(url, prefs[profileKeyFor(type)]?.takeIf { it.isNotBlank() })
+                }
             }
             resolved = updated
             lastRefreshAt = prefs[LAST_REFRESH_KEY] ?: 0L
@@ -137,10 +149,14 @@ class EndpointResolver @Inject constructor(
         val newResolved = SourceType.values().associateWith { type ->
             val candidates = (remoteConfig?.get(type) ?: emptyList())
                 .ifEmpty { DEFAULTS[type] ?: emptyList() }
-            if (candidates.isEmpty()) return@associateWith resolved[type] ?: ""
+            if (candidates.isEmpty()) {
+                return@associateWith resolved[type] ?: DEFAULTS[type]!!.first()
+            }
             val source = sourcesProvider.get()[type]
+            // The probe must use the candidate's own profile: a poster-layout mirror probed
+            // with card paths returns zero items and would be discarded as unhealthy.
             val healthy = if (source != null)
-                pickHealthiest(candidates, MIN_HEALTHY_ITEMS) { url -> source.probeListCount(url) }
+                pickHealthiest(candidates, MIN_HEALTHY_ITEMS) { c -> source.probeListCount(c.url, c.profile) }
             else null
             healthy ?: pickBestEndpoint(candidates) ?: candidates.first()
         }
@@ -148,13 +164,17 @@ class EndpointResolver @Inject constructor(
         lastRefreshAt = System.currentTimeMillis()
         runCatching {
             dataStore.edit { prefs ->
-                newResolved.forEach { (type, url) -> prefs[keyFor(type)] = url }
+                newResolved.forEach { (type, candidate) ->
+                    prefs[keyFor(type)] = candidate.url
+                    candidate.profile?.let { prefs[profileKeyFor(type)] = it }
+                        ?: prefs.remove(profileKeyFor(type))
+                }
                 prefs[LAST_REFRESH_KEY] = lastRefreshAt
             }
         }
     }
 
-    private suspend fun fetchRemoteConfig(): Map<SourceType, List<String>>? = withContext(Dispatchers.IO) {
+    private suspend fun fetchRemoteConfig(): Map<SourceType, List<EndpointCandidate>>? = withContext(Dispatchers.IO) {
         runCatching {
             withTimeout(FETCH_TIMEOUT_MS) {
                 val req = Request.Builder().url(REMOTE_URL).get().build()
@@ -167,7 +187,7 @@ class EndpointResolver @Inject constructor(
         }.getOrNull()
     }
 
-    private fun parseConfig(json: String): Map<SourceType, List<String>>? = runCatching {
+    private fun parseConfig(json: String): Map<SourceType, List<EndpointCandidate>>? = runCatching {
         val root = JSONObject(json)
 
         // Side effect: also extract update block (if present), update volatile updateConfig.
@@ -202,13 +222,22 @@ class EndpointResolver @Inject constructor(
             "xnxx" to SourceType.XNXX,
             "forum5278" to SourceType.FORUM5278,
         )
-        val result = mutableMapOf<SourceType, List<String>>()
+        val result = mutableMapOf<SourceType, List<EndpointCandidate>>()
         keyMap.forEach { (key, type) ->
             // Look first in `endpoints`, then fall through to `adult_endpoints`.
             // (No conflict in practice — keys partition cleanly between the two objects.)
             val arr = endpoints?.optJSONArray(key) ?: adultEndpoints?.optJSONArray(key) ?: return@forEach
+            // Entries may be a bare URL string (original schema) or an object carrying the
+            // mirror's profile. Both forms coexist so an older config still parses.
             val list = (0 until arr.length()).mapNotNull { idx ->
-                arr.optString(idx, "").trim().takeIf { it.isNotBlank() }
+                when (val raw = arr.opt(idx)) {
+                    is JSONObject -> endpointCandidate(
+                        raw.optString("url", null),
+                        raw.optString("profile", null),
+                    )
+                    is String -> endpointCandidate(raw, null)
+                    else -> null
+                }
             }
             if (list.isNotEmpty()) result[type] = list
         }
@@ -217,31 +246,31 @@ class EndpointResolver @Inject constructor(
 
     /** Probe all candidates in parallel; among successful ones, return first by priority order.
      *  Returns null if every probe failed/timed out — caller falls back to first candidate. */
-    private suspend fun pickBestEndpoint(candidates: List<String>): String? = coroutineScope {
-        val successful = candidates.map { url ->
+    private suspend fun pickBestEndpoint(candidates: List<EndpointCandidate>): EndpointCandidate? = coroutineScope {
+        val successful = candidates.map { candidate ->
             async(Dispatchers.IO) {
                 runCatching {
                     withTimeout(PROBE_TIMEOUT_MS) {
-                        val req = Request.Builder().url(url).head().build()
+                        val req = Request.Builder().url(candidate.url).head().build()
                         okHttpClient.newCall(req).execute().use { resp ->
-                            url.takeIf { resp.isSuccessful }
+                            candidate.url.takeIf { resp.isSuccessful }
                         }
                     }
                 }.getOrNull()
             }
-        }.awaitAll().toSet()
-        candidates.firstOrNull { it in successful }
+        }.awaitAll().filterNotNull().toSet()
+        candidates.firstOrNull { it.url in successful }
     }
 }
 
 /** Pure selection: returns the first candidate (by priority order) whose probe count >= minItems;
  *  null if none qualify. A probe returning -1 (unsupported) or 0 (broken) counts as unhealthy.
  *  Extracted for unit testing. */
-internal suspend fun pickHealthiest(
-    candidates: List<String>,
+internal suspend fun <T> pickHealthiest(
+    candidates: List<T>,
     minItems: Int,
-    probe: suspend (String) -> Int,
-): String? {
+    probe: suspend (T) -> Int,
+): T? {
     for (url in candidates) {
         val count = runCatching { probe(url) }.getOrDefault(-1)
         if (count >= minItems) return url

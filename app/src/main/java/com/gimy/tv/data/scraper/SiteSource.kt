@@ -25,5 +25,12 @@ interface SiteSource {
      */
     val cloudflareWarmUpUrl: String? get() = null
 
-    suspend fun probeListCount(baseUrl: String): Int = -1
+    /**
+     * Item count parsed from [baseUrl]'s list page; -1 when unsupported.
+     *
+     * [profile] identifies the mirror's template so a source with several differently-shaped
+     * mirrors probes each with its own paths — probing a poster mirror with card paths would
+     * return 0 and wrongly mark a healthy endpoint as broken.
+     */
+    suspend fun probeListCount(baseUrl: String, profile: String? = null): Int = -1
 }

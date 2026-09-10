@@ -1,11 +1,21 @@
 {
-  "version": 3,
+  "version": 4,
   "endpoints": {
     "gimymax": [
-      "https://gitube.tv"
+      {
+        "url": "https://gitube.tv",
+        "profile": "browse"
+      }
     ],
     "gimytv": [
-      "https://gimytv.me"
+      {
+        "url": "https://gimytv.me",
+        "profile": "card"
+      },
+      {
+        "url": "https://gimyai.tw",
+        "profile": "poster"
+      }
     ],
     "movieffm": [
       "https://www.movieffm.net"

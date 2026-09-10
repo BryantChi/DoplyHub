@@ -1,6 +1,7 @@
 package com.gimy.tv.data.scraper
 
 import com.gimy.tv.data.endpoint.EndpointResolver
+import com.gimy.tv.data.endpoint.gimyMirrorFor
 import com.gimy.tv.data.scraper.parser.GimyParser
 import com.gimy.tv.data.scraper.parser.GimyPaths
 import com.gimy.tv.domain.model.*
@@ -20,8 +21,19 @@ class GimyTvSource @Inject constructor(
     override val sourceType = SourceType.GIMYTV
     override val baseUrl: String get() = endpointResolver.getBaseUrl(sourceType)
 
-    private val paths = GimyPaths(list = "/type", detail = "/vod", episode = "/ep")
-    private val parser = GimyParser(sourceType, paths)
+    // Paths and template follow whichever mirror EndpointResolver settled on, so a
+    // fallback to a differently-shaped mirror parses correctly instead of silently
+    // returning nothing. Cached per profile — rebuilding compiles regexes each time.
+    private var mirrorCache: Pair<String?, Pair<GimyPaths, GimyParser>>? = null
+
+    private fun mirror(): Pair<GimyPaths, GimyParser> {
+        val profile = endpointResolver.getProfile(sourceType)
+        mirrorCache?.takeIf { it.first == profile }?.let { return it.second }
+        val m = gimyMirrorFor(profile)
+        val built = m.paths to GimyParser(sourceType, m.paths, m.layout)
+        mirrorCache = profile to built
+        return built
+    }
 
     // Only the search path is challenged; list/detail/play are served normally.
     override val cloudflareWarmUpUrl: String
@@ -38,6 +50,7 @@ class GimyTvSource @Inject constructor(
 
     override suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod> =
         withContext(Dispatchers.IO) {
+            val (paths, parser) = mirror()
             val url = if (page <= 1) "$baseUrl${paths.list}/$typeId.html"
             else "$baseUrl${paths.list}/$typeId-$page.html"
             parser.parseVodList(fetchDocument(url), baseUrl, page)
@@ -45,6 +58,7 @@ class GimyTvSource @Inject constructor(
 
     override suspend fun fetchVodDetail(vodId: Long): VodDetail =
         withContext(Dispatchers.IO) {
+            val (paths, parser) = mirror()
             parser.parseVodDetail(fetchDocument("$baseUrl${paths.detail}/$vodId.html"), vodId, baseUrl)
         }
 
@@ -60,13 +74,16 @@ class GimyTvSource @Inject constructor(
             val doc = fetchDocument("$baseUrl/search/$enc----------$page---.html")
             doc.select("#stickyside").remove()
             // Search pages use the search-item template, not the card template used by lists.
-            parser.parseSearchResults(doc, baseUrl, page)
+            mirror().second.parseSearchResults(doc, baseUrl, page)
         }
 
-    override suspend fun probeListCount(baseUrl: String): Int = withContext(Dispatchers.IO) {
+    override suspend fun probeListCount(baseUrl: String, profile: String?): Int = withContext(Dispatchers.IO) {
         runCatching {
-            val doc = Jsoup.parse(fetchHtml("$baseUrl${paths.list}/2.html"), baseUrl)
-            parser.parseVodList(doc, baseUrl, 1).items.size
+            // Probe the candidate with ITS OWN profile, not the currently selected one.
+            val m = gimyMirrorFor(profile)
+            val probeParser = GimyParser(sourceType, m.paths, m.layout)
+            val doc = Jsoup.parse(fetchHtml("$baseUrl${m.paths.list}/2.html"), baseUrl)
+            probeParser.parseVodList(doc, baseUrl, 1).items.size
         }.getOrDefault(0)
     }
 
