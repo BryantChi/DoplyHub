@@ -104,3 +104,16 @@ interface MovieffmSlugDao {
     @Query("DELETE FROM movieffm_slugs WHERE cachedAt < :thresholdMs")
     suspend fun pruneOlderThan(thresholdMs: Long): Int
 }
+
+
+@Dao
+interface EmbedSlugDao {
+    @Query("SELECT slug FROM embed_slugs WHERE vodId = :vodId AND sourceType = :sourceType LIMIT 1")
+    suspend fun getSlug(vodId: Long, sourceType: String): String?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(rows: List<EmbedSlugEntity>)
+
+    @Query("DELETE FROM embed_slugs WHERE cachedAt < :thresholdMs")
+    suspend fun pruneOlderThan(thresholdMs: Long): Int
+}

@@ -27,6 +27,8 @@ class DoplyApp : Application(), ImageLoaderFactory {
             @JvmSuppressWildcards com.gimy.tv.data.scraper.SiteSource>>
     @Inject lateinit var movieffmSlugDao: MovieffmSlugDao
 
+    @Inject lateinit var embedSlugDao: com.gimy.tv.data.local.dao.EmbedSlugDao
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -56,6 +58,8 @@ class DoplyApp : Application(), ImageLoaderFactory {
             runCatching {
                 val cutoff = System.currentTimeMillis() - 30L * 24 * 3600 * 1000
                 movieffmSlugDao.pruneOlderThan(cutoff)
+                // Same treatment for the jable/xnxx slug map added in v3.1.0.
+                embedSlugDao.pruneOlderThan(cutoff)
             }
         }
     }

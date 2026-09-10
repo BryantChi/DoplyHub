@@ -60,6 +60,27 @@ object DatabaseModule {
         }
     }
 
+    /**
+     * v3.1.0 — persist the slug↔id map for jable / xnxx.
+     *
+     * Their ids are one-way hashes of the detail slug and the reverse map lived only in
+     * memory, so favourites and history opened after a restart failed with "slug not in
+     * cache". Composite key because both sources share the table.
+     */
+    private val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `embed_slugs` (
+                    `vodId` INTEGER NOT NULL,
+                    `slug` TEXT NOT NULL,
+                    `sourceType` TEXT NOT NULL,
+                    `cachedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`sourceType`, `vodId`)
+                )
+            """.trimIndent())
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): GimyDatabase {
@@ -67,7 +88,7 @@ object DatabaseModule {
             context,
             GimyDatabase::class.java,
             "gimy_tv.db"
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
          .fallbackToDestructiveMigration()
          .build()
     }
@@ -86,4 +107,8 @@ object DatabaseModule {
 
     @Provides
     fun provideMovieffmSlugDao(db: GimyDatabase): MovieffmSlugDao = db.movieffmSlugDao()
+
+    @Provides
+    @Singleton
+    fun provideEmbedSlugDao(db: GimyDatabase): EmbedSlugDao = db.embedSlugDao()
 }

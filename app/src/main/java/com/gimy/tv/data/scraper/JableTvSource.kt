@@ -27,10 +27,11 @@ import javax.inject.Singleton
 class JableTvSource @Inject constructor(
     client: OkHttpClient,
     endpointResolver: EndpointResolver,
+    embedSlugDao: com.gimy.tv.data.local.dao.EmbedSlugDao,
     // Jable is the only EmbeddedHlsSource behind Cloudflare; XNXX deliberately does not
     // pass this and keeps the original UA.
     webViewUserAgentProvider: com.gimy.tv.data.network.WebViewUserAgentProvider,
-) : EmbeddedHlsSource(client, endpointResolver, webViewUserAgentProvider) {
+) : EmbeddedHlsSource(client, endpointResolver, webViewUserAgentProvider, embedSlugDao = embedSlugDao) {
 
     override val sourceType = SourceType.JABLE_TV
 

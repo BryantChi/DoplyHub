@@ -11,9 +11,10 @@ import com.gimy.tv.data.local.entity.*
         WatchHistoryEntity::class,
         VodCacheEntity::class,
         SearchHistoryEntity::class,
-        MovieffmSlugEntity::class
+        MovieffmSlugEntity::class,
+        EmbedSlugEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class GimyDatabase : RoomDatabase() {
@@ -22,4 +23,5 @@ abstract class GimyDatabase : RoomDatabase() {
     abstract fun vodCacheDao(): VodCacheDao
     abstract fun searchHistoryDao(): SearchHistoryDao
     abstract fun movieffmSlugDao(): MovieffmSlugDao
+    abstract fun embedSlugDao(): EmbedSlugDao
 }

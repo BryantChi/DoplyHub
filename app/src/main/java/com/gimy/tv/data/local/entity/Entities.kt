@@ -70,3 +70,23 @@ data class MovieffmSlugEntity(
      *  ancient by any prune query). */
     val cachedAt: Long = System.currentTimeMillis(),
 )
+
+
+/**
+ * Reverse map for slug-based embed sources (jable / xnxx).
+ *
+ * Their detail URLs are slugs but Vod.id must be a Long, so the id is a one-way hash of the
+ * slug. Favourites and history store only the id, so without this table the mapping dies
+ * with the process and every saved entry fails to open after a restart.
+ *
+ * Composite key: two sources share this table and their ids come from independent hash
+ * spaces, so a collision must not let one source read the other's slug.
+ */
+@Entity(tableName = "embed_slugs", primaryKeys = ["sourceType", "vodId"])
+data class EmbedSlugEntity(
+    val vodId: Long,
+    val slug: String,
+    val sourceType: String,
+    /** Lets the existing startup prune drop rows untouched for a long time. */
+    val cachedAt: Long = System.currentTimeMillis(),
+)

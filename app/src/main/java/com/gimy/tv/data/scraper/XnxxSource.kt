@@ -29,7 +29,8 @@ import javax.inject.Singleton
 class XnxxSource @Inject constructor(
     client: OkHttpClient,
     endpointResolver: EndpointResolver,
-) : EmbeddedHlsSource(client, endpointResolver) {
+    embedSlugDao: com.gimy.tv.data.local.dao.EmbedSlugDao,
+) : EmbeddedHlsSource(client, endpointResolver, webViewUserAgentProvider = null, embedSlugDao = embedSlugDao) {
 
     override val sourceType = SourceType.XNXX
 

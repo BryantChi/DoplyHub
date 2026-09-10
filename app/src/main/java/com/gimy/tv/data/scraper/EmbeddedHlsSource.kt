@@ -31,6 +31,9 @@ abstract class EmbeddedHlsSource(
     protected val client: OkHttpClient,
     protected val endpointResolver: EndpointResolver,
     private val webViewUserAgentProvider: WebViewUserAgentProvider? = null,
+    /** Persists the slug↔id map. Null keeps the old memory-only behaviour rather than
+     *  crashing, so a subclass that does not need it stays valid. */
+    private val embedSlugDao: com.gimy.tv.data.local.dao.EmbedSlugDao? = null,
 ) : SiteSource {
 
     abstract override val sourceType: SourceType
@@ -79,6 +82,32 @@ abstract class EmbeddedHlsSource(
 
     protected fun slugForId(vodId: Long): String? = idToSlug.get(vodId)
 
+    /**
+     * Repopulates the in-memory reverse map from Room before a detail URL is built.
+     *
+     * Favourites and history store only the hashed id, and the hash is one-way — without
+     * this, every saved entry failed after a restart because the map died with the process.
+     */
+    protected suspend fun ensureSlugCached(vodId: Long) {
+        resolveSlug(
+            vodId = vodId,
+            fromMemory = { idToSlug.get(it) },
+            fromDb = { embedSlugDao?.getSlug(it, sourceType.name) },
+            remember = { id, slug -> idToSlug.put(id, slug); slugToId.put(slug, id) },
+        )
+    }
+
+    /** Persists slugs seen on a list page so they outlive this process. */
+    protected suspend fun persistSlugs(items: List<Vod>) {
+        val dao = embedSlugDao ?: return
+        val rows = items.mapNotNull { vod ->
+            idToSlug.get(vod.id)?.let {
+                com.gimy.tv.data.local.entity.EmbedSlugEntity(vod.id, it, sourceType.name)
+            }
+        }
+        if (rows.isNotEmpty()) runCatching { dao.insertAll(rows) }
+    }
+
     private fun stableHashLong(s: String): Long {
         var h = 1125899906842597L
         for (c in s) h = 31L * h + c.code.toLong()
@@ -106,6 +135,9 @@ abstract class EmbeddedHlsSource(
         withContext(Dispatchers.IO) {
             val doc = fetchDocument(buildListUrlForPath(path, page))
             val items = parseListCards(doc)
+            // parseListCards fills the in-memory map via stableId(); mirror it into Room so
+            // anything favourited or watched from this list still opens after a restart.
+            persistSlugs(items)
             val maxPage = parseMaxPage(doc)
             val hasNext = if (maxPage != null) maxPage > page
                 else doc.select("a:contains(下一頁), a:contains(Next), a.next, a[rel=next]").isNotEmpty()
@@ -114,6 +146,7 @@ abstract class EmbeddedHlsSource(
 
     override suspend fun fetchVodDetail(vodId: Long): VodDetail =
         withContext(Dispatchers.IO) {
+            ensureSlugCached(vodId)
             val doc = fetchDocument(detailUrlFor(vodId))
             val (title, cover, year) = parseDetailMeta(doc, vodId)
             // Embed sites don't have multi-source episode lists — single virtual episode
@@ -136,6 +169,9 @@ abstract class EmbeddedHlsSource(
             // Strip our "embed:{vodId}" sentinel and refetch the detail page to extract m3u8
             val vodId = episodeUrl.removePrefix("embed:").toLongOrNull()
                 ?: throw ScraperException("Invalid embed url: $episodeUrl")
+            // "繼續觀看" can jump straight here without opening the detail screen first,
+            // so this path needs the slug restored too.
+            ensureSlugCached(vodId)
             val html = fetchHtml(detailUrlFor(vodId))
             val match = hlsRegex.find(html)
                 ?: throw ScraperException("hlsUrl not found on detail page")
