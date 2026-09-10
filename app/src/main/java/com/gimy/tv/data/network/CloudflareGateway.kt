@@ -6,6 +6,11 @@ import android.webkit.CookieManager
 import android.webkit.WebView
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
@@ -44,17 +49,20 @@ class CloudflareGateway @Inject constructor(
 
     /** Hosts currently being solved. The search screen reads this to say "verifying" instead
      *  of silently returning fewer sources. */
-    private val _solvingHosts = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
-    val solvingHosts: kotlinx.coroutines.flow.StateFlow<Set<String>> = _solvingHosts
+    private val _solvingHosts = MutableStateFlow<Set<String>>(emptySet())
+    val solvingHosts: StateFlow<Set<String>> = _solvingHosts
 
     /** Solves any endpoint that has no clearance yet, so the first real search does not have
      *  to wait. Fire-and-forget: failures leave behaviour exactly as it was. */
-    suspend fun warmUp(candidateUrls: List<String>) {
-        hostsNeedingWarmUp(candidateUrls) { host ->
+    suspend fun warmUp(candidateUrls: List<String>): Unit = coroutineScope {
+        val targets = hostsNeedingWarmUp(candidateUrls) { host ->
             cookieStore.rawFor(host)?.contains(CLEARANCE_COOKIE) == true
-        }.forEach { url ->
-            runCatching { url.toHttpUrlOrNull()?.let { solve(it) } }
         }
+        // Different hosts share nothing, so solve them side by side. Sequentially this
+        // would take up to SOLVE_TIMEOUT_MS per host — a minute before search is ready.
+        targets
+            .map { url -> async { runCatching { url.toHttpUrlOrNull()?.let { u -> solve(u) } } } }
+            .awaitAll()
     }
 
     suspend fun solve(url: HttpUrl): Boolean {
@@ -123,7 +131,9 @@ class CloudflareGateway @Inject constructor(
 
     private companion object {
         const val CLEARANCE_COOKIE = "cf_clearance"
-        const val SOLVE_TIMEOUT_MS = 20_000L
+        // jable.tv's interstitial consistently needs longer than the Gimy ones; 20s was
+        // cutting it off mid-solve. Only paid when a challenge is actually in progress.
+        const val SOLVE_TIMEOUT_MS = 35_000L
         const val POLL_INTERVAL_MS = 400L
     }
 }
