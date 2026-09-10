@@ -117,9 +117,7 @@ class JableTvSource @Inject constructor(
     }
 
     override fun parseDetailMeta(doc: Document, vodId: Long): Triple<String, String, Int> {
-        val title = doc.selectFirst("h6.title, h1.title, h1")?.text()?.trim()
-            ?: doc.selectFirst("meta[property=og:title]")?.attr("content")?.trim()
-            ?: "Unknown"
+        val title = jableDetailTitle(doc)
         val cover = doc.selectFirst("meta[property=og:image]")?.attr("content").orEmpty()
         return Triple(title, cover, 0)
     }
