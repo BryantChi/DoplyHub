@@ -808,7 +808,11 @@ class VodRepositoryImpl @Inject constructor(
             categories.map { (typeId, name) ->
                 async {
                     try {
-                        withTimeout(6000) {
+                        // 給的時間比 gimy 那組還長：movieffm 的分類頁約 170KB（gimy 約 60KB），
+                        // 九頁同時抓再用 Jsoup 解，在電視盒的 CPU 上遠比模擬器吃力。原本 6 秒
+                        // 在開發機綽綽有餘，到電視上卻整組逾時，首頁就安靜地少掉所有 FFM 列。
+                        // 這一段是 Phase 2、不擋首頁顯示，拉長只會讓 FFM 列晚一點補上。
+                        withTimeout(12_000) {
                             val result = movieffmSource.fetchVodList(typeId, 1)
                             HomeRowData(name, SourceType.MOVIEFFM, typeId, result.items.take(15))
                         }

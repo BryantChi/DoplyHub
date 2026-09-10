@@ -33,16 +33,24 @@ class CacheCleaner @Inject constructor(
     /**
      * @param reresolveEndpoints 是否順便重新探測鏡像。設定頁的「清除快取」與首頁重試都要，
      *        單純想丟掉圖片快取的場合可以關掉，省下探測的等待。
+     * @param clearImages 是否連封面圖一起丟。重試路徑刻意不丟：封面從來不是載入失敗的原因，
+     *        丟掉卻會讓整頁的圖同時重抓，那個流量爆發正好和內容請求搶頻寬——電視盒上
+     *        MovieFFM 的分類頁本來就大（約 170KB × 9 頁），一被排擠就整組逾時消失。
      * @return 是否在時間內等到探測結果；false 代表探測還在背景跑，下一次取用才會換網址。
      */
-    suspend fun clearAll(reresolveEndpoints: Boolean = true): Boolean = withContext(Dispatchers.IO) {
+    suspend fun clearAll(
+        reresolveEndpoints: Boolean = true,
+        clearImages: Boolean = true,
+    ): Boolean = withContext(Dispatchers.IO) {
         // evictAll 會走磁碟，要在 IO 上跑；任何一層失敗都不該擋住其他層。
         runCatching { okHttpClient.cache?.evictAll() }
         runCatching { vodRepository.clearMemoryCaches() }
-        runCatching {
-            val loader = context.imageLoader
-            loader.memoryCache?.clear()
-            loader.diskCache?.clear()
+        if (clearImages) {
+            runCatching {
+                val loader = context.imageLoader
+                loader.memoryCache?.clear()
+                loader.diskCache?.clear()
+            }
         }
         if (reresolveEndpoints) {
             runCatching { endpointResolver.awaitRefresh(ENDPOINT_REFRESH_BUDGET_MS) }.getOrDefault(false)

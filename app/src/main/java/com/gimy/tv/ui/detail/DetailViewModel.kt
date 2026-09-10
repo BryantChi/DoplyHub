@@ -85,7 +85,7 @@ class DetailViewModel @Inject constructor(
         if (vodId == null) return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            runCatching { cacheCleaner.clearAll(reresolveEndpoints = false) }
+            runCatching { cacheCleaner.clearAll(reresolveEndpoints = false, clearImages = false) }
             loadDetail(isRefresh = false)
         }
     }

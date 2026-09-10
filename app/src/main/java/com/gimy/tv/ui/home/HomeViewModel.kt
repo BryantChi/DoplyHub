@@ -112,7 +112,7 @@ class HomeViewModel @Inject constructor(
             // 先進載入中，清快取這段也要有畫面回饋，否則按下去像是沒反應。
             _uiState.update { it.copy(isLoading = true, error = null) }
             // 等重新探測跑完再抓：只丟背景刷新的話當次仍用舊網址，使用者得按第二次才生效。
-            runCatching { cacheCleaner.clearAll() }
+            runCatching { cacheCleaner.clearAll(clearImages = false) }
             fetchHome(isRefresh = false, force = true)
         }
     }
