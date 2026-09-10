@@ -1,13 +1,13 @@
 package com.gimy.tv.data.scraper
 
 import com.gimy.tv.data.endpoint.EndpointResolver
-import com.gimy.tv.data.scraper.parser.GimyTvParser
+import com.gimy.tv.data.scraper.parser.GimyParser
+import com.gimy.tv.data.scraper.parser.GimyPaths
 import com.gimy.tv.domain.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import javax.inject.Inject
@@ -20,6 +20,9 @@ class GimyTvSource @Inject constructor(
     override val sourceType = SourceType.GIMYTV
     override val baseUrl: String get() = endpointResolver.getBaseUrl(sourceType)
 
+    private val paths = GimyPaths(list = "/type", detail = "/vod", episode = "/ep")
+    private val parser = GimyParser(sourceType, paths)
+
     override suspend fun fetchCategories(): List<Category> = listOf(
         Category(2, "電視劇", sourceType), Category(1, "電影", sourceType),
         Category(4, "動漫", sourceType), Category(29, "綜藝", sourceType),
@@ -31,19 +34,20 @@ class GimyTvSource @Inject constructor(
 
     override suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod> =
         withContext(Dispatchers.IO) {
-            val url = if (page <= 1) "$baseUrl/type/$typeId.html" else "$baseUrl/type/$typeId-$page.html"
-            GimyTvParser.parseVodList(fetchDocument(url), baseUrl, page)
+            val url = if (page <= 1) "$baseUrl${paths.list}/$typeId.html"
+            else "$baseUrl${paths.list}/$typeId-$page.html"
+            parser.parseVodList(fetchDocument(url), baseUrl, page)
         }
 
     override suspend fun fetchVodDetail(vodId: Long): VodDetail =
         withContext(Dispatchers.IO) {
-            GimyTvParser.parseVodDetail(fetchDocument("$baseUrl/vod/$vodId.html"), vodId, baseUrl)
+            parser.parseVodDetail(fetchDocument("$baseUrl${paths.detail}/$vodId.html"), vodId, baseUrl)
         }
 
     override suspend fun fetchPlayerData(episodeUrl: String): PlayerData =
         withContext(Dispatchers.IO) {
             val url = if (episodeUrl.startsWith("http")) episodeUrl else "$baseUrl$episodeUrl"
-            parsePlayerData(fetchHtml(url))
+            parseGimyPlayerData(fetchHtml(url))
         }
 
     override suspend fun search(keyword: String, page: Int): PaginatedResult<Vod> =
@@ -51,13 +55,13 @@ class GimyTvSource @Inject constructor(
             val enc = java.net.URLEncoder.encode(keyword, "UTF-8")
             val doc = fetchDocument("$baseUrl/search/$enc----------$page---.html")
             doc.select("#stickyside").remove()
-            GimyTvParser.parseVodList(doc, baseUrl, page)
+            parser.parseVodList(doc, baseUrl, page)
         }
 
     override suspend fun probeListCount(baseUrl: String): Int = withContext(Dispatchers.IO) {
         runCatching {
-            val doc = Jsoup.parse(fetchHtml("$baseUrl/type/2.html"), baseUrl)
-            GimyTvParser.parseVodList(doc, baseUrl, 1).items.size
+            val doc = Jsoup.parse(fetchHtml("$baseUrl${paths.list}/2.html"), baseUrl)
+            parser.parseVodList(doc, baseUrl, 1).items.size
         }.getOrDefault(0)
     }
 
@@ -70,21 +74,4 @@ class GimyTvSource @Inject constructor(
     }
 
     private fun fetchDocument(url: String): Document = Jsoup.parse(fetchHtml(url), url)
-
-    private fun parsePlayerData(html: String): PlayerData {
-        val idx = html.indexOf("player_data="); if (idx == -1) throw ScraperException("player_data not found")
-        val s = html.indexOf('{', idx); if (s == -1) throw ScraperException("JSON not found")
-        var d = 0; var e = -1
-        for (i in s until minOf(s + 5000, html.length)) { when (html[i]) { '{' -> d++; '}' -> { d--; if (d == 0) { e = i; break } } } }
-        if (e == -1) throw ScraperException("JSON incomplete")
-        val json = JSONObject(html.substring(s, e + 1))
-        var url = json.optString("url", "")
-        url = when (json.optInt("encrypt", 0)) {
-            1 -> String(android.util.Base64.decode(url, android.util.Base64.DEFAULT))
-            2 -> String(android.util.Base64.decode(String(android.util.Base64.decode(url, android.util.Base64.DEFAULT)), android.util.Base64.DEFAULT))
-            else -> url
-        }
-        if (url.isBlank()) throw ScraperException("Empty URL")
-        return PlayerData(url, json.optInt("encrypt", 0), json.optString("from", ""))
-    }
 }

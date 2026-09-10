@@ -61,11 +61,13 @@ class EndpointResolver @Inject constructor(
 
         // Hard-coded fallback for cold starts when remote JSON is unreachable.
         // Bump on each release so old installs still work.
-        // Note: gimymax.com is intentionally excluded — as of 2026-05 it became a
-        // "redirect announcement" page that responds 200 OK but serves no real content.
+        // Domain lineage (verified 2026-09-10): gimytv.ai → gimytv.me and
+        // gimy01.tv → gimy01.co → gitube.tv. Excluded on purpose: gimymax.com (2026-05
+        // redirect-announcement page, 200 OK with no content) and gimyplus.com (2026-09
+        // turned into a link-index tool with no /vod/ pages).
         private val DEFAULTS: Map<SourceType, List<String>> = mapOf(
-            SourceType.GIMYMAX to listOf("https://gimy01.co"),
-            SourceType.GIMYTV to listOf("https://gimyplus.com"),
+            SourceType.GIMYMAX to listOf("https://gitube.tv"),
+            SourceType.GIMYTV to listOf("https://gimytv.me"),
             SourceType.MOVIEFFM to listOf("https://www.movieffm.net"),
             SourceType.GIMY_TW to listOf("https://gimy.tw"),
             SourceType.EYNY_TV to listOf("https://eynytv.com"),
