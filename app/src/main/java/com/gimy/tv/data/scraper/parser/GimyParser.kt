@@ -34,13 +34,40 @@ data class GimyPaths(
  * the other's markup instead of half-parsing it, which is what made the 2026-09 outage
  * silent (HTTP 200, zero items, no error).
  */
+/**
+ * Which template a Gimy mirror serves.
+ *
+ * [CARD] — gimytv.me / gitube.tv: `a.card__thumb` cards, `div.playlist-block` routes.
+ * [POSTER] — gimyai.tw: `a.poster` cards, `div.block` + `.route-title` routes.
+ *
+ * Both encode the route id the same way in episode URLs (`/{token}/{vod}-{sid}-{ep}.html`),
+ * so only the selectors differ — everything downstream is shared.
+ */
+enum class GimyLayout { CARD, POSTER }
+
 class GimyParser(
     private val sourceType: SourceType,
     private val paths: GimyPaths,
+    private val layout: GimyLayout = GimyLayout.CARD,
 ) {
     private val vodIdRegex = Regex("${Regex.escape(paths.detail)}/(\\d+)\\.html")
     private val epRegex = Regex("${Regex.escape(paths.episode)}/\\d+-(\\d+)-(\\d+)\\.html")
-    private val cardSelector = "a.card__thumb[href*=${paths.detail}/]"
+    private val cardSelector = when (layout) {
+        GimyLayout.CARD -> "a.card__thumb[href*=${paths.detail}/]"
+        GimyLayout.POSTER -> "a.poster[href*=${paths.detail}/]"
+    }
+    private val statusSelector = when (layout) {
+        GimyLayout.CARD -> "span.card__badge"
+        GimyLayout.POSTER -> "span.poster__status"
+    }
+    private val routeBlockSelector = when (layout) {
+        GimyLayout.CARD -> "div.playlist-block"
+        GimyLayout.POSTER -> "div.block"
+    }
+    private val routeTitleSelector = when (layout) {
+        GimyLayout.CARD -> ".playlist-block__title"
+        GimyLayout.POSTER -> ".route-title"
+    }
     private val episodeSelector = "a[href~=${paths.episode}/]"
     private val searchCardSelector = "a.search-item__thumb[href*=${paths.detail}/]"
 
@@ -49,14 +76,14 @@ class GimyParser(
         val items = mutableListOf<Vod>()
         for (card in doc.select(cardSelector)) {
             val id = vodIdRegex.find(card.attr("href"))?.groupValues?.get(1)?.toLongOrNull() ?: continue
-            val title = card.attr("aria-label").ifBlank {
-                card.selectFirst("img")?.attr("alt").orEmpty()
-            }.ifBlank {
-                card.parent()?.selectFirst("a.card__body h3.card__title")?.text().orEmpty()
-            }.trim()
+            val title = card.attr("aria-label")
+                .ifBlank { card.selectFirst("h3.poster__title")?.text().orEmpty() }
+                .ifBlank { card.selectFirst("img")?.attr("alt").orEmpty() }
+                .ifBlank { card.parent()?.selectFirst("a.card__body h3.card__title")?.text().orEmpty() }
+                .trim()
             if (title.isBlank()) continue
             val cover = resolveUrl(card.selectFirst("img")?.attr("src").orEmpty(), baseUrl)
-            val status = card.selectFirst("span.card__badge")?.text()?.trim() ?: ""
+            val status = card.selectFirst(statusSelector)?.text()?.trim() ?: ""
             @Suppress("DEPRECATION")
             items.add(Vod(id, sourceType, title, cover, "", 0, status,
                 siteStatus = parseEpisodeStatus(status)))
@@ -111,20 +138,9 @@ class GimyParser(
         val status = extractMeta(body, "狀態")
         val synopsis = doc.select("p").firstOrNull { it.text().length > 50 && !it.text().contains("導演") }?.text()?.trim() ?: ""
 
-        val groups = mutableListOf<EpisodeGroup>()
-        for (block in doc.select("div.playlist-block")) {
-            val name = block.selectFirst(".playlist-block__title")?.text()?.trim()
-                ?.replace(Regex("\\s*ᴴᴰ\\s*"), "")?.trim() ?: continue
-            val eps = mutableListOf<Episode>()
-            var sId = 0
-            for (link in block.select(episodeSelector)) {
-                val m = epRegex.find(link.attr("href")) ?: continue
-                sId = m.groupValues[1].toIntOrNull() ?: continue
-                val n = m.groupValues[2].toIntOrNull() ?: continue
-                eps.add(Episode(n, link.text().trim(), link.attr("href")))
-            }
-            if (eps.isNotEmpty() && name.isNotBlank())
-                groups.add(EpisodeGroup(name, sId, eps.sortedBy { it.number }))
+        val groups = when (layout) {
+            GimyLayout.CARD -> parseCardRoutes(doc)
+            GimyLayout.POSTER -> parsePosterRoutes(doc)
         }
         val sorted = groups.sortedWith(compareByDescending { g ->
             val i = stabilityOrder.indexOfFirst { g.sourceName.contains(it) }; if (i >= 0) stabilityOrder.size - i else -1
@@ -135,6 +151,50 @@ class GimyParser(
                 siteStatus = parseEpisodeStatus(status)),
             director, actors, synopsis, sorted)
     }
+
+    /** CARD: each route is its own block, and the block's title names it. */
+    private fun parseCardRoutes(doc: Document): List<EpisodeGroup> {
+        val groups = mutableListOf<EpisodeGroup>()
+        for (block in doc.select(routeBlockSelector)) {
+            val name = cleanRouteName(block.selectFirst(routeTitleSelector)?.ownText()) ?: continue
+            var sId = 0
+            val eps = mutableListOf<Episode>()
+            for (link in block.select(episodeSelector)) {
+                val m = epRegex.find(link.attr("href")) ?: continue
+                sId = m.groupValues[1].toIntOrNull() ?: continue
+                val n = m.groupValues[2].toIntOrNull() ?: continue
+                eps.add(Episode(n, link.text().trim(), link.attr("href")))
+            }
+            if (eps.isNotEmpty()) groups.add(EpisodeGroup(name, sId, eps.sortedBy { it.number }))
+        }
+        return groups
+    }
+
+    /**
+     * POSTER: every route sits inside a single block as a `.route-title` followed by its
+     * `.eps[data-route-sid]` sibling. Iterating blocks here would collapse all routes into
+     * one group carrying every episode, so the episode container is the anchor instead.
+     */
+    private fun parsePosterRoutes(doc: Document): List<EpisodeGroup> {
+        val groups = mutableListOf<EpisodeGroup>()
+        for (eps in doc.select(".eps[data-route-sid]")) {
+            val sId = eps.attr("data-route-sid").toIntOrNull() ?: continue
+            val title = eps.previousElementSibling()
+                ?.takeIf { it.hasClass("route-title") }?.ownText()
+            val name = cleanRouteName(title) ?: continue
+            val list = eps.select(episodeSelector).mapNotNull { link ->
+                val m = epRegex.find(link.attr("href")) ?: return@mapNotNull null
+                val n = m.groupValues[2].toIntOrNull() ?: return@mapNotNull null
+                Episode(n, link.text().trim(), link.attr("href"))
+            }
+            if (list.isNotEmpty()) groups.add(EpisodeGroup(name, sId, list.sortedBy { it.number }))
+        }
+        return groups
+    }
+
+    /** ownText() already skips the nested HD badge; this drops the superscript marker too. */
+    private fun cleanRouteName(raw: String?): String? =
+        raw?.trim()?.replace(Regex("\\s*ᴴᴰ\\s*"), "")?.trim()?.takeIf { it.isNotBlank() }
 
     private fun resolveUrl(url: String, baseUrl: String): String = when {
         url.isBlank() -> ""
