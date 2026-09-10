@@ -27,6 +27,18 @@ interface FavoriteDao {
 
     @Query("UPDATE favorites SET title = :title WHERE vodId = :vodId AND sourceType = :sourceType")
     suspend fun updateTitle(vodId: Long, sourceType: String, title: String): Int
+
+    @Query("UPDATE favorites SET missCount = :missCount WHERE vodId = :vodId AND sourceType = :sourceType")
+    suspend fun updateMissCount(vodId: Long, sourceType: String, missCount: Int): Int
+
+    @Query("SELECT missCount FROM favorites WHERE vodId = :vodId AND sourceType = :sourceType LIMIT 1")
+    suspend fun missCountOf(vodId: Long, sourceType: String): Int?
+
+    @Query("DELETE FROM favorites WHERE missCount > 0")
+    suspend fun deleteStale(): Int
+
+    @Query("SELECT COUNT(*) FROM favorites WHERE missCount > 0")
+    fun staleCount(): Flow<Int>
 }
 
 @Dao
@@ -52,6 +64,21 @@ interface WatchHistoryDao {
 
     @Query("UPDATE watch_history SET title = :title WHERE vodId = :vodId AND sourceType = :sourceType")
     suspend fun updateTitle(vodId: Long, sourceType: String, title: String): Int
+
+    @Query("UPDATE watch_history SET missCount = :missCount WHERE vodId = :vodId AND sourceType = :sourceType")
+    suspend fun updateMissCount(vodId: Long, sourceType: String, missCount: Int): Int
+
+    @Query("SELECT missCount FROM watch_history WHERE vodId = :vodId AND sourceType = :sourceType LIMIT 1")
+    suspend fun missCountOf(vodId: Long, sourceType: String): Int?
+
+    @Query("DELETE FROM watch_history WHERE vodId = :vodId AND sourceType = :sourceType")
+    suspend fun deleteStaleRow(vodId: Long, sourceType: String): Int
+
+    @Query("DELETE FROM watch_history WHERE missCount > 0")
+    suspend fun deleteStale(): Int
+
+    @Query("SELECT COUNT(*) FROM watch_history WHERE missCount > 0")
+    fun staleCount(): Flow<Int>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(history: WatchHistoryEntity)

@@ -81,6 +81,20 @@ object DatabaseModule {
         }
     }
 
+    /**
+     * v3.1.0 — track consecutive failed opens per saved entry.
+     *
+     * Lets favourites/history show an entry as stale, and lets the app retire one only after
+     * repeated misses on a source that is itself provably healthy. Existing rows default to
+     * 0 so nothing is considered stale until it actually fails.
+     */
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `favorites` ADD COLUMN `missCount` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `watch_history` ADD COLUMN `missCount` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): GimyDatabase {
@@ -88,7 +102,7 @@ object DatabaseModule {
             context,
             GimyDatabase::class.java,
             "gimy_tv.db"
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
          .fallbackToDestructiveMigration()
          .build()
     }

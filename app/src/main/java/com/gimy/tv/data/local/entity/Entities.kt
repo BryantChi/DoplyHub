@@ -16,6 +16,9 @@ data class FavoriteEntity(
     val addedAt: Long = System.currentTimeMillis(),
     /** v2.3.0+ : split adult records from main flow. Migrated rows default to false. */
     val isAdult: Boolean = false,
+    /** Consecutive failed opens. 0 = fine; >0 shows as stale; reaching the threshold on a
+     *  healthy source makes it eligible for automatic removal. */
+    val missCount: Int = 0,
 )
 
 @Entity(tableName = "watch_history")
@@ -44,6 +47,9 @@ data class WatchHistoryEntity(
      *  episode; legacy rows pre-migration use null. Once parsers populate this,
      *  watch progress for OAD won't collide with main episode at same number. */
     val episodeKind: String? = null,
+    /** Consecutive failed opens. 0 = fine; >0 shows as stale; reaching the threshold on a
+     *  healthy source makes it eligible for automatic removal. */
+    val missCount: Int = 0,
 )
 
 @Entity(tableName = "vod_cache")

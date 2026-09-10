@@ -34,7 +34,16 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class HistoryViewModel @Inject constructor(private val repo: WatchHistoryRepository) : ViewModel() {
+class HistoryViewModel @Inject constructor(
+    private val repo: WatchHistoryRepository,
+    private val watchHistoryDao: com.gimy.tv.data.local.dao.WatchHistoryDao,
+) : ViewModel() {
+    /** Entries that failed to open; cleared on demand. */
+    val staleCount: StateFlow<Int> = watchHistoryDao.staleCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    fun clearStale() { viewModelScope.launch { runCatching { watchHistoryDao.deleteStale() } } }
+
     val history: StateFlow<List<WatchHistoryEntry>> = repo.getRecentHistory(50).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     fun clear() { viewModelScope.launch { repo.clearHistory() } }
     fun delete(entry: WatchHistoryEntry) { viewModelScope.launch { repo.deleteEntry(entry.vodId, entry.sourceType) } }
@@ -46,12 +55,22 @@ fun HistoryScreen(onVodClick: (SourceType, Long) -> Unit, onBack: () -> Unit, vm
     val dims = LocalDimensions.current
     val isTV = LocalIsTelevision.current
     val history by vm.history.collectAsState()
+    val staleCount by vm.staleCount.collectAsState()
     var pendingDelete by remember { mutableStateOf<WatchHistoryEntry?>(null) }
 
     Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))) {
         Row(Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding), verticalAlignment = Alignment.CenterVertically) {
             PageHeader("觀看歷史", onBack)
             Spacer(Modifier.weight(1f))
+            // Sits before the blanket "clear": removing only the entries that no longer open
+            // is far less destructive than wiping the whole history.
+            if (staleCount > 0) {
+                com.gimy.tv.ui.components.DoplyButton(
+                    onClick = { vm.clearStale() },
+                    containerColor = CinemaSurface,
+                ) { Text("清除失效 $staleCount 筆", color = Color.White, fontSize = 12.sp) }
+                Spacer(Modifier.width(8.dp))
+            }
             if (history.isNotEmpty()) {
                 var f by remember { mutableStateOf(false) }
                 if (isTV) {

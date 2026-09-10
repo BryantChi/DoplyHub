@@ -25,13 +25,25 @@ import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.domain.repository.FavoriteRepository
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.theme.*
+import kotlinx.coroutines.launch
+import com.gimy.tv.ui.components.DoplyButton
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 
 @HiltViewModel
-class FavoritesViewModel @Inject constructor(fav: FavoriteRepository) : ViewModel() {
+class FavoritesViewModel @Inject constructor(
+    fav: FavoriteRepository,
+    private val favoriteDao: com.gimy.tv.data.local.dao.FavoriteDao,
+) : ViewModel() {
     val favorites: StateFlow<List<Vod>> = fav.getFavorites().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Entries that failed to open. Surfaced so the user can clear them deliberately,
+     *  rather than relying only on the conservative automatic retirement. */
+    val staleCount: StateFlow<Int> = favoriteDao.staleCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    fun clearStale() { viewModelScope.launch { runCatching { favoriteDao.deleteStale() } } }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -39,8 +51,15 @@ class FavoritesViewModel @Inject constructor(fav: FavoriteRepository) : ViewMode
 fun FavoritesScreen(onVodClick: (SourceType, Long) -> Unit, onBack: () -> Unit, vm: FavoritesViewModel = hiltViewModel()) {
     val dims = LocalDimensions.current
     val favs by vm.favorites.collectAsState()
+    val staleCount by vm.staleCount.collectAsState()
     Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))) {
-        PageHeader("我的收藏", onBack)
+        PageHeader("我的收藏", onBack) {
+            if (staleCount > 0) {
+                DoplyButton(onClick = { vm.clearStale() }, containerColor = CinemaSurface) {
+                    Text("清除失效 $staleCount 筆", color = CinemaTextPrimary, fontSize = 12.sp)
+                }
+            }
+        }
         if (favs.isEmpty()) EmptyState("還沒有收藏的內容")
         else LazyVerticalGrid(GridCells.Adaptive(dims.cardWidth), contentPadding = PaddingValues(horizontal = dims.screenHorizontalPadding, vertical = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(dims.cardSpacing), verticalArrangement = Arrangement.spacedBy(dims.cardSpacing), modifier = Modifier.fillMaxSize()

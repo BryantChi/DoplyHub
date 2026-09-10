@@ -14,7 +14,7 @@ import com.gimy.tv.data.local.entity.*
         MovieffmSlugEntity::class,
         EmbedSlugEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class GimyDatabase : RoomDatabase() {

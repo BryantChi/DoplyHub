@@ -34,7 +34,8 @@ class DetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val vodRepository: VodRepository,
     private val favoriteRepository: FavoriteRepository,
-    private val watchHistoryRepository: WatchHistoryRepository
+    private val watchHistoryRepository: WatchHistoryRepository,
+    private val staleEntryTracker: com.gimy.tv.data.cleanup.StaleEntryTracker,
 ) : ViewModel() {
 
     private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYTV"
@@ -78,6 +79,8 @@ class DetailViewModel @Inject constructor(
                 // Phase 1: Load primary source detail (fast — show immediately).
                 // Cleanup happens at repository layer via EpisodeNormalizer.
                 val detail = vodRepository.getVodDetail(sourceType, id)
+                // A successful open clears any stale marking on this entry.
+                staleEntryTracker.recordOpenResult(sourceType, id, opened = true)
                 if (!isActive) return@launch  // refresh() cancelled us mid-fetch
                 _uiState.update {
                     it.copy(isLoading = false, isRefreshing = false, isEnriching = true, detail = detail)
@@ -138,6 +141,12 @@ class DetailViewModel @Inject constructor(
                     else it.copy(isLoading = false, isEnriching = false, error = "網路連線失敗，請檢查網路後重試")
                 }
             } catch (e: Exception) {
+                // Counted as a miss, unlike the IOException branch above: a network fault
+                // says nothing about whether this particular entry still exists, and
+                // treating it as evidence would let one bad network retire real data.
+                if (!isRefresh) {
+                    runCatching { staleEntryTracker.recordOpenResult(sourceType, id, opened = false) }
+                }
                 _uiState.update {
                     if (isRefresh) it.copy(isRefreshing = false, isEnriching = false)
                     else it.copy(isLoading = false, isEnriching = false, error = "載入失敗: ${e.message}")
