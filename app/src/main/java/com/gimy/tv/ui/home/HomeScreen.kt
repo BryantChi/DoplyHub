@@ -86,7 +86,7 @@ fun HomeScreen(
     ) {
         when {
             uiState.isLoading -> LoadingOverlay()
-            uiState.error != null -> ErrorOverlay(uiState.error ?: "") { viewModel.loadHome() }
+            uiState.error != null -> ErrorOverlay(uiState.error ?: "") { viewModel.retry() }
             else -> {
                 RefreshableContainer(
                     isRefreshing = uiState.isRefreshing,

@@ -83,16 +83,37 @@ class HomeViewModel @Inject constructor(
     }
 
     fun loadHome() {
-        fetchHome(isRefresh = false)
+        fetchHome(isRefresh = false, force = false)
     }
 
     fun refresh() {
         if (_uiState.value.isRefreshing) return
         moreSourceCache.clear()  // force "More Sources" rows to re-fetch on next collect
-        fetchHome(isRefresh = true)
+        fetchHome(isRefresh = true, force = true)
     }
 
-    private fun fetchHome(isRefresh: Boolean) {
+    /**
+     * 「載入失敗」畫面上的重試。跟 loadHome() 的差別在 force=true：
+     * 會清掉 OkHttp 磁碟快取並要求 EndpointResolver 重新探測鏡像。
+     *
+     * 原本這裡直接呼叫 loadHome()，等於用同一個（可能已失效的）網址、同一份 HTTP 快取
+     * 再打一次，所以鏡像掛掉時按幾次重試都是同樣結果。EndpointResolver 的 resolved 會
+     * 存進 DataStore 且 TTL 24 小時，只有 refresh() 路徑會重新探測——錯誤畫面反而是
+     * 唯一碰不到重新探測的入口。
+     *
+     * 用 isRefresh=false 是為了保留載入中／錯誤訊息的 UI；isRefresh=true 那條路徑
+     * 假設畫面上已有內容可以留著，在空畫面重試時會把錯誤訊息吃掉變成一片空白。
+     */
+    fun retry() {
+        moreSourceCache.clear()
+        fetchHome(isRefresh = false, force = true)
+    }
+
+    /**
+     * @param isRefresh 走下拉重整的 UI（保留現有內容、顯示重整條）而非全螢幕載入中。
+     * @param force 讓資料層真的重抓：清 HTTP 快取 + 重新探測端點，而不是吃記憶體快取。
+     */
+    private fun fetchHome(isRefresh: Boolean, force: Boolean) {
         // Snapshot so we can preserve visible content if refresh produces nothing
         val previousRows = _uiState.value.rows
 
@@ -103,7 +124,7 @@ class HomeViewModel @Inject constructor(
                 else it.copy(isLoading = true, error = null)
             }
             try {
-                val gimyRows = vodRepository.getGimyHomeRows(forceRefresh = isRefresh)
+                val gimyRows = vodRepository.getGimyHomeRows(forceRefresh = force)
                     .filter { it.items.isNotEmpty() }
                     .map { HomeRow(it.title, it.typeId, it.items, it.sourceType) }
 
@@ -128,7 +149,7 @@ class HomeViewModel @Inject constructor(
         // Phase 2: Load movieffm in background (append when ready)
         viewModelScope.launch {
             try {
-                val ffmRows = vodRepository.getMovieffmHomeRows(forceRefresh = isRefresh)
+                val ffmRows = vodRepository.getMovieffmHomeRows(forceRefresh = force)
                     .filter { it.items.isNotEmpty() }
 
                 _uiState.update { state ->
