@@ -271,20 +271,9 @@ class VodRepositoryImpl @Inject constructor(
         return searchResult
     }
 
-    private fun mergeSearchResults(primary: List<Vod>, secondary: List<Vod>): List<Vod> {
-        val result = primary.toMutableList()
-        // Dedup by (base, season) — different seasons of the same show stay
-        // separate. Previous normalizeTitle-only dedup folded "斗羅大陸" and
-        // "斗羅大陸 第二季" into one bucket and dropped one of them from search
-        // results.
-        val primaryKeys = primary.map { parseTitleKey(it.title) }.toSet()
-        for (vod in secondary) {
-            if (parseTitleKey(vod.title) !in primaryKeys) {
-                result.add(vod)
-            }
-        }
-        return result
-    }
+    /** 合併規則抽到 SearchResultMerge.kt 以便單獨測試；這裡只決定「哪些算同一部片」。 */
+    private fun mergeSearchResults(primary: List<Vod>, secondary: List<Vod>): List<Vod> =
+        mergeSearchResults(primary, secondary) { parseTitleKey(it.title) }
 
     private fun normalizeTitle(title: String): String {
         var s = title

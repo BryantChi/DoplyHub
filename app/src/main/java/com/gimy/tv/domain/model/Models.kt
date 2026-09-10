@@ -45,7 +45,14 @@ data class Vod(
      *  same — the [EpisodeStatus.Empty] default is migration safety only and
      *  may become non-defaulted in v3.1. */
     val siteStatus: EpisodeStatus = EpisodeStatus.Empty,
-    val rating: Double? = null
+    val rating: Double? = null,
+    /**
+     * 其他也有這部片的來源 → 該來源的 vodId。只有聚合搜尋的合併會填。
+     *
+     * 為什麼要記 id 而不只是來源：使用者用來源篩選挑了 Eyny，點下去就該開 Eyny 的版本，
+     * 而每個站的 id 空間是各自獨立的，只記來源就無從組出網址。
+     */
+    val altSources: Map<SourceType, Long> = emptyMap(),
 )
 
 data class VodDetail(

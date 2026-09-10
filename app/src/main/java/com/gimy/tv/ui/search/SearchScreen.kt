@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
+import com.gimy.tv.data.repository.idFor
+import com.gimy.tv.data.repository.searchSources
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.VodCard
@@ -210,16 +212,22 @@ fun SearchScreen(
                     }
                 }
 
-                // Per-source counts for chip filter (Phase 3.2)
+                // 依「哪些來源有這部片」計數，而不是卡片掛在誰名下。同一部片被多個站收錄時
+                // 只會出一張卡，若只算歸屬來源，排在合併順序後面的站（例如 Eyny）幾乎永遠
+                // 不會出現在篩選裡，即使它確實有那部片。
                 val sourceCounts = remember(uiState.results) {
-                    uiState.results.groupBy { it.sourceType }.mapValues { it.value.size }
+                    val counts = mutableMapOf<SourceType, Int>()
+                    uiState.results.forEach { vod ->
+                        vod.searchSources().forEach { counts[it] = (counts[it] ?: 0) + 1 }
+                    }
+                    counts.toMap()
                 }
                 var selectedSource by remember { mutableStateOf<SourceType?>(null) }
                 // Reset chip when query changes
                 LaunchedEffect(uiState.query) { selectedSource = null }
                 val filteredResults = remember(uiState.results, selectedSource) {
                     if (selectedSource == null) uiState.results
-                    else uiState.results.filter { it.sourceType == selectedSource }
+                    else uiState.results.filter { selectedSource in it.searchSources() }
                 }
 
                 RefreshableContainer(
@@ -263,7 +271,12 @@ fun SearchScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             items(filteredResults, key = { "${it.sourceType}_${it.id}" }) { vod ->
-                                VodCard(vod, onClick = { onVodClick(vod.sourceType, vod.id) })
+                                // 篩了某個來源就開那個來源的版本——各站的 id 空間互不相通，
+                                // 用歸屬來源的 id 會開到另一部片或直接 404。角標也跟著換，
+                                // 否則篩了 Eyny 卻整排顯示 GTV，看起來像篩選沒生效。
+                                val src = selectedSource ?: vod.sourceType
+                                val shown = if (src == vod.sourceType) vod else vod.copy(sourceType = src)
+                                VodCard(shown, onClick = { onVodClick(src, vod.idFor(src)) })
                             }
                         }
                         if (!uiState.hasMore && !uiState.isLoadingMore) {
