@@ -25,6 +25,21 @@ interface FavoriteDao {
     @Query("SELECT * FROM favorites WHERE sourceType = :sourceType")
     suspend fun getBySource(sourceType: String): List<FavoriteEntity>
 
+    @Query("SELECT * FROM favorites WHERE vodId = :vodId AND sourceType = :sourceType LIMIT 1")
+    suspend fun getByVod(vodId: Long, sourceType: String): FavoriteEntity?
+
+    /** 舊 id 失效後改指到新的一筆。missCount 一併歸零——能開了就不該還標著失效。 */
+    @Query(
+        "UPDATE favorites SET vodId = :newVodId, sourceType = :newSourceType, missCount = 0 " +
+            "WHERE vodId = :oldVodId AND sourceType = :oldSourceType"
+    )
+    suspend fun relink(
+        oldVodId: Long,
+        oldSourceType: String,
+        newVodId: Long,
+        newSourceType: String,
+    ): Int
+
     @Query("UPDATE favorites SET title = :title WHERE vodId = :vodId AND sourceType = :sourceType")
     suspend fun updateTitle(vodId: Long, sourceType: String, title: String): Int
 
@@ -73,6 +88,18 @@ interface WatchHistoryDao {
 
     @Query("DELETE FROM watch_history WHERE vodId = :vodId AND sourceType = :sourceType")
     suspend fun deleteStaleRow(vodId: Long, sourceType: String): Int
+
+    /** 舊 id 失效後改指到新的一筆；播放進度留著，換的只是這筆記錄指向誰。 */
+    @Query(
+        "UPDATE watch_history SET vodId = :newVodId, sourceType = :newSourceType, missCount = 0 " +
+            "WHERE vodId = :oldVodId AND sourceType = :oldSourceType"
+    )
+    suspend fun relink(
+        oldVodId: Long,
+        oldSourceType: String,
+        newVodId: Long,
+        newSourceType: String,
+    ): Int
 
     @Query("DELETE FROM watch_history WHERE missCount > 0")
     suspend fun deleteStale(): Int

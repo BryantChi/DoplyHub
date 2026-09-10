@@ -35,6 +35,14 @@ interface VodRepository {
 
     /** 丟掉記憶體內的首頁／搜尋／詳情快取。清除快取與重試路徑用，讓下一次取用真的重打。 */
     fun clearMemoryCaches()
+
+    /**
+     * 依片名找出同一部片，用於舊 id 失效後的復原。
+     *
+     * 會分別回報「有沒有找到」與「[preferredSource] 這次到底有沒有回應」，因為呼叫端
+     * 要靠後者分辨「這部片真的沒了」與「只是連不上」。
+     */
+    suspend fun findByTitle(title: String, preferredSource: SourceType): TitleLookup
 }
 
 interface FavoriteRepository {
@@ -58,6 +66,10 @@ interface WatchHistoryRepository {
     suspend fun clearHistory()
     suspend fun clearAdultHistory()
 }
+
+/** [VodRepository.findByTitle] 的結果。[sourceAnswered] 為 false 代表原來源這次沒回應，
+ *  找不到不能當成「這部片不存在」。 */
+data class TitleLookup(val match: Vod?, val sourceAnswered: Boolean)
 
 data class WatchHistoryEntry(
     val vodId: Long,

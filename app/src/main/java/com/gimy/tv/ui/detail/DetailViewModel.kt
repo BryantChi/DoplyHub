@@ -37,11 +37,17 @@ class DetailViewModel @Inject constructor(
     private val watchHistoryRepository: WatchHistoryRepository,
     private val staleEntryTracker: com.gimy.tv.data.cleanup.StaleEntryTracker,
     private val cacheCleaner: com.gimy.tv.data.cache.CacheCleaner,
+    private val savedEntryRecovery: com.gimy.tv.data.repair.SavedEntryRecovery,
 ) : ViewModel() {
 
     private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYTV"
-    private val vodId: Long? = savedStateHandle.get<String>("vodId")?.toLongOrNull()
-    private val sourceType = runCatching { SourceType.valueOf(sourceTypeName) }.getOrDefault(SourceType.GIMYTV)
+
+    // 不是 val：舊版存下來的 id 在新網域上失效時，SavedEntryRecovery 會把收藏／紀錄改指到
+    // 新的一筆，整個 ViewModel 必須跟著改指過去，否則收藏狀態、播放進度、刪除記錄都還對著
+    // 一個已經不存在的 id。
+    private var vodId: Long? = savedStateHandle.get<String>("vodId")?.toLongOrNull()
+    private var sourceType: SourceType =
+        runCatching { SourceType.valueOf(sourceTypeName) }.getOrDefault(SourceType.GIMYTV)
 
     private val _uiState = MutableStateFlow(DetailUiState())
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
@@ -50,6 +56,9 @@ class DetailViewModel @Inject constructor(
      *  off a new one — without this, an old Phase 2 enrichment that finishes after a
      *  refresh started can race-overwrite the fresh state. */
     private var loadJob: Job? = null
+
+    /** 收藏狀態訂閱。改指到新的一筆時要重訂，否則還在監看舊 id。 */
+    private var favoriteJob: Job? = null
 
     init {
         loadDetail(isRefresh = false)
@@ -161,23 +170,49 @@ class DetailViewModel @Inject constructor(
                     else it.copy(isLoading = false, isEnriching = false, error = "網路連線失敗，請檢查網路後重試")
                 }
             } catch (e: Exception) {
-                // Counted as a miss, unlike the IOException branch above: a network fault
-                // says nothing about whether this particular entry still exists, and
-                // treating it as evidence would let one bad network retire real data.
-                if (!isRefresh) {
-                    runCatching { staleEntryTracker.recordOpenResult(sourceType, id, opened = false) }
+                // 走到這裡多半是 404（ScraperException，不是 IOException）。最常見的成因是
+                // 這筆記錄存於換網域之前：id 屬於舊站的 id 空間，在新站上根本不存在。先用
+                // 存著的片名把同一部片找回來，找不到再談失效。
+                //
+                // 失效計數改由 SavedEntryRecovery 負責，這裡不再自己記一次——它會分辨
+                // 「來源有回應但查無此片」與「來源根本沒回應」，後者不該算在使用者頭上。
+                val plan = if (!isRefresh) {
+                    runCatching { savedEntryRecovery.recover(sourceType, id) }
+                        .getOrDefault(com.gimy.tv.data.repair.RecoveryPlan.Inconclusive)
+                } else {
+                    com.gimy.tv.data.repair.RecoveryPlan.Inconclusive
                 }
+                if (plan is com.gimy.tv.data.repair.RecoveryPlan.Relink && isActive) {
+                    retargetTo(plan.target)
+                    loadDetail(isRefresh = false)
+                    return@launch
+                }
+                val message =
+                    if (plan is com.gimy.tv.data.repair.RecoveryPlan.MarkStale) {
+                        "這部片在來源站上已經找不到了。可到收藏或觀看紀錄頁按「清除失效」一次清掉。"
+                    } else {
+                        "載入失敗: ${e.message}"
+                    }
                 _uiState.update {
                     if (isRefresh) it.copy(isRefreshing = false, isEnriching = false)
-                    else it.copy(isLoading = false, isEnriching = false, error = "載入失敗: ${e.message}")
+                    else it.copy(isLoading = false, isEnriching = false, error = message)
                 }
             }
         }
     }
 
+    /** 記錄已改指到新的一筆：更新目標並重訂與 id 綁定的狀態。 */
+    private fun retargetTo(target: com.gimy.tv.data.repair.RecoveryTarget) {
+        sourceType = target.sourceType
+        vodId = target.vodId
+        observeFavorite()
+        loadWatchProgress()
+    }
+
     private fun observeFavorite() {
         val id = vodId ?: return
-        viewModelScope.launch {
+        favoriteJob?.cancel()
+        favoriteJob = viewModelScope.launch {
             favoriteRepository.isFavorite(id, sourceType).collect { fav ->
                 _uiState.update { it.copy(isFavorite = fav) }
             }

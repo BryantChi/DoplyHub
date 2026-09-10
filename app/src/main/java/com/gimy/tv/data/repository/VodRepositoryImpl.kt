@@ -20,6 +20,7 @@ import com.gimy.tv.domain.model.*
 import com.gimy.tv.domain.model.Confidence
 import com.gimy.tv.domain.model.EpisodeStatus
 import com.gimy.tv.domain.repository.HomeRowData
+import com.gimy.tv.domain.repository.TitleLookup
 import com.gimy.tv.domain.util.parseEpisodeStatus
 import com.gimy.tv.domain.repository.VodRepository
 import kotlinx.coroutines.async
@@ -724,6 +725,21 @@ class VodRepositoryImpl @Inject constructor(
         101 to 1, 201 to 20, 202 to 13, 203 to 16, 204 to 21,
         205 to 4, 207 to 14, 208 to 15, 206 to 29
     )
+
+    override suspend fun findByTitle(title: String, preferredSource: SourceType): TitleLookup {
+        val key = parseTitleKey(title)
+        // 先問原來源。網域換了但站還是同一個時，片子多半還在、只是 id 不同，這一步就會中。
+        val primary = runCatching {
+            withTimeout(6_000) { getSource(preferredSource).search(title, 1) }
+        }
+        primary.getOrNull()?.items?.firstOrNull { parseTitleKey(it.title) == key }
+            ?.let { return TitleLookup(it, sourceAnswered = true) }
+
+        // 原來源查無此片才跨來源找。換站至少讓這筆記錄還開得起來，比留著一個死連結好。
+        val cross = runCatching { searchAllSources(title, 1).items }.getOrDefault(emptyList())
+            .firstOrNull { parseTitleKey(it.title) == key }
+        return TitleLookup(cross, sourceAnswered = primary.isSuccess)
+    }
 
     override fun clearMemoryCaches() {
         gimyHomeCache = null
