@@ -31,6 +31,7 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val vodRepository: VodRepository,
     private val watchHistoryRepository: WatchHistoryRepository,
+    private val cacheCleaner: com.gimy.tv.data.cache.CacheCleaner,
     sourcePreferencesRepository: com.gimy.tv.data.preferences.SourcePreferencesRepository,
 ) : ViewModel() {
 
@@ -93,8 +94,9 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
-     * 「載入失敗」畫面上的重試。跟 loadHome() 的差別在 force=true：
-     * 會清掉 OkHttp 磁碟快取並要求 EndpointResolver 重新探測鏡像。
+     * 「載入失敗」畫面上的重試。跟 loadHome() 的差別是它會先把所有層級的快取清掉
+     * （HTTP 回應、首頁／搜尋／詳情的記憶體快取、封面圖），並「等」鏡像重新探測完成，
+     * 再用 force=true 重抓。
      *
      * 原本這裡直接呼叫 loadHome()，等於用同一個（可能已失效的）網址、同一份 HTTP 快取
      * 再打一次，所以鏡像掛掉時按幾次重試都是同樣結果。EndpointResolver 的 resolved 會
@@ -106,7 +108,13 @@ class HomeViewModel @Inject constructor(
      */
     fun retry() {
         moreSourceCache.clear()
-        fetchHome(isRefresh = false, force = true)
+        viewModelScope.launch {
+            // 先進載入中，清快取這段也要有畫面回饋，否則按下去像是沒反應。
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            // 等重新探測跑完再抓：只丟背景刷新的話當次仍用舊網址，使用者得按第二次才生效。
+            runCatching { cacheCleaner.clearAll() }
+            fetchHome(isRefresh = false, force = true)
+        }
     }
 
     /**

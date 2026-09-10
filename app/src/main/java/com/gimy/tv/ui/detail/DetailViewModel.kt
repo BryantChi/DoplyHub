@@ -36,6 +36,7 @@ class DetailViewModel @Inject constructor(
     private val favoriteRepository: FavoriteRepository,
     private val watchHistoryRepository: WatchHistoryRepository,
     private val staleEntryTracker: com.gimy.tv.data.cleanup.StaleEntryTracker,
+    private val cacheCleaner: com.gimy.tv.data.cache.CacheCleaner,
 ) : ViewModel() {
 
     private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYTV"
@@ -59,6 +60,25 @@ class DetailViewModel @Inject constructor(
     fun refresh() {
         if (vodId == null || _uiState.value.isRefreshing) return
         loadDetail(isRefresh = true)
+    }
+
+    /**
+     * 錯誤畫面上的重試：先清快取再用 isRefresh=false 重載。
+     *
+     * 不能直接用 refresh()。那條路徑假設畫面上已經有內容可以留著，失敗時只會把
+     * isRefreshing 收掉而不重設錯誤訊息——在錯誤畫面按下去，detail 與 error 會同時是
+     * null，when 沒有任何分支命中，整頁變空白，連「返回」都不見。
+     *
+     * 不重新探測鏡像：能走到詳情頁代表列表已經抓得到，鏡像本身是通的，問題多半出在
+     * 這一筆的網址或被快取住的錯誤回應。整站掛掉那種情況由首頁的重試負責。
+     */
+    fun retry() {
+        if (vodId == null) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            runCatching { cacheCleaner.clearAll(reresolveEndpoints = false) }
+            loadDetail(isRefresh = false)
+        }
     }
 
     private fun loadDetail(isRefresh: Boolean) {

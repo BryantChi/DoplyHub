@@ -69,7 +69,7 @@ fun DetailScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             ActionButton("返回", false, onBack)
-                            ActionButton("重試", false) { viewModel.refresh() }
+                            ActionButton("重試", false) { viewModel.retry() }
                             if (uiState.lastEpisode != null) {
                                 ActionButton("刪除記錄", false) { viewModel.deleteHistory() }
                             }
