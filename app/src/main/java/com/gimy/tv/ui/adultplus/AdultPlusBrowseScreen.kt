@@ -23,6 +23,8 @@ import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import com.gimy.tv.ui.components.RefreshableContainer
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.favorites.PageHeader
+import com.gimy.tv.ui.components.RefreshIconButton
+import com.gimy.tv.ui.components.RefreshLoadingBar
 import com.gimy.tv.ui.theme.*
 
 @Composable
@@ -67,7 +69,10 @@ fun AdultPlusBrowseScreen(
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
     ) {
-        PageHeader(state.title.ifBlank { "更多" }, onBack)
+        PageHeader(state.title.ifBlank { "更多" }, onBack) {
+            RefreshIconButton(isRefreshing = state.isRefreshing, onClick = { vm.refresh() })
+        }
+        RefreshLoadingBar(state.isRefreshing)
 
         RefreshableContainer(
             isRefreshing = state.isRefreshing,

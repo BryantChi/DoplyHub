@@ -71,6 +71,33 @@ class AdultContentScreenViewModel @Inject constructor(
         return flow.asStateFlow()
     }
 
+    /** Drives the header spinner and the loading bar during a full refresh. */
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    /**
+     * Refreshes every tab, including ones the user has not opened yet.
+     *
+     * [refreshTab] deliberately bails on an uncached tab (`rowCache[key] ?: return`), so
+     * pull-to-refresh only ever touched the visible source — switching tabs afterwards still
+     * showed stale data. This creates the missing flows so a single press really does cover
+     * all of them.
+     */
+    fun refreshAll(tabs: List<AdultTab>) {
+        if (tabs.isEmpty()) return
+        _isRefreshing.value = true
+        viewModelScope.launch {
+            tabs.forEach { tab ->
+                val flow = rowCache.getOrPut(tab.key) { MutableStateFlow(AdultRowState(loading = true)) }
+                fetchPage(tab, flow, page = 1, append = false)
+            }
+            // fetchPage launches its own coroutines, so this returns immediately. Hold the
+            // spinner briefly so a cache-fast refresh is still perceivable.
+            kotlinx.coroutines.delay(800)
+            _isRefreshing.value = false
+        }
+    }
+
     /** Pull-to-refresh: reset to page 1, replace items. */
     fun refreshTab(tab: AdultTab) {
         val flow = rowCache[tab.key] ?: return

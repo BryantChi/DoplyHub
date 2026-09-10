@@ -49,8 +49,17 @@ fun FavoritesScreen(onVodClick: (SourceType, Long) -> Unit, onBack: () -> Unit, 
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
+/**
+ * Shared page header. [actions] is an optional trailing slot so screens can put a refresh
+ * button where the general-browse screens have one — without it the 18+ screens had no
+ * focusable refresh entry at all, only pull-to-refresh.
+ */
 @Composable
-fun PageHeader(title: String, onBack: () -> Unit) {
+fun PageHeader(
+    title: String,
+    onBack: () -> Unit,
+    actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
+) {
     val dims = LocalDimensions.current
     Row(Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding), verticalAlignment = Alignment.CenterVertically) {
         var f by remember { mutableStateOf(false) }
@@ -71,6 +80,8 @@ fun PageHeader(title: String, onBack: () -> Unit) {
         Box(Modifier.width(3.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(CinemaRed))
         Spacer(Modifier.width(10.dp))
         Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CinemaTextPrimary)
+        Spacer(Modifier.weight(1f))
+        actions()
     }
 }
 

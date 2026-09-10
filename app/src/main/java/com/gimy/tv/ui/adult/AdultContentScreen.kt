@@ -27,6 +27,8 @@ import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import com.gimy.tv.ui.components.RefreshableContainer
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.favorites.PageHeader
+import com.gimy.tv.ui.components.RefreshIconButton
+import com.gimy.tv.ui.components.RefreshLoadingBar
 import com.gimy.tv.ui.theme.*
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -53,7 +55,16 @@ fun AdultContentScreen(
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
     ) {
-        PageHeader("18+", onBack)
+        val refreshingAll by vm.isRefreshing.collectAsState()
+        PageHeader("18+", onBack) {
+            // Refreshes every tab, not just the visible one — see refreshAll's docs.
+            RefreshIconButton(
+                isRefreshing = refreshingAll,
+                onClick = { vm.refreshAll(tabs) },
+                enabled = tabs.isNotEmpty(),
+            )
+        }
+        RefreshLoadingBar(refreshingAll)
 
         if (tabs.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

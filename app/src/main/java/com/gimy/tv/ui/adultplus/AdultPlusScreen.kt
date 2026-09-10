@@ -26,6 +26,8 @@ import com.gimy.tv.ui.components.RefreshableContainer
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.favorites.PageHeader
 import com.gimy.tv.ui.components.FocusableChip
+import com.gimy.tv.ui.components.RefreshIconButton
+import com.gimy.tv.ui.components.RefreshLoadingBar
 import com.gimy.tv.ui.theme.*
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -50,7 +52,11 @@ fun AdultPlusScreen(
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
     ) {
-        PageHeader("進階", onBack)
+        val refreshingAll by vm.isRefreshing.collectAsState()
+        PageHeader("進階", onBack) {
+            RefreshIconButton(isRefreshing = refreshingAll, onClick = { vm.refreshAll() })
+        }
+        RefreshLoadingBar(refreshingAll)
 
         // Entry to the「全部分類」index. Sits above the refresh container so it's
         // always reachable; the refresh gesture only consumes pulls from the
