@@ -111,6 +111,13 @@ class DoplyApp : Application(), ImageLoaderFactory {
             .build()
         return ImageLoader.Builder(this)
             .okHttpClient(client)
+            // 關閉硬體點陣圖（Coil 在 API 26+ 預設 Bitmap.Config.HARDWARE）。
+            // 硬體點陣圖是直接放在 GPU 的 AHardwareBuffer，繪製內容由驅動決定；
+            // 電視盒（Amlogic/Mali）與模擬器的驅動會把回收後的 buffer 畫成殘影或雜訊，
+            // 症狀是「第一次開正常，關掉再開所有封面變成亂碼色塊」——
+            // 已在模擬器上重現並確認關掉此選項即完全恢復。
+            // 代價是點陣圖改放 Java heap，記憶體多一些，但封面圖不大，可接受。
+            .allowHardware(false)
             .crossfade(true)
             .build()
     }
