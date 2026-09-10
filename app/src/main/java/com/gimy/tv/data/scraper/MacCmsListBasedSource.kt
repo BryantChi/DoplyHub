@@ -175,7 +175,7 @@ abstract class MacCmsListBasedSource(
                 card.parent()?.selectFirst(".myui-vodlist__detail h4 a")?.text()?.trim().orEmpty()
             }
             if (title.isBlank()) continue
-            val cover = resolveUrl(card.attr("data-original").ifBlank { card.attr("data-src") })
+            val cover = resolveUrl(macCmsCardCover(card))
             val status = card.selectFirst("span.pic-text, span.note")?.text()?.trim() ?: ""
             items.add(Vod(id, sourceType, title, cover, "", 0, status,
                 siteStatus = parseEpisodeStatus(status)))
