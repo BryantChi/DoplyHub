@@ -33,7 +33,8 @@ class EynyTvSource @Inject constructor(
         withContext(Dispatchers.IO) {
             val doc = fetchDocument(buildSearchUrl(keyword, page))
             doc.select("#stickyside").remove()
-            EynyTvParser.parseVodList(doc, baseUrl, page)
+            // 搜尋頁用的是 module-search-item 模板，與列表頁的 module-item 不同。
+            EynyTvParser.parseSearchResults(doc, baseUrl, page)
         }
 
     // eynytv.com uses the module template, NOT the base myui template. This source fully

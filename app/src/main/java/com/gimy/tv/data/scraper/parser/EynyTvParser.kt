@@ -12,6 +12,38 @@ import org.jsoup.nodes.Document
 object EynyTvParser {
     private val vodIdRegex = Regex("/voddetail/(\\d+)\\.html")
 
+    /**
+     * 搜尋頁的解析。**不能沿用 [parseVodList]**：搜尋頁與列表頁是不同模板，卡片分別是
+     * `.module-search-item` 與 `.module-item`，實測搜尋頁上 `.module-item` 數量為 0。
+     * 原本 search() 直接呼叫 parseVodList，所以 Eyny 每次搜尋都回 0 筆、在聚合結果裡
+     * 靜默缺席，看起來就像這個站沒有這部片。
+     */
+    fun parseSearchResults(doc: Document, baseUrl: String, page: Int): PaginatedResult<Vod> {
+        doc.select("#stickyside, .myui-side, aside").remove()
+        val items = mutableListOf<Vod>()
+        for (item in doc.select(".module-search-item")) {
+            val href = item.selectFirst("a[href*=/voddetail/]")?.attr("href").orEmpty()
+            val id = vodIdRegex.find(href)?.groupValues?.get(1)?.toLongOrNull() ?: continue
+            val title = item.selectFirst("h3 a")?.text()?.trim().orEmpty()
+                .ifBlank { item.selectFirst("a[href*=/voddetail/]")?.attr("title")?.trim().orEmpty() }
+            if (title.isBlank()) continue
+            // src 是 lazyload 的佔位圖（loading.png），真正的封面在 data-src。取錯不會有
+            // 任何錯誤跡象，只會整頁變成同一張灰圖。
+            val img = item.selectFirst("img")
+            val cover = resolveUrl(
+                img?.attr("data-src").orEmpty().ifBlank { img?.attr("data-original").orEmpty() },
+                baseUrl,
+            )
+            val status = item.selectFirst(".video-serial")?.text()?.trim().orEmpty()
+            @Suppress("DEPRECATION")
+            items.add(Vod(id, SourceType.EYNY_TV, title, cover, "", 0, status,
+                siteStatus = parseEpisodeStatus(status)))
+        }
+        val unique = items.distinctBy { it.id }
+        val hasNext = doc.select("a:contains(下一頁), a:contains(下一页), a.next").isNotEmpty()
+        return PaginatedResult(unique, page, if (hasNext) page + 1 else page, hasNext)
+    }
+
     fun parseVodList(doc: Document, baseUrl: String, page: Int): PaginatedResult<Vod> {
         doc.select("#stickyside, .myui-side, aside").remove()
         val items = mutableListOf<Vod>()
