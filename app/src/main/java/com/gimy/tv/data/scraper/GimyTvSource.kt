@@ -55,7 +55,8 @@ class GimyTvSource @Inject constructor(
             val enc = java.net.URLEncoder.encode(keyword, "UTF-8")
             val doc = fetchDocument("$baseUrl/search/$enc----------$page---.html")
             doc.select("#stickyside").remove()
-            parser.parseVodList(doc, baseUrl, page)
+            // Search pages use the search-item template, not the card template used by lists.
+            parser.parseSearchResults(doc, baseUrl, page)
         }
 
     override suspend fun probeListCount(baseUrl: String): Int = withContext(Dispatchers.IO) {

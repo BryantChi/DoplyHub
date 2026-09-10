@@ -42,6 +42,7 @@ class GimyParser(
     private val epRegex = Regex("${Regex.escape(paths.episode)}/\\d+-(\\d+)-(\\d+)\\.html")
     private val cardSelector = "a.card__thumb[href*=${paths.detail}/]"
     private val episodeSelector = "a[href~=${paths.episode}/]"
+    private val searchCardSelector = "a.search-item__thumb[href*=${paths.detail}/]"
 
     fun parseVodList(doc: Document, baseUrl: String, page: Int): PaginatedResult<Vod> {
         doc.select("#stickyside, .rankings, .rank-list").remove()
@@ -65,6 +66,37 @@ class GimyParser(
         val totalPages = Regex("(\\d+)/(\\d+)").find(doc.select(".page, .stui-page, .section__nav").text())
             ?.groupValues?.get(2)?.toIntOrNull() ?: if (hasNext) page + 1 else page
         return PaginatedResult(unique, page, totalPages, hasNext || page < totalPages)
+    }
+
+    /**
+     * Search pages ship a different template from list pages — `article.search-item` with
+     * `search-item__thumb/__title/__meta` instead of the `card__*` family. Reusing
+     * [parseVodList] here silently yields zero results, which is how search stayed broken
+     * behind the Cloudflare wall without anyone noticing.
+     *
+     * Meta reads "類型 · 年份 · 地區 · 狀態"; only the trailing segment is the episode status.
+     */
+    fun parseSearchResults(doc: Document, baseUrl: String, page: Int): PaginatedResult<Vod> {
+        doc.select("#stickyside, .rankings, .rank-list").remove()
+        val items = mutableListOf<Vod>()
+        for (thumb in doc.select(searchCardSelector)) {
+            val id = vodIdRegex.find(thumb.attr("href"))?.groupValues?.get(1)?.toLongOrNull() ?: continue
+            val card = thumb.parents().firstOrNull { it.hasClass("search-item") }
+            val title = thumb.attr("aria-label")
+                .ifBlank { card?.selectFirst("h2.search-item__title")?.text().orEmpty() }
+                .ifBlank { thumb.selectFirst("img")?.attr("alt").orEmpty() }
+                .trim()
+            if (title.isBlank()) continue
+            val cover = resolveUrl(thumb.selectFirst("img")?.attr("src").orEmpty(), baseUrl)
+            val status = card?.selectFirst("p.search-item__meta")?.text()
+                ?.substringAfterLast('\u00B7')?.trim().orEmpty()
+            @Suppress("DEPRECATION")
+            items.add(Vod(id, sourceType, title, cover, "", 0, status,
+                siteStatus = parseEpisodeStatus(status)))
+        }
+        val unique = items.distinctBy { it.id }
+        val hasNext = doc.select("a:contains(下一頁), a[title=下一頁], .chip-nav--next").isNotEmpty()
+        return PaginatedResult(unique, page, if (hasNext) page + 1 else page, hasNext)
     }
 
     fun parseVodDetail(doc: Document, vodId: Long, baseUrl: String): VodDetail {

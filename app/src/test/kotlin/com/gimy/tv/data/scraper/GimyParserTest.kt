@@ -194,4 +194,78 @@ class GimyParserTest {
         val e = runCatching { extractPlayerJson("<html><body>no player here</body></html>") }.exceptionOrNull()
         assertThat(e).isInstanceOf(ScraperException::class.java)
     }
+
+    // ── search results ──
+
+    /**
+     * Search pages use a different template from list pages: article.search-item with
+     * search-item__thumb / __title / __meta, not the card__* family. Captured from
+     * gimytv.me and gitube.tv on 2026-09-10 — both mirrors are byte-identical here
+     * apart from the detail path.
+     */
+    private fun searchHtml(detailPath: String) = """
+        <div class="search-list">
+          <article class="search-item">
+            <a href="$detailPath/481112.html" class="search-item__thumb" aria-label="財閥X刑警第二季">
+              <img src="https://imgs.1777cdn.com/upload/vod/20260807-1/ae3be38.jpg" alt="財閥X刑警第二季">
+            </a>
+            <div class="search-item__body">
+              <h2 class="search-item__title"><a href="$detailPath/481112.html">財閥X刑警第二季</a></h2>
+              <p class="search-item__meta"> 韓劇 · 2026 · 韓國 · 更新至10 </p>
+            </div>
+          </article>
+          <article class="search-item">
+            <a href="$detailPath/263439.html" class="search-item__thumb" aria-label="財閥家的大少爺">
+              <img src="/upload/vod/20240423-1/e0988ed.jpg" alt="財閥家的大少爺">
+            </a>
+            <div class="search-item__body">
+              <h2 class="search-item__title"><a href="$detailPath/263439.html">財閥家的大少爺</a></h2>
+              <p class="search-item__meta"> 韓劇 · 2022 · 韓國 · 全16集 </p>
+            </div>
+          </article>
+        </div>
+    """.trimIndent()
+
+    @Suppress("DEPRECATION")
+    @Test fun `parses gimytv search results`() {
+        val doc = Jsoup.parse(searchHtml("/vod"), gimytvBase)
+        val r = gimytvParser.parseSearchResults(doc, gimytvBase, page = 1)
+        assertThat(r.items).hasSize(2)
+        val first = r.items[0]
+        assertThat(first.id).isEqualTo(481112L)
+        assertThat(first.title).isEqualTo("財閥X刑警第二季")
+        assertThat(first.coverUrl).isEqualTo("https://imgs.1777cdn.com/upload/vod/20260807-1/ae3be38.jpg")
+        assertThat(first.sourceType).isEqualTo(SourceType.GIMYTV)
+        assertThat(first.status).isEqualTo("更新至10")
+    }
+
+    @Suppress("DEPRECATION")
+    @Test fun `parses gitube search results through the same parser`() {
+        val doc = Jsoup.parse(searchHtml("/title"), gitubeBase)
+        val r = gitubeParser.parseSearchResults(doc, gitubeBase, page = 1)
+        assertThat(r.items).hasSize(2)
+        assertThat(r.items[0].id).isEqualTo(481112L)
+        assertThat(r.items[0].sourceType).isEqualTo(SourceType.GIMYMAX)
+        assertThat(r.items[1].status).isEqualTo("全16集")
+    }
+
+    /** Same isolation rule as the list parser: a mirror's config must not read the other's HTML. */
+    @Test fun `search path tokens gate the match`() {
+        val doc = Jsoup.parse(searchHtml("/title"), gitubeBase)
+        assertThat(gimytvParser.parseSearchResults(doc, gitubeBase, page = 1).items).isEmpty()
+    }
+
+    @Test fun `resolves root-relative search cover against baseUrl`() {
+        val doc = Jsoup.parse(searchHtml("/vod"), gimytvBase)
+        val r = gimytvParser.parseSearchResults(doc, gimytvBase, page = 1)
+        assertThat(r.items[1].coverUrl).isEqualTo("https://gimytv.me/upload/vod/20240423-1/e0988ed.jpg")
+    }
+
+    /** Meta is "類型 · 年份 · 地區 · 狀態"; only the trailing segment is the episode status. */
+    @Test fun `takes only the trailing segment of search meta as status`() {
+        val doc = Jsoup.parse(searchHtml("/vod"), gimytvBase)
+        val r = gimytvParser.parseSearchResults(doc, gimytvBase, page = 1)
+        assertThat(r.items[0].status).doesNotContain("韓劇")
+        assertThat(r.items[0].status).doesNotContain("2026")
+    }
 }

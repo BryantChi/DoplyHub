@@ -1,6 +1,8 @@
 package com.gimy.tv.data.scraper
 
 import com.gimy.tv.data.endpoint.EndpointResolver
+import com.gimy.tv.data.network.WebViewUserAgentProvider
+import com.gimy.tv.data.network.embedUserAgent
 import com.gimy.tv.domain.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,6 +30,7 @@ import org.jsoup.nodes.Document
 abstract class EmbeddedHlsSource(
     protected val client: OkHttpClient,
     protected val endpointResolver: EndpointResolver,
+    private val webViewUserAgentProvider: WebViewUserAgentProvider? = null,
 ) : SiteSource {
 
     abstract override val sourceType: SourceType
@@ -47,8 +50,10 @@ abstract class EmbeddedHlsSource(
     /** Extract (title, cover, year) metadata from a detail page. */
     protected abstract fun parseDetailMeta(doc: Document, vodId: Long): Triple<String, String, Int>
 
-    private val userAgent =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    /** Jable sits behind Cloudflare and must send the UA that solved the challenge;
+     *  XNXX does not, and keeps the original value. See [embedUserAgent]. */
+    private val userAgent: String
+        get() = embedUserAgent(sourceType, webViewUserAgentProvider?.userAgent)
 
     // ─── Slug ↔ stableId cache ───
     // jable / xnxx use slug-based detail URLs (e.g. "fns-203", "1h3vtvb4/the_widow…")

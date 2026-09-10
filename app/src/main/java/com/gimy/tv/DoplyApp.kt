@@ -17,6 +17,8 @@ import javax.inject.Inject
 class DoplyApp : Application(), ImageLoaderFactory {
 
     @Inject lateinit var endpointResolver: EndpointResolver
+
+    @Inject lateinit var cfCookieStore: com.gimy.tv.data.network.CfCookieStore
     @Inject lateinit var movieffmSlugDao: MovieffmSlugDao
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -24,6 +26,9 @@ class DoplyApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         appScope.launch { endpointResolver.warmUp() }
+        // Restores a previously solved cf_clearance so search works immediately
+        // instead of paying the 6-8s challenge again on every launch.
+        appScope.launch { runCatching { cfCookieStore.warmUp() } }
 
         // Prune MovieFFM slug cache rows untouched for >30 days. Single DELETE WHERE,
         // negligible disk cost. Skips WorkManager scheduling because the slug table only
