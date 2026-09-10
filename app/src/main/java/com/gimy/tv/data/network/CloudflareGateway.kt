@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.Response
 import java.util.concurrent.ConcurrentHashMap
@@ -41,6 +42,21 @@ class CloudflareGateway @Inject constructor(
      *  and without this each would spawn its own WebView for the same challenge. */
     private val hostLocks = ConcurrentHashMap<String, Mutex>()
 
+    /** Hosts currently being solved. The search screen reads this to say "verifying" instead
+     *  of silently returning fewer sources. */
+    private val _solvingHosts = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
+    val solvingHosts: kotlinx.coroutines.flow.StateFlow<Set<String>> = _solvingHosts
+
+    /** Solves any endpoint that has no clearance yet, so the first real search does not have
+     *  to wait. Fire-and-forget: failures leave behaviour exactly as it was. */
+    suspend fun warmUp(candidateUrls: List<String>) {
+        hostsNeedingWarmUp(candidateUrls) { host ->
+            cookieStore.rawFor(host)?.contains(CLEARANCE_COOKIE) == true
+        }.forEach { url ->
+            runCatching { url.toHttpUrlOrNull()?.let { solve(it) } }
+        }
+    }
+
     suspend fun solve(url: HttpUrl): Boolean {
         if (!userAgentProvider.isWebViewAvailable) return false
         val lock = hostLocks.getOrPut(url.host) { Mutex() }
@@ -53,6 +69,16 @@ class CloudflareGateway @Inject constructor(
 
     @SuppressLint("SetJavaScriptEnabled")
     private suspend fun solveInWebView(url: HttpUrl): Boolean = withContext(Dispatchers.Main) {
+        _solvingHosts.value = _solvingHosts.value + url.host
+        try {
+            return@withContext solveInWebViewInner(url)
+        } finally {
+            _solvingHosts.value = _solvingHosts.value - url.host
+        }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private suspend fun solveInWebViewInner(url: HttpUrl): Boolean = withContext(Dispatchers.Main) {
         val webView = WebView(context).apply {
             settings.javaScriptEnabled = true          // the challenge is a JS computation
             settings.domStorageEnabled = true

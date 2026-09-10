@@ -94,4 +94,35 @@ class CloudflareChallengeTest {
         val results = """<article class="search-item"><a href="/vod/1.html" class="search-item__thumb"></a></article>"""
         assertThat(isSearchRateLimited(results)).isFalse()
     }
+
+    // ── warm-up target selection ──
+
+    /**
+     * Aggregated search gives each source 5 seconds, but solving a challenge takes 6-20.
+     * The first search therefore always loses the challenged source. Warming up at launch
+     * removes that, but only for hosts that have no clearance yet — re-solving a host we
+     * already hold a cookie for would burn a WebView launch for nothing.
+     */
+    @Test fun `only hosts without a clearance are warmed up`() {
+        val held = setOf("gimytv.me")
+        val targets = hostsNeedingWarmUp(
+            listOf("https://gimytv.me", "https://gitube.tv"),
+        ) { it in held }
+        assertThat(targets).containsExactly("https://gitube.tv")
+    }
+
+    @Test fun `duplicate candidates are warmed up once`() {
+        val targets = hostsNeedingWarmUp(
+            listOf("https://gitube.tv", "https://gitube.tv"),
+        ) { false }
+        assertThat(targets).containsExactly("https://gitube.tv")
+    }
+
+    @Test fun `blank candidates are ignored`() {
+        assertThat(hostsNeedingWarmUp(listOf("", "  ")) { false }).isEmpty()
+    }
+
+    @Test fun `nothing to warm up when every host already has a clearance`() {
+        assertThat(hostsNeedingWarmUp(listOf("https://gitube.tv")) { true }).isEmpty()
+    }
 }

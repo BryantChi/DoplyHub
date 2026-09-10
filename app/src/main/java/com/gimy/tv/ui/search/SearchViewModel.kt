@@ -21,13 +21,17 @@ data class SearchUiState(
     val error: String? = null,
     val currentPage: Int = 1,
     val hasMore: Boolean = false,
-    val isLoadingMore: Boolean = false
+    val isLoadingMore: Boolean = false,
+    /** A gated source is solving its Cloudflare challenge right now. Shown so the first
+     *  search reads as "verifying" rather than quietly returning fewer sources. */
+    val isVerifying: Boolean = false
 )
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val vodRepository: VodRepository,
-    private val searchHistoryRepository: SearchHistoryRepository
+    private val searchHistoryRepository: SearchHistoryRepository,
+    cloudflareGateway: com.gimy.tv.data.network.CloudflareGateway,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
@@ -36,6 +40,11 @@ class SearchViewModel @Inject constructor(
     private var searchJob: Job? = null
 
     init {
+        viewModelScope.launch {
+            cloudflareGateway.solvingHosts.collect { hosts ->
+                _uiState.update { it.copy(isVerifying = hosts.isNotEmpty()) }
+            }
+        }
         viewModelScope.launch {
             searchHistoryRepository.getRecentSearches(10).collect { keywords ->
                 _uiState.update { it.copy(recentSearches = keywords) }

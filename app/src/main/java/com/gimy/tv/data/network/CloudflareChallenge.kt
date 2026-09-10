@@ -65,3 +65,25 @@ private val RATE_LIMIT_MARKERS = listOf("搜尋太頻繁", "搜索太频繁")
  */
 internal fun isSearchRateLimited(body: String): Boolean =
     RATE_LIMIT_MARKERS.any { body.contains(it) }
+
+
+/** Host portion of a URL, without pulling in a URL parser for what is a prefix match. */
+private fun hostOf(url: String): String =
+    url.substringAfter("://").substringBefore('/').substringBefore(':')
+
+/**
+ * Picks which endpoints are worth warming up at launch.
+ *
+ * Aggregated search allows each source 5 seconds while solving a challenge takes 6-20, so a
+ * cold first search always drops the challenged source. Warming up at launch closes that gap
+ * — but only for hosts with no clearance yet; re-solving one we already hold a cookie for
+ * would spend a WebView launch to learn nothing.
+ */
+internal fun hostsNeedingWarmUp(
+    candidates: List<String>,
+    hasClearance: (String) -> Boolean,
+): List<String> = candidates
+    .map { it.trim() }
+    .filter { it.isNotBlank() }
+    .distinct()
+    .filterNot { hasClearance(hostOf(it)) }

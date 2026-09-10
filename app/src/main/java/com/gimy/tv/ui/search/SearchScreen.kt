@@ -169,7 +169,11 @@ fun SearchScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         DoplyLoadingIndicator(dims.loadingIndicatorSize)
                         Spacer(Modifier.height(12.dp))
-                        Text("搜尋「${uiState.query}」中…", color = CinemaTextMuted, fontSize = 14.sp)
+                        Text(
+                            if (uiState.isVerifying) "首次搜尋需通過站台驗證，請稍候…"
+                            else "搜尋「${uiState.query}」中…",
+                            color = CinemaTextMuted, fontSize = 14.sp,
+                        )
                     }
                 }
             }

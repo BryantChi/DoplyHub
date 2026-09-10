@@ -23,6 +23,10 @@ class GimyTvSource @Inject constructor(
     private val paths = GimyPaths(list = "/type", detail = "/vod", episode = "/ep")
     private val parser = GimyParser(sourceType, paths)
 
+    // Only the search path is challenged; list/detail/play are served normally.
+    override val cloudflareWarmUpUrl: String
+        get() = "$baseUrl/search/%E7%86%B1%E9%96%80----------1---.html"
+
     override suspend fun fetchCategories(): List<Category> = listOf(
         Category(2, "電視劇", sourceType), Category(1, "電影", sourceType),
         Category(4, "動漫", sourceType), Category(29, "綜藝", sourceType),

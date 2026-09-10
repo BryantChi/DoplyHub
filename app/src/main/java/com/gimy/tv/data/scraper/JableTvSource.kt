@@ -34,6 +34,9 @@ class JableTvSource @Inject constructor(
 
     override val sourceType = SourceType.JABLE_TV
 
+    // Jable challenges the whole site, so any page works as a warm-up target.
+    override val cloudflareWarmUpUrl: String get() = "$baseUrl/hot/"
+
     override val hlsRegex = Regex("""var hlsUrl ?= ?['"]([^'"]+\.m3u8[^'"]*)['"]""")
 
     override fun buildListUrlForPath(path: String, page: Int): String {
