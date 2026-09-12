@@ -24,6 +24,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.*
 import com.gimy.tv.ui.theme.*
@@ -32,6 +33,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 @OptIn(ExperimentalTvMaterial3Api::class)
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun PlayerScreen(
     onBack: () -> Unit,
@@ -63,6 +65,10 @@ fun PlayerScreen(
 
         ExoPlayer.Builder(context.applicationContext)
             .setLoadControl(loadControl)
+            // 改用 App 自己的 OkHttp 取串流。預設的 DefaultHttpDataSource 走系統的
+            // HttpURLConnection，不吃 App 的 DNS——播放 CDN 被 ISP 的 DNS 過濾時
+            // （解析到封鎖頁、自簽憑證），畫面只會全黑而 App 完全無法繞過。
+            .setMediaSourceFactory(DefaultMediaSourceFactory(viewModel.mediaDataSourceFactory))
             .build().apply {
                 playWhenReady = true
                 setAudioAttributes(

@@ -42,7 +42,17 @@ data class PlayerUiState(
 class PlayerViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val vodRepository: VodRepository,
-    private val watchHistoryRepository: WatchHistoryRepository
+    private val watchHistoryRepository: WatchHistoryRepository,
+    /**
+     * 交給 PlayerScreen 建 ExoPlayer 用，讓播放走 App 自己的 OkHttp 而非系統的
+     * HttpURLConnection——後者不吃 App 的 DNS 設定，播放用的 CDN 一旦被 ISP 的 DNS 過濾
+     * 就完全沒轍（實測「極速雲」的 v2.ppqrrs.com 被導向封鎖頁，模擬器正常、實機全黑）。
+     *
+     * 放在 ViewModel 而不是 Screen 直接取，是因為 Composable 拿 Hilt 相依要多繞
+     * EntryPoint；ViewModel 本來就是這個畫面的相依來源。
+     */
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    val mediaDataSourceFactory: androidx.media3.datasource.DataSource.Factory,
 ) : ViewModel() {
 
     private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYTV"
