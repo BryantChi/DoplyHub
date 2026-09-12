@@ -123,6 +123,30 @@ class EpisodeStatusParserTest {
         assertThat(s).isInstanceOf(EpisodeStatus.Raw::class.java)
     }
 
+    // ── 髒資料不得炸掉整批 ──
+    // 這個 parser 是所有來源共用的，而呼叫端多半把整批 catch 掉：一筆解析失敗
+    // 等於整個分類從畫面上消失，且毫無跡象。實際事故見 v3.1.10 的修正。
+
+    @Test fun `日期被誤當集數時不得拋例外`() {
+        // 實際發生過：movieffm 綜藝分類出現 "202520250915"，toInt() 拋
+        // NumberFormatException，整個分類九列變八列。
+        val s = parseEpisodeStatus("更新至第202520250915集")
+        assertThat(s).isInstanceOf(EpisodeStatus.Raw::class.java)
+    }
+
+    @Test fun `超出合理範圍的集數落回 Raw 而非硬湊數字`() {
+        // 上界 9999：真實影集不會有上萬集，超過幾乎必然是年份或 id 被誤配。
+        val s = parseEpisodeStatus("全20250915集")
+        assertThat(s).isInstanceOf(EpisodeStatus.Raw::class.java)
+    }
+
+    @Test fun `邊界內的大集數仍正常解析`() {
+        // 確認上界沒有誤殺長壽動畫這類真的集數很多的作品。
+        val s = parseEpisodeStatus("更新至第1200集")
+        assertThat(s).isInstanceOf(EpisodeStatus.InProgress::class.java)
+        assertThat((s as EpisodeStatus.InProgress).latest).isEqualTo(1200)
+    }
+
     @Test fun `full-width digits fall through to Raw (current behavior pinning)`() {
         // Document gap: \d in regex doesn't match full-width digits. If a scraper
         // ever emits "更新至第１２集" we'll classify as Raw rather than InProgress.
