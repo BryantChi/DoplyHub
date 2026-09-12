@@ -29,6 +29,24 @@ private val DOH_HOSTS = setOf(
     "movieffm.net",
 )
 
+/**
+ * 已知的 DNS 過濾「封鎖頁」位址。
+ *
+ * RPZ 過濾的表現不是解析失敗，而是**解析成功但回一個假位址**——那台伺服器送自簽憑證，
+ * 於是錯誤長得跟「CDN 換了新根憑證」一模一樣。所以光看例外分不出來，得看解析到的 IP。
+ *
+ * 有這張表就不必窮舉被擋的網域：白名單只是省一次系統查詢的捷徑，真正的判斷靠這裡。
+ * 這很重要，因為影片 CDN 每部片都可能不同、而且會換，靠人工維護清單追不上。
+ *
+ * 新增方式：`adb shell ping -c 1 <host>` 看實機解析到什麼，再 `openssl s_client` 確認
+ * 那台送的是不是自簽的 landing 憑證。
+ */
+private val BLOCKPAGE_IPS = setOf(
+    // 2026-09-12 實測：AS131644 TWNIC，憑證 CN=rpz10-landing（自簽）。
+    // 目前已知擋掉 www.movieffm.net 與播放線路「極速雲」的 v2.ppqrrs.com。
+    "182.173.0.181",
+)
+
 private val dohLock = Any()
 
 @Volatile
@@ -86,16 +104,35 @@ internal class SelectiveDohDns(
 ) : Dns {
 
     override fun lookup(hostname: String): List<InetAddress> {
-        if (!needsDoh(hostname)) return system.lookup(hostname)
+        // 白名單上的網域已知被擋，直接走 DoH，省掉註定要丟掉的那次系統查詢。
+        if (needsDoh(hostname)) return dohThenSystem(hostname)
 
+        val viaSystem = try {
+            system.lookup(hostname)
+        } catch (e: Exception) {
+            // 系統 DNS 解不出來也可能是被擋（有些過濾器直接回 NXDOMAIN），值得讓 DoH 試一次。
+            android.util.Log.w("DohDns", "系統 DNS 解析 $hostname 失敗，改試 DoH", e)
+            return dohThenSystem(hostname)
+        }
+
+        // 關鍵判斷：RPZ 過濾會「成功」回一個封鎖頁位址，而不是失敗。只看例外永遠發現不了，
+        // 得比對解析結果。命中就代表這個網域其實被擋了，改問 DoH 拿真正的位址。
+        if (viaSystem.any { it.hostAddress in BLOCKPAGE_IPS }) {
+            android.util.Log.w("DohDns", "$hostname 被 DNS 導向封鎖頁，改用 DoH")
+            return dohThenSystem(hostname)
+        }
+        return viaSystem
+    }
+
+    private fun dohThenSystem(hostname: String): List<InetAddress> {
         val viaDoh = try {
             doh.lookup(hostname)
         } catch (e: Exception) {
             android.util.Log.w("DohDns", "DoH 解析 $hostname 失敗，改用系統 DNS", e)
             emptyList()
         }
-        // 退回系統 DNS 救不回被 RPZ 擋掉的網域（系統 DNS 會「成功」回一個錯的 IP），
-        // 這一步的用途是保命：DoH 不可用時至少不要讓解析直接失敗。
+        // 退回系統 DNS 救不回被擋的網域（它會「成功」回封鎖頁），這一步純粹是保命：
+        // DoH 不可用時至少不要讓解析直接失敗，否則整個 App 連不上任何站。
         return viaDoh.ifEmpty { system.lookup(hostname) }
     }
 
