@@ -59,6 +59,13 @@ class PlayerViewModel @Inject constructor(
 
     private var vodDetail: VodDetail? = null
 
+    /** 在**播放**階段（而非取流階段）失敗過的線路 sourceId。
+     *
+     *  為什麼需要分開記：getPlayerData 成功只代表「網址拿得到」，不代表播得動——網址本身
+     *  已死、CDN 憑證鏈驗不過都屬於這類，playWithFallback 完全看不到。沒有這組記錄的話，
+     *  自動換線會沿著 retryWithNextSource 的環狀順序繞回同一條死線路。換片或換集時清空。 */
+    private val failedPlaybackSourceIds = mutableSetOf<Int>()
+
     init {
         loadPlayer()
     }
@@ -66,6 +73,7 @@ class PlayerViewModel @Inject constructor(
     private fun loadPlayer() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = "正在載入影片資訊…") }
+            failedPlaybackSourceIds.clear()
             val id = vodId ?: run {
                 _uiState.update { it.copy(isLoading = false, error = "無效的影片 ID") }
                 return@launch
@@ -264,6 +272,7 @@ class PlayerViewModel @Inject constructor(
 
     fun switchEpisode(episodeNum: Int) {
         val detail = vodDetail ?: return
+        failedPlaybackSourceIds.clear()
         val ordered = orderedSourcesFrom(detail.episodes, _uiState.value.sourceId)
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = "正在載入第${episodeNum}集…") }
@@ -312,6 +321,30 @@ class PlayerViewModel @Inject constructor(
         val hasNext = detail.episodes.any { line -> line.episodes.any { it.number == nextNum } }
         if (!hasNext) return
         switchEpisode(nextNum)
+    }
+
+    /**
+     * ExoPlayer 自己重試數次仍播不動時，由 PlayerScreen 呼叫。
+     *
+     * 補的是取流與播放之間的缺口：[playWithFallback] 只要 getPlayerData 回得了網址就算成功，
+     * 之後 ExoPlayer 播不播得起來它一概不知道。實際踩過的案例是影片 CDN 換成 Let's Encrypt
+     * 的新根憑證，取流完全正常、ExoPlayer 卻在 TLS 握手就倒，而畫面只是一片全黑，沒有任何
+     * 訊息可循。
+     *
+     * 行為：把目前線路記成「播放失敗」，換到還沒失敗過的下一條；全部都試過就把原因顯示出來。
+     */
+    fun onPlaybackFailed(reason: String) {
+        val detail = vodDetail ?: return
+        failedPlaybackSourceIds += _uiState.value.sourceId
+        val next = detail.episodes.firstOrNull { it.sourceId !in failedPlaybackSourceIds }
+        if (next == null) {
+            _uiState.update { it.copy(
+                isLoading = false,
+                error = "所有線路都無法播放\n（$reason）",
+            ) }
+            return
+        }
+        switchSource(next.sourceId)
     }
 
     fun retryWithNextSource() {

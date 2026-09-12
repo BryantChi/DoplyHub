@@ -143,7 +143,22 @@ fun PlayerScreen(
                 if (errorRetryCount < 3) {
                     errorRetryCount++
                     exoPlayer.prepare()
+                    return
                 }
+                // 重試三次仍失敗。原本這裡直接放棄，畫面就永遠停在全黑——使用者不知道發生
+                // 什麼事，除錯也只能接 adb 撈 ExoPlayer 的 stack trace（CDN 換根憑證那次就是
+                // 這樣才找到的）。改成記一筆 log 並把原因往上報，讓 ViewModel 換線或顯示出來。
+                // 一定要連網址一起印：這類失敗幾乎都是「某一個 CDN 有問題」，
+                // 而每條線路的 CDN 都不一樣。少了網址就只能從 stack trace 反推是哪一台。
+                val failedUri = generateSequence(error.cause as? Throwable) { it.cause }
+                    .filterIsInstance<androidx.media3.datasource.HttpDataSource.HttpDataSourceException>()
+                    .firstOrNull()?.dataSpec?.uri
+                android.util.Log.w(
+                    "PlayerFallback",
+                    "playback failed after 3 retries: ${error.errorCodeName} url=$failedUri",
+                    error,
+                )
+                viewModel.onPlaybackFailed(describePlaybackError(error))
                 // After 3 retries, stop — avoid infinite loop on non-recoverable errors
             }
         }
@@ -302,5 +317,23 @@ fun PlayerScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * 把 ExoPlayer 的例外翻成一句使用者看得懂的話。
+ *
+ * 為什麼要逐一辨認而不是直接印 message：這些 message 是整串 Java 例外文字（例如
+ * 「CertPathValidatorException: Trust anchor for certification path not found」），
+ * 對使用者毫無意義。認不出來的就保留 errorCodeName——那是 Media3 定義的字串常數，
+ * 混淆後仍然可讀，使用者回報時我們照樣查得到。
+ */
+private fun describePlaybackError(error: androidx.media3.common.PlaybackException): String {
+    val causes = generateSequence(error.cause) { it.cause }
+    return when {
+        causes.any { it is javax.net.ssl.SSLHandshakeException } -> "連線安全驗證失敗"
+        causes.any { it is java.net.UnknownHostException } -> "找不到影片伺服器"
+        causes.any { it is java.net.SocketTimeoutException } -> "連線逾時"
+        else -> error.errorCodeName
     }
 }
