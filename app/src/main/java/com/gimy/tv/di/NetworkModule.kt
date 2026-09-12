@@ -42,6 +42,13 @@ object NetworkModule {
             .dns(createDohDns(context))
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
+            // 整個 call 的絕對上限。這條是必要的：專案裡所有抓取都用阻塞的 execute()，
+            // 而 coroutine 的 withTimeout 只在掛起點生效，中斷不了阻塞呼叫——上層宣告
+            // 「搜尋 5 秒、取流 8 秒」，實際卻可能耗到 connect 8s + read 15s + 重導向數次。
+            // callTimeout 是 OkHttp 自己的計時器，會真的把 call 取消掉。
+            // 取 20 秒是「絕對不該超過」的上限，不是預期值：正常站台 2-5 秒就回，
+            // 所以不會誤殺任何本來會成功的請求。
+            .callTimeout(20, TimeUnit.SECONDS)
             .followRedirects(true)
             // Without a jar every request went out cookie-less, so a solved Cloudflare
             // challenge could never be reused. cf_clearance lives here.
