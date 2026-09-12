@@ -805,7 +805,16 @@ class VodRepositoryImpl @Inject constructor(
                             val result = movieffmSource.fetchVodList(typeId, 1)
                             HomeRowData(name, SourceType.MOVIEFFM, typeId, result.items.take(15))
                         }
-                    } catch (_: Exception) { null }
+                    } catch (e: Exception) {
+                        // 原本這裡靜默吞掉，九個分類全失敗時首頁就只是安靜地少掉所有 FFM 列，
+                        // 完全查不出是逾時、網址錯還是解析掛掉。
+                        android.util.Log.w(
+                            "HomeLoad",
+                            "ffm $name($typeId) failed url=${movieffmSource.baseUrl}",
+                            e,
+                        )
+                        null
+                    }
                 }
             }.mapNotNull { it.await() }.filter { it.items.isNotEmpty() }
         }
