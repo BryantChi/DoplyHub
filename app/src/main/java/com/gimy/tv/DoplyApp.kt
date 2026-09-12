@@ -11,7 +11,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import com.gimy.tv.data.network.createDohDns
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -86,6 +88,18 @@ class DoplyApp : Application(), ImageLoaderFactory {
             // 封面圖也要走 DoH：有些來源的圖片就掛在被 DNS 過濾的網域上，
             // 只讓 API 繞過的話，列表有資料但封面全是黑框。
             .dns(createDohDns(this))
+            // 這個 client 原本一個 timeout 都沒設，吃 OkHttp 預設的 connect/read 各 10 秒，
+            // 並行上限更是預設的 64。首頁一次要載幾十張封面，等於瞬間開六十幾條連線，
+            // 在電視盒上會把頻寬與 CPU 佔滿，把同時在跑的目錄抓取與端點探測一起拖垮
+            // （清快取後重開特別明顯，因為所有封面都要重抓）。
+            // 12 是估過的：一屏大約六到九張卡，夠用而不至於灌爆慢速裝置。
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(12, TimeUnit.SECONDS)
+            .callTimeout(20, TimeUnit.SECONDS)
+            .dispatcher(Dispatcher().apply {
+                maxRequests = 12
+                maxRequestsPerHost = 4
+            })
             .addInterceptor { chain ->
                 val req = chain.request()
                 val host = req.url.host

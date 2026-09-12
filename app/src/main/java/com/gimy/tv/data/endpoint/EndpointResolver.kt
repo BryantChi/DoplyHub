@@ -12,6 +12,7 @@ import com.gimy.tv.data.update.UpdateConfig
 import com.gimy.tv.domain.model.SourceType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -57,6 +58,8 @@ class EndpointResolver @Inject constructor(
             "https://raw.githubusercontent.com/BryantChi/DoplyHub/dev/endpoints.json"
         private const val CACHE_TTL_MS = 24L * 60 * 60 * 1000  // 24h
         private const val PROBE_TIMEOUT_MS = 3000L
+        /** 啟動後延後多久才開始探測，讓首頁先把網路讓出來。 */
+        private const val WARMUP_PROBE_DELAY_MS = 6000L
         private const val FETCH_TIMEOUT_MS = 6000L
         // A healthy list page returns at least this many parseable items; tune if false-positives arise.
         private const val MIN_HEALTHY_ITEMS = 5
@@ -120,8 +123,18 @@ class EndpointResolver @Inject constructor(
 
     /** Loads cached resolved URLs, then refreshes if 24h-stale. Called once from DoplyApp.onCreate. */
     suspend fun warmUp() {
+        // 讀 DataStore 很快，必須同步做完：首頁馬上就要用 getBaseUrl() 拿網址。
         loadCache()
-        refreshIfStale()
+        // 探測則延後。它會打十幾個站台、每個最長吃滿 connect+read，而 App 剛啟動時
+        // 首頁的十八個請求、Cloudflare 的 WebView 暖機都在跑，全部共用同一個 OkHttp
+        // dispatcher 的十個並行額度——在電視盒上互搶的結果是首頁與探測一起逾時，
+        // 表現成「來源全失效 + 整個 App 很慢」。
+        // 這幾秒完全不影響可用性：首頁此刻用的是快取或 DEFAULTS 裡的網址，本來就能用，
+        // 探測只是為了「之後」換到更好的鏡像。
+        internalScope.launch {
+            delay(WARMUP_PROBE_DELAY_MS)
+            refreshIfStale()
+        }
     }
 
     suspend fun refreshIfStale() {
