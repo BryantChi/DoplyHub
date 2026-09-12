@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Adds Let's Encrypt's ISRG Root X1/X2 as trust anchors on top of the system store.
+    把 Let's Encrypt 的根憑證連同 APK 一起包進來，疊在系統憑證庫之上。
 
-    Why: some Android devices (older TV firmware, certain emulator images) don't ship ISRG Root X1.
-    Let's Encrypt-signed sites (e.g. gimy01.tv) then fail SSL chain validation.
-    This file ships the roots inside the APK so the App can connect regardless of system trust state.
+    為什麼需要：裝置的系統憑證庫是出廠時就固定的，之後幾乎不會補新的根。舊電視韌體沒有
+    ISRG Root X1，較新的 Root YR / YE 則是連 2022 年的手機都沒有——憑證鏈一旦往上接不到
+    任何一個「本來就信任的根」，TLS 就直接握手失敗，表現出來是播放黑畫面或整頁載入失敗。
 
-    System CAs are still trusted as well — this is additive, not replacement.
+    YR / YE 是 2026-09-12 追進來的（Let's Encrypt 的 gen-y 世代，YR 為 RSA、YE 為 ECDSA）：
+    影片 CDN play.phimgood.com 改由 Root YR 簽發，而實機（Galaxy A32 / Android 13）系統裡
+    ISRG 只有 X1 與 X2，於是 ExoPlayer 抓 m3u8 時丟
+    「CertPathValidatorException: Trust anchor for certification path not found」。
+    站台本身走 Google Trust Services 的舊根所以毫無異狀，只有播放掛掉，很容易誤判成播放器問題。
+
+    注意是「加上去」而不是「取代」：system 這條留著，系統原本信任的 CA 全部照舊有效。
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
@@ -14,6 +20,8 @@
             <certificates src="system" />
             <certificates src="@raw/isrg_root_x1" />
             <certificates src="@raw/isrg_root_x2" />
+            <certificates src="@raw/isrg_root_yr" />
+            <certificates src="@raw/isrg_root_ye" />
         </trust-anchors>
     </base-config>
 </network-security-config>
