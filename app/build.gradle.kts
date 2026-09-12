@@ -120,6 +120,7 @@ dependencies {
     // Network / Scraping
     implementation(libs.jsoup)
     implementation(libs.okhttp)
+    implementation(libs.okhttp.dnsoverhttps)
 
     // Coroutines
     implementation(libs.coroutines.android)

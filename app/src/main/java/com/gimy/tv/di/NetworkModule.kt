@@ -3,6 +3,7 @@ package com.gimy.tv.di
 import android.content.Context
 import com.gimy.tv.data.network.CfCookieStore
 import com.gimy.tv.data.network.CloudflareInterceptor
+import com.gimy.tv.data.network.createDohDns
 import com.gimy.tv.data.network.SearchRateLimitInterceptor
 import com.gimy.tv.data.network.WebViewUserAgentProvider
 import com.gimy.tv.data.network.httpUserAgent
@@ -35,6 +36,10 @@ object NetworkModule {
 
         return OkHttpClient.Builder()
             .cache(cache)
+            // 走 DoH 而非裝置的 DNS：使用者家中的 ISP DNS 對部分來源做了 RPZ 過濾，
+            // 解析會被導到封鎖頁（自簽憑證），錯誤訊息與「CDN 換根憑證」難以分辨。
+            // 詳見 createDohDns 的說明，含解析失敗時退回系統 DNS 的理由。
+            .dns(createDohDns(context))
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .followRedirects(true)

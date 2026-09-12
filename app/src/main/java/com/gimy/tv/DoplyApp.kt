@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import com.gimy.tv.data.network.createDohDns
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 
@@ -82,6 +83,9 @@ class DoplyApp : Application(), ImageLoaderFactory {
         val ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         val client = OkHttpClient.Builder()
+            // 封面圖也要走 DoH：有些來源的圖片就掛在被 DNS 過濾的網域上，
+            // 只讓 API 繞過的話，列表有資料但封面全是黑框。
+            .dns(createDohDns(this))
             .addInterceptor { chain ->
                 val req = chain.request()
                 val host = req.url.host
