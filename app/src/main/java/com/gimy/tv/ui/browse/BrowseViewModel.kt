@@ -71,6 +71,13 @@ class BrowseViewModel @Inject constructor(
             }
             try {
                 val result = vodRepository.getVodList(sourceType, typeId, page)
+                // 分類頁原本完全沒有記錄，空白時分不出是抓不到、解析 0 筆、還是站方真的沒內容。
+                // 「HTTP 200 + 解析 0 筆」是這個專案最常見也最難察覺的失效（站方改版、換模板
+                // 都長這樣），筆數是唯一能一眼分辨的線索。
+                android.util.Log.w(
+                    "BrowseLoad",
+                    "$sourceType(typeId=$typeId) page=$page → ${result.items.size} 筆, hasMore=${result.hasMore}",
+                )
                 val newItems = result.items.distinctBy { "${it.sourceType}_${it.id}" }
                 _uiState.update { state ->
                     val merged = if (isFirstPage) newItems
@@ -87,6 +94,7 @@ class BrowseViewModel @Inject constructor(
                     )
                 }
             } catch (e: Exception) {
+                android.util.Log.w("BrowseLoad", "$sourceType(typeId=$typeId) page=$page 失敗", e)
                 _uiState.update {
                     if (isRefresh) it.copy(isRefreshing = false, error = e.message)
                     else it.copy(isLoading = false, isLoadingMore = false, error = e.message)
