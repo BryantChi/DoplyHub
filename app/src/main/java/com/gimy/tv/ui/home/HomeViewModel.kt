@@ -126,7 +126,7 @@ class HomeViewModel @Inject constructor(
         val previousRows = _uiState.value.rows
 
         // Phase 1: Load gimymax (fast — show immediately)
-        viewModelScope.launch {
+        val gimyJob = viewModelScope.launch {
             _uiState.update {
                 if (isRefresh) it.copy(isRefreshing = true, error = null)
                 else it.copy(isLoading = true, error = null)
@@ -135,9 +135,13 @@ class HomeViewModel @Inject constructor(
                 val gimyRows = vodRepository.getGimyHomeRows(forceRefresh = force)
                     .filter { it.items.isNotEmpty() }
                     .map { HomeRow(it.title, it.typeId, it.items, it.sourceType) }
+                android.util.Log.w("HomeLoad", "gimy ok: ${gimyRows.size} rows (force=$force)")
 
                 if (gimyRows.isNotEmpty()) {
-                    _uiState.update { it.copy(isLoading = false, rows = gimyRows) }
+                    // error = null 是必要的：Phase 2 可能已經搶先把「無法載入內容」寫進去了
+                    // （它失敗得快，常比這裡早回來），不清掉的話畫面會被錯誤蓋住，
+                    // 即使這 10 列資料已經在手上。
+                    _uiState.update { it.copy(isLoading = false, rows = gimyRows, error = null) }
                 } else if (!isRefresh) {
                     // Phase 1 returned nothing — keep loading, let Phase 2 try
                     _uiState.update { it.copy(rows = emptyList()) }
@@ -146,6 +150,7 @@ class HomeViewModel @Inject constructor(
             } catch (e: kotlin.coroutines.cancellation.CancellationException) {
                 throw e
             } catch (e: Exception) {
+                android.util.Log.w("HomeLoad", "gimy FAILED (force=$force)", e)
                 if (!isRefresh) {
                     // Don't set isLoading=false yet — Phase 2 might still succeed
                     _uiState.update { it.copy(rows = emptyList()) }
@@ -159,6 +164,13 @@ class HomeViewModel @Inject constructor(
             try {
                 val ffmRows = vodRepository.getMovieffmHomeRows(forceRefresh = force)
                     .filter { it.items.isNotEmpty() }
+                android.util.Log.w("HomeLoad", "ffm ok: ${ffmRows.size} rows (force=$force)")
+
+                // ffm 空的時候，「是不是整頁都載不到」必須看 Phase 1 的結果，不能用當下的
+                // state.rows 判斷：ffm 失敗得快，幾乎總是比 gimy 早回來，那一刻 rows 還是空的，
+                // 於是把還在路上的 gimy 結果誤判成全部失敗，寫下錯誤畫面蓋住後到的內容。
+                // 只在空的時候才等，有內容就照舊立即併入，不拖慢正常情況。
+                if (ffmRows.isEmpty()) gimyJob.join()
 
                 _uiState.update { state ->
                     if (ffmRows.isNotEmpty()) {
@@ -176,7 +188,10 @@ class HomeViewModel @Inject constructor(
                 }
             } catch (e: kotlin.coroutines.cancellation.CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.w("HomeLoad", "ffm FAILED (force=$force)", e)
+                // 同上：ffm 掛掉不代表整頁沒東西，要等 Phase 1 的結果才能下結論。
+                gimyJob.join()
                 _uiState.update { state ->
                     when {
                         isRefresh && state.rows.isEmpty() && previousRows.isNotEmpty() ->
