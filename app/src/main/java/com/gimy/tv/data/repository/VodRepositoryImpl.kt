@@ -245,7 +245,10 @@ class VodRepositoryImpl @Inject constructor(
                     // 符合的片」要分開，否則無法判斷這次搜尋值不值得放進快取。
                     try {
                         withTimeout(5_000) { src.search(keyword, page) }
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        // 搜尋同時打八個來源，少了一個在結果裡看不出來——「這個站明明有這部片
+                        // 卻沒出現」的回報，過去只能靠猜。記下來才查得動。
+                        android.util.Log.w("SearchFallback", "${src.sourceType} 搜尋失敗", e)
                         null
                     }
                 }
@@ -766,7 +769,12 @@ class VodRepositoryImpl @Inject constructor(
                             val result = gimyTvSource.fetchVodList(typeId, 1)
                             HomeRowData(name, SourceType.GIMYTV, typeId, result.items.take(15))
                         }
-                    } catch (_: Exception) { null }
+                    } catch (e: Exception) {
+                        // 與 movieffm 那組對稱。gimy 是首頁主力（十列），某個分類失敗時
+                        // 原本只是安靜地少一列，看不出是逾時、解析掛掉還是站方改版。
+                        android.util.Log.w("HomeLoad", "gimy $name($typeId) failed", e)
+                        null
+                    }
                 }
             }.mapNotNull { it.await() }.filter { it.items.isNotEmpty() }
         }

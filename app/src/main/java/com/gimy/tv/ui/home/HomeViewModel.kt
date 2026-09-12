@@ -56,7 +56,9 @@ class HomeViewModel @Inject constructor(
                 viewModelScope.launch {
                     try {
                         flow.value = vodRepository.getVodList(sourceType, typeId, 1).items.take(15)
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        // 失敗時那一列就是空的，畫面上與「這個來源沒有這個分類」無法區分。
+                        android.util.Log.w("HomeLoad", "更多來源 $sourceType($typeId) failed", e)
                         flow.value = emptyList()
                     }
                 }

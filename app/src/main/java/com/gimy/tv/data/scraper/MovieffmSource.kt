@@ -435,7 +435,10 @@ class MovieffmSource @Inject constructor(
             } else {
                 parseFlatVideoUrls(arr, sourceNames)
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            // 解析不出播放網址 = 這部片一條線路都沒有。靜默回空清單會讓詳情頁顯示
+            // 「暫無可用播放線路」，與「站方真的沒有片源」完全分不出來。
+            android.util.Log.w("HomeLoad", "movieffm 取流網址解析失敗", e)
             emptyList()
         }
     }
