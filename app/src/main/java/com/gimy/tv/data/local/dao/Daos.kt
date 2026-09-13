@@ -74,6 +74,11 @@ interface WatchHistoryDao {
     @Query("SELECT * FROM watch_history WHERE vodId = :vodId AND sourceType = :sourceType LIMIT 1")
     suspend fun getByVod(vodId: Long, sourceType: String): WatchHistoryEntity?
 
+    /** 同 [getByVod] 但會持續推送。詳情頁需要這個：它疊在播放器底下時不會重建，
+     *  一次性查詢拿到的永遠是「進播放器之前」的舊值。 */
+    @Query("SELECT * FROM watch_history WHERE vodId = :vodId AND sourceType = :sourceType LIMIT 1")
+    fun observeByVod(vodId: Long, sourceType: String): Flow<WatchHistoryEntity?>
+
     @Query("SELECT * FROM watch_history WHERE sourceType = :sourceType")
     suspend fun getBySource(sourceType: String): List<WatchHistoryEntity>
 

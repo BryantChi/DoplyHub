@@ -34,6 +34,10 @@ class WatchHistoryRepositoryImpl @Inject constructor(
         return dao.getByVod(vodId, sourceType.name)?.toEntry()
     }
 
+    override fun observeProgress(vodId: Long, sourceType: SourceType): Flow<WatchHistoryEntry?> {
+        return dao.observeByVod(vodId, sourceType.name).map { it?.toEntry() }
+    }
+
     override suspend fun saveProgress(entry: WatchHistoryEntry) {
         val existing = dao.getByVod(entry.vodId, entry.sourceType.name)
         dao.upsert(

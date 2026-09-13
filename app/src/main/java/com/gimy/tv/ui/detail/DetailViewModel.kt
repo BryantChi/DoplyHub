@@ -60,10 +60,13 @@ class DetailViewModel @Inject constructor(
     /** 收藏狀態訂閱。改指到新的一筆時要重訂，否則還在監看舊 id。 */
     private var favoriteJob: Job? = null
 
+    /** 觀看進度訂閱。同樣要在改指時重訂。 */
+    private var progressJob: Job? = null
+
     init {
         loadDetail(isRefresh = false)
         observeFavorite()
-        loadWatchProgress()
+        observeWatchProgress()
     }
 
     fun refresh() {
@@ -206,7 +209,7 @@ class DetailViewModel @Inject constructor(
         sourceType = target.sourceType
         vodId = target.vodId
         observeFavorite()
-        loadWatchProgress()
+        observeWatchProgress()
     }
 
     private fun observeFavorite() {
@@ -219,13 +222,18 @@ class DetailViewModel @Inject constructor(
         }
     }
 
-    private fun loadWatchProgress() {
+    /** 訂閱而非單次查詢：詳情頁疊在播放器底下時 composition 不會重建，init 也不會再跑，
+     *  用一次性的 getProgress 會讓「續播第 N 集」與集數的已看標記永遠停在進播放器之前
+     *  的值——看完第 2 集返回，畫面上還是第 1 集，第一次看的片甚至整個按鈕都不出現。
+     *
+     *  收到 null 也要寫回去（而不是像以前那樣跳過），否則刪掉記錄後標記不會歸零。 */
+    private fun observeWatchProgress() {
         val id = vodId ?: return
-        viewModelScope.launch {
-            val progress = watchHistoryRepository.getProgress(id, sourceType)
-            if (progress != null) {
+        progressJob?.cancel()
+        progressJob = viewModelScope.launch {
+            watchHistoryRepository.observeProgress(id, sourceType).collect { progress ->
                 _uiState.update {
-                    it.copy(lastEpisode = progress.episodeNum, lastSourceId = progress.sourceId)
+                    it.copy(lastEpisode = progress?.episodeNum, lastSourceId = progress?.sourceId)
                 }
             }
         }

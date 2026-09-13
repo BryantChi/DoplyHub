@@ -61,6 +61,8 @@ interface WatchHistoryRepository {
     /** Adult-only recent list — surfaced inside the 18+ zone only. */
     fun getRecentAdultHistory(limit: Int = 50): Flow<List<WatchHistoryEntry>>
     suspend fun getProgress(vodId: Long, sourceType: SourceType): WatchHistoryEntry?
+    /** 同 [getProgress] 但會持續推送。看完一集返回詳情頁時，一次性查詢拿到的是舊值。 */
+    fun observeProgress(vodId: Long, sourceType: SourceType): Flow<WatchHistoryEntry?>
     suspend fun saveProgress(entry: WatchHistoryEntry)
     suspend fun deleteEntry(vodId: Long, sourceType: SourceType)
     suspend fun clearHistory()
