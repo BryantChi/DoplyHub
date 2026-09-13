@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import com.gimy.tv.data.network.CloudflareInterceptor
+import com.gimy.tv.data.network.SearchRateLimitInterceptor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +26,7 @@ import okhttp3.Request
 import okio.buffer
 import okio.sink
 import java.io.File
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -42,6 +45,33 @@ class UpdateController @Inject constructor(
     private val okHttpClient: OkHttpClient,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** APK 下載專用的 client。
+     *
+     *  主 client 有 `callTimeout(20s)`——那是為了讓十二處阻塞 `execute()` 的抓取有個
+     *  絕對上限（理由見 NetworkModule），但它涵蓋整個 call 包含 body 讀取，套在
+     *  幾 MB 的 APK 下載上就變成「超過 20 秒一律失敗」。這裡只為下載解除，不動全域。
+     *
+     *  順帶收掉三樣對下載沒有意義的東西：20MB 共用磁碟快取、CloudflareInterceptor、
+     *  以及會對每個成功回應 peek 8KB 當字串解的 SearchRateLimitInterceptor。
+     *  readTimeout 也縮短——取消時要等當前這次 read 回來才看得到 ensureActive，
+     *  繼承來的 15 秒太久。
+     *
+     *  用 newBuilder 是刻意的：共用同一個連線池與 dispatcher，不會多開資源。 */
+    private val downloadClient: OkHttpClient by lazy {
+        okHttpClient.newBuilder()
+            .callTimeout(0, TimeUnit.MILLISECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .cache(null)
+            .apply {
+                // 只拿掉這兩個具名的；不可以用 clear()，那會把 NetworkModule 裡
+                // 設定 User-Agent 的匿名 interceptor 一起清掉。
+                interceptors().removeAll {
+                    it is CloudflareInterceptor || it is SearchRateLimitInterceptor
+                }
+            }
+            .build()
+    }
 
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
@@ -187,7 +217,7 @@ class UpdateController @Inject constructor(
         val target = File(dir, "DoplyHub-v${info.latestVersion}.apk")
         val req = Request.Builder().url(info.downloadUrl).get().build()
         try {
-            okHttpClient.newCall(req).execute().use { resp ->
+            downloadClient.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) error("HTTP ${resp.code}")
                 val body = resp.body ?: error("空白回應")
                 val total = if (body.contentLength() > 0) body.contentLength() else info.sizeBytes
