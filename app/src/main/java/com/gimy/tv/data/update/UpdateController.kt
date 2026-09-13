@@ -1,5 +1,6 @@
 package com.gimy.tv.data.update
 
+import com.gimy.tv.domain.model.UpdateState
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -272,14 +273,4 @@ class UpdateController @Inject constructor(
         }
         target
     }
-}
-
-sealed class UpdateState {
-    data object Idle : UpdateState()
-    data object Checking : UpdateState()
-    data object UpToDate : UpdateState()
-    data class Available(val info: UpdateInfo.Available) : UpdateState()
-    data class Downloading(val info: UpdateInfo.Available, val downloaded: Long, val total: Long) : UpdateState()
-    data class ReadyToInstall(val info: UpdateInfo.Available, val apkFile: File) : UpdateState()
-    data class Error(val message: String) : UpdateState()
 }

@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.gimy.tv.data.update.UpdateState
+import com.gimy.tv.domain.model.UpdateState
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.DoplyButton

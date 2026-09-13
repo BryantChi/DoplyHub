@@ -36,8 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
-import com.gimy.tv.data.repository.idFor
-import com.gimy.tv.data.repository.searchSources
+import com.gimy.tv.domain.model.idFor
+import com.gimy.tv.domain.model.searchSources
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.VodCard

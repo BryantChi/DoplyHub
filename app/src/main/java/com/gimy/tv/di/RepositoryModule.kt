@@ -26,6 +26,9 @@ abstract class RepositoryModule {
     @Binds
     abstract fun bindSearchHistoryRepository(impl: SearchHistoryRepositoryImpl): SearchHistoryRepository
 
+    @Binds
+    abstract fun bindAdultPlusCatalog(impl: AdultPlusCatalogImpl): AdultPlusCatalog
+
     @Binds @IntoMap @SourceTypeKey(SourceType.GIMYMAX)
     abstract fun bindGimyMaxIntoMap(s: GimyMaxSource): SiteSource
 

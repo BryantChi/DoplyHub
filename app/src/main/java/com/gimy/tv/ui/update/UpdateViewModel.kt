@@ -2,7 +2,7 @@ package com.gimy.tv.ui.update
 
 import androidx.lifecycle.ViewModel
 import com.gimy.tv.data.update.UpdateController
-import com.gimy.tv.data.update.UpdateState
+import com.gimy.tv.domain.model.UpdateState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject

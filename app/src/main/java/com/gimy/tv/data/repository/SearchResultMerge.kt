@@ -38,8 +38,3 @@ internal fun mergeSearchResults(
     return result
 }
 
-/** 這張卡在搜尋結果裡可歸屬的所有來源，供來源篩選使用。 */
-fun Vod.searchSources(): Set<SourceType> = setOf(sourceType) + altSources.keys
-
-/** 用 [source] 篩選時，這張卡該開哪一個 vodId。 */
-fun Vod.idFor(source: SourceType): Long = if (source == sourceType) id else altSources[source] ?: id

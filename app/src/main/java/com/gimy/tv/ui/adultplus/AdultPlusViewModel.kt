@@ -2,9 +2,7 @@ package com.gimy.tv.ui.adultplus
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gimy.tv.data.scraper.Forum5278Source
-import com.gimy.tv.data.scraper.JableTvSource
-import com.gimy.tv.data.scraper.XnxxSource
+import com.gimy.tv.domain.repository.AdultPlusCatalog
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.domain.repository.FavoriteRepository
@@ -44,9 +42,7 @@ data class AdultPlusRowState(
 
 @HiltViewModel
 class AdultPlusViewModel @Inject constructor(
-    private val jableSource: JableTvSource,
-    private val xnxxSource: XnxxSource,
-    private val forum5278Source: Forum5278Source,
+    private val adultPlusCatalog: AdultPlusCatalog,
     watchHistoryRepository: WatchHistoryRepository,
     favoriteRepository: FavoriteRepository,
 ) : ViewModel() {
@@ -157,15 +153,7 @@ class AdultPlusViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 withTimeout(12_000) {
-                    val result = when (row.sourceType) {
-                        SourceType.JABLE_TV -> jableSource.fetchVodListByPath(row.key, page)
-                        SourceType.XNXX -> xnxxSource.fetchVodListByPath(row.key, page)
-                        SourceType.FORUM5278 -> {
-                            val forumId = row.key.removePrefix("forum:").toIntOrNull() ?: 23
-                            forum5278Source.fetchVodList(forumId, page)
-                        }
-                        else -> com.gimy.tv.domain.model.PaginatedResult(emptyList<Vod>(), page, 0, false)
-                    }
+                    val result = adultPlusCatalog.fetchByPath(row.sourceType, row.key, page)
                     val limited = result.items.take(24)
                     val combined = if (append) flow.value.items + limited else limited
                     val unique = combined.distinctBy { "${it.sourceType}_${it.id}" }

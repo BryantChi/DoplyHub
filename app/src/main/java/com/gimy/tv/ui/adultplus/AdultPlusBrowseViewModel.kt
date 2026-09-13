@@ -3,9 +3,7 @@ package com.gimy.tv.ui.adultplus
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gimy.tv.data.scraper.Forum5278Source
-import com.gimy.tv.data.scraper.JableTvSource
-import com.gimy.tv.data.scraper.XnxxSource
+import com.gimy.tv.domain.repository.AdultPlusCatalog
 import com.gimy.tv.domain.model.PaginatedResult
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
@@ -41,9 +39,7 @@ data class AdultPlusBrowseState(
 @HiltViewModel
 class AdultPlusBrowseViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val jableSource: JableTvSource,
-    private val xnxxSource: XnxxSource,
-    private val forum5278Source: Forum5278Source,
+    private val adultPlusCatalog: AdultPlusCatalog,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AdultPlusBrowseState())
@@ -86,15 +82,7 @@ class AdultPlusBrowseViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 withTimeout(15_000) {
-                    val result: PaginatedResult<Vod> = when (src) {
-                        SourceType.JABLE_TV -> jableSource.fetchVodListByPath(path, page)
-                        SourceType.XNXX -> xnxxSource.fetchVodListByPath(path, page)
-                        SourceType.FORUM5278 -> {
-                            val forumId = path.removePrefix("forum:").toIntOrNull() ?: 23
-                            forum5278Source.fetchVodList(forumId, page)
-                        }
-                        else -> PaginatedResult(emptyList(), page, 0, false)
-                    }
+                    val result: PaginatedResult<Vod> = adultPlusCatalog.fetchByPath(src, path, page)
                     val combined = if (append) _state.value.items + result.items else result.items
                     val unique = combined.distinctBy { "${it.sourceType}_${it.id}" }
                     val gotNew = !append || unique.size > _state.value.items.size

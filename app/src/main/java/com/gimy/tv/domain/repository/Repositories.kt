@@ -110,3 +110,18 @@ interface SearchHistoryRepository {
     suspend fun removeSearch(keyword: String)
     suspend fun clearSearches()
 }
+
+/**
+ * 成人進階區的清單來源。
+ *
+ * jable／xnxx 用路徑、5278 用版面編號，三者不吃 typeId 那一套，所以沒有走 VodRepository。
+ * 但這不代表畫面該直接注入三個 scraper——同一段 `when (sourceType)` 分派原本在
+ * AdultPlusViewModel 與 AdultPlusBrowseViewModel 各寫一次，新增來源要改兩個地方，
+ * 而 UI 層也因此 import 了資料層的具體實作。
+ */
+interface AdultPlusCatalog {
+    /** [pathKey] 是該來源自己的清單鍵：jable／xnxx 是路徑，5278 是 "forum:{id}"。 */
+    suspend fun fetchByPath(
+        sourceType: SourceType, pathKey: String, page: Int,
+    ): PaginatedResult<Vod>
+}
