@@ -122,17 +122,17 @@ class UpdateController @Inject constructor(
         val available = (_state.value as? UpdateState.Available) ?: return
         downloadJob?.cancel()
         val token = ++downloadToken
+        // 立刻切到 Downloading。以前要等第一次進度回呼（connect 最久 8 秒，再加 200ms
+        // 節流）狀態才會變，這段空窗期裡「發現新版本」對話框還在畫面上，遙控器重按
+        // 確認鍵就會再開一條下載——而舊那條當時還取消不掉。
+        _state.value = UpdateState.Downloading(available.info, 0L, available.info.sizeBytes)
         downloadJob = scope.launch {
             try {
                 val apkFile = downloadApk(available.info) { downloaded, total ->
                     if (token != downloadToken) return@downloadApk
                     _state.update { prev ->
-                        when (prev) {
-                            is UpdateState.Downloading -> prev.copy(downloaded = downloaded, total = total)
-                            // 首次回呼時狀態還是 Available，在這裡完成轉換。
-                            is UpdateState.Available -> UpdateState.Downloading(available.info, downloaded, total)
-                            else -> prev
-                        }
+                        if (prev is UpdateState.Downloading) prev.copy(downloaded = downloaded, total = total)
+                        else prev
                     }
                 }
                 if (token != downloadToken) return@launch
