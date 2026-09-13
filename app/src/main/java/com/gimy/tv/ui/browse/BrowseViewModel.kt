@@ -22,10 +22,23 @@ data class BrowseUiState(
     val error: String? = null
 )
 
-private val categoryNames = mapOf(
+/**
+ * typeId → 畫面標題。
+ *
+ * **同一份對應在三個地方各寫一次**（這裡、[com.gimy.tv.ui.category.CategoryScreen] 的分類
+ * 清單、各 source 的 fetchCategories），改動時三處都要跟著改，否則會出現「抓到的內容是對的、
+ * 標題卻是別的分類」——2026-09-13 就是這樣：15 與 21 在這張表裡對調，點日劇顯示港劇、
+ * 點港劇顯示日劇，而內容其實都正確。
+ *
+ * gimy 的編號以站台實際頁面標題為準（2026-09-13 逐一核對 gimytv.me/type/N.html）：
+ * 2 電視劇、1 電影、4 動漫、29 綜藝、13 陸劇、20 韓劇、16 美劇、15 日劇、14 台劇、
+ * 21 港劇、22 紀錄片、3 綜藝。原本表裡的 30 已被站方移除（回 404），故刪除；
+ * 3 實際是綜藝而非紀錄片，一併更正。100 起為 movieffm 自己的編號。
+ */
+internal val categoryNames = mapOf(
     2 to "電視劇", 1 to "電影", 4 to "動漫", 29 to "綜藝",
-    13 to "陸劇", 20 to "韓劇", 16 to "美劇", 21 to "日劇",
-    14 to "台劇", 15 to "港劇", 30 to "紀錄片", 3 to "紀錄片",
+    13 to "陸劇", 20 to "韓劇", 16 to "美劇", 15 to "日劇",
+    14 to "台劇", 21 to "港劇", 22 to "紀錄片", 3 to "綜藝",
     100 to "電影", 101 to "熱門電影", 200 to "電視劇",
     201 to "韓劇", 202 to "陸劇", 203 to "美劇", 204 to "日劇",
     205 to "動漫", 206 to "綜藝", 207 to "台劇", 208 to "港劇",
