@@ -144,53 +144,23 @@ fun PinInputDialog(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun PinKey(label: String, enabled: Boolean, onClick: () -> Unit) {
-    val isTV = LocalIsTelevision.current
-    if (isTV) {
-        // TV: focus-based selection with D-pad
-        var f by remember { mutableStateOf(false) }
-        Button(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = Modifier
-                .size(56.dp)
-                .onFocusChanged { f = it.isFocused },
-            shape = ButtonDefaults.shape(shape = RoundedCornerShape(8.dp)),
-            colors = ButtonDefaults.colors(
-                containerColor = if (f) CinemaRed else CinemaSurface,
-                focusedContainerColor = CinemaRed,
-                disabledContainerColor = CinemaSurface.copy(0.4f),
-            ),
-            contentPadding = PaddingValues(0.dp),
-        ) {
-            Text(
-                label,
-                color = if (f) Color.White else CinemaTextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-    } else {
-        // Phone / Pad: standard touch button — tv.material3.Button doesn't fire onClick on touch
-        androidx.compose.material3.Button(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = Modifier.size(56.dp),
-            shape = RoundedCornerShape(8.dp),
-            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                containerColor = CinemaSurface,
-                contentColor = CinemaTextPrimary,
-                disabledContainerColor = CinemaSurface.copy(0.4f),
-                disabledContentColor = CinemaTextMuted,
-            ),
-            contentPadding = PaddingValues(0.dp),
-        ) {
-            Text(
-                label,
-                color = CinemaTextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+    // TV／手機的分支交給 DoplyButton。焦點時底色翻紅、字翻白，用 focusedContentColor
+    // 表達即可，原本為了同一件事在這裡自己記了一份 focus 狀態。
+    DoplyButton(
+        onClick = onClick,
+        modifier = Modifier.size(56.dp),
+        enabled = enabled,
+        shape = RoundedCornerShape(8.dp),
+        containerColor = CinemaSurface,
+        contentColor = CinemaTextPrimary,
+        focusedContainerColor = CinemaRed,
+        focusedContentColor = Color.White,
+        disabledContainerColor = CinemaSurface.copy(0.4f),
+        disabledContentColor = CinemaTextMuted,
+        contentPadding = PaddingValues(0.dp),
+        focusBorder = false,
+    ) {
+        Text(label, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

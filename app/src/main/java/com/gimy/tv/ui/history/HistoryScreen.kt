@@ -74,19 +74,14 @@ fun HistoryScreen(onVodClick: (SourceType, Long) -> Unit, onBack: () -> Unit, vm
             }
             if (history.isNotEmpty()) {
                 var f by remember { mutableStateOf(false) }
-                if (isTV) {
-                    Button(onClick = { vm.clear() }, modifier = Modifier.onFocusChanged { f = it.isFocused },
-                        shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
-                        colors = ButtonDefaults.colors(containerColor = CinemaSurface, focusedContainerColor = CinemaRed),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp)
-                    ) { Text("清除", color = Color.White, fontSize = 12.sp) }
-                } else {
-                    androidx.compose.material3.Button(onClick = { vm.clear() },
-                        shape = RoundedCornerShape(6.dp),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = CinemaSurface, contentColor = Color.White),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp)
-                    ) { Text("清除", color = Color.White, fontSize = 12.sp) }
-                }
+                DoplyButton(
+                    onClick = { vm.clear() },
+                    shape = RoundedCornerShape(6.dp),
+                    containerColor = CinemaSurface,
+                    contentColor = Color.White,
+                    focusBorder = false,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
+                ) { Text("清除", color = Color.White, fontSize = 12.sp) }
             }
         }
         if (history.isEmpty()) EmptyState("還沒有觀看記錄")

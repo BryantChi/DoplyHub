@@ -26,7 +26,12 @@ fun DoplyButton(
     contentColor: Color = Color.White,
     focusedContainerColor: Color = CinemaRed,
     focusedContentColor: Color = Color.White,
+    disabledContainerColor: Color = containerColor.copy(0.4f),
+    disabledContentColor: Color = contentColor.copy(0.5f),
     contentPadding: PaddingValues = PaddingValues(horizontal = 18.dp, vertical = 9.dp),
+    /** TV 上要不要畫白色焦點外框。chip 這種密集排列的小按鈕靠底色變化就夠，
+     *  加外框反而雜亂，所以給它們關掉的空間。 */
+    focusBorder: Boolean = true,
     content: @Composable RowScope.() -> Unit
 ) {
     if (LocalIsTelevision.current) {
@@ -44,13 +49,18 @@ fun DoplyButton(
                 contentColor = contentColor,
                 focusedContainerColor = focusedContainerColor,
                 focusedContentColor = focusedContentColor,
+                disabledContainerColor = disabledContainerColor,
             ),
-            border = androidx.tv.material3.ButtonDefaults.border(
-                focusedBorder = androidx.tv.material3.Border(
-                    border = BorderStroke(2.dp, Color.White),
-                    shape = shape,
-                ),
-            ),
+            border = if (focusBorder) {
+                androidx.tv.material3.ButtonDefaults.border(
+                    focusedBorder = androidx.tv.material3.Border(
+                        border = BorderStroke(2.dp, Color.White),
+                        shape = shape,
+                    ),
+                )
+            } else {
+                androidx.tv.material3.ButtonDefaults.border()
+            },
             contentPadding = contentPadding,
             content = content,
         )
@@ -63,6 +73,8 @@ fun DoplyButton(
             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                 containerColor = containerColor,
                 contentColor = contentColor,
+                disabledContainerColor = disabledContainerColor,
+                disabledContentColor = disabledContentColor,
             ),
             contentPadding = contentPadding,
             content = content,

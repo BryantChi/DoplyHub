@@ -232,34 +232,19 @@ fun AdultContentScreen(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun AdultSourceTab(label: String, selected: Boolean, onClick: () -> Unit) {
-    val isTV = LocalIsTelevision.current
-    var f by remember { mutableStateOf(false) }
-    val container = when {
-        selected -> CinemaRed
-        f -> CinemaRed.copy(0.5f)
-        else -> CinemaSurface
-    }
-    if (isTV) {
-        Button(
-            onClick = onClick,
-            modifier = Modifier.onFocusChanged { f = it.isFocused },
-            shape = ButtonDefaults.shape(shape = RoundedCornerShape(20.dp)),
-            colors = ButtonDefaults.colors(containerColor = container, focusedContainerColor = CinemaRed),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 7.dp),
-        ) {
-            Text(label, color = Color.White, fontSize = 13.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
-        }
-    } else {
-        androidx.compose.material3.Button(
-            onClick = onClick,
-            shape = RoundedCornerShape(20.dp),
-            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                containerColor = container, contentColor = Color.White),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 7.dp),
-        ) {
-            Text(label, color = Color.White, fontSize = 13.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
-        }
+    // 原本自己接 onFocusChanged 算「有焦點時 CinemaRed.copy(0.5f)」，但同時也設了
+    // focusedContainerColor = CinemaRed，焦點狀態一律蓋過去，那個半透明色畫不出來。
+    DoplyButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        containerColor = if (selected) CinemaRed else CinemaSurface,
+        contentColor = Color.White,
+        focusBorder = false,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 7.dp),
+    ) {
+        Text(
+            label, color = Color.White, fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+        )
     }
 }

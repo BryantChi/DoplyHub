@@ -354,11 +354,12 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
                     // Phone: button inside text column to avoid overlap
                     if (!isTV) {
                         Spacer(Modifier.height(8.dp))
-                        androidx.compose.material3.Button(
+                        DoplyButton(
                             onClick = { items.getOrNull(currentIdx % items.size)?.let(onItemClick) },
                             shape = RoundedCornerShape(6.dp),
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = CinemaRed, contentColor = Color.White),
-                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)
+                            containerColor = CinemaRed,
+                            contentColor = Color.White,
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                         ) {
                             Text("▶  觀看詳情", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }

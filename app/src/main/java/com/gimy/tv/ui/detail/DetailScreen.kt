@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import com.gimy.tv.ui.components.RefreshIconButton
 import com.gimy.tv.ui.components.RefreshLoadingBar
@@ -306,28 +307,15 @@ fun DetailScreen(
                                             if (isLowConfidence) append(" ${g.episodes.size}集⚠")
                                         }
                                         var f by remember { mutableStateOf(false) }
-                                        if (isTV) {
-                                            Button(
-                                                onClick = { srcIdx = i },
-                                                modifier = Modifier.onFocusChanged { f = it.isFocused },
-                                                shape = ButtonDefaults.shape(shape = RoundedCornerShape(5.dp)),
-                                                colors = ButtonDefaults.colors(
-                                                    containerColor = when { sel -> CinemaRed; f -> CinemaRed.copy(0.5f); else -> CinemaSurface },
-                                                    focusedContainerColor = if (sel) CinemaRed else CinemaRed.copy(0.5f)
-                                                ),
-                                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 7.dp)
-                                            ) { Text(label, color = Color.White, fontSize = 13.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal) }
-                                        } else {
-                                            androidx.compose.material3.Button(
-                                                onClick = { srcIdx = i },
-                                                shape = RoundedCornerShape(5.dp),
-                                                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                                    containerColor = if (sel) CinemaRed else CinemaSurface,
-                                                    contentColor = Color.White,
-                                                ),
-                                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 7.dp)
-                                            ) { Text(label, color = Color.White, fontSize = 13.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal) }
-                                        }
+                                        DoplyButton(
+                                            onClick = { srcIdx = i },
+                                            shape = RoundedCornerShape(5.dp),
+                                            containerColor = if (sel) CinemaRed else CinemaSurface,
+                                            contentColor = Color.White,
+                                            focusedContainerColor = if (sel) CinemaRed else CinemaRed.copy(0.5f),
+                                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 7.dp),
+                                            focusBorder = false,
+                                        ) { Text(label, color = Color.White, fontSize = 13.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal) }
                                     }
                                 }
                             }
@@ -456,22 +444,18 @@ private fun DetailInfo(
             val ep = lastEp
             val sId = uiState.lastSourceId ?: d.episodes.firstOrNull()?.sourceId ?: 0
             var pf by remember { mutableStateOf(false) }
-            if (isTV) {
-                Button(
-                    onClick = { onPlayClick(d.vod.sourceType.name, d.vod.id, sId, ep) },
-                    modifier = Modifier.onFocusChanged { pf = it.isFocused },
-                    shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
-                    colors = ButtonDefaults.colors(containerColor = CinemaRed, focusedContainerColor = Color.White),
-                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 9.dp)
-                ) { Text("▶ 續播第${ep}集", color = if (pf) CinemaBlack else Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
-            } else {
-                androidx.compose.material3.Button(
-                    onClick = { onPlayClick(d.vod.sourceType.name, d.vod.id, sId, ep) },
-                    shape = RoundedCornerShape(6.dp),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = CinemaRed, contentColor = Color.White),
-                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 9.dp)
-                ) { Text("▶ 續播第${ep}集", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
-            }
+            // 有焦點時底色翻成白、字翻成黑，交給 focusedContentColor 表達，
+            // 不必自己接 onFocusChanged 記狀態。
+            DoplyButton(
+                onClick = { onPlayClick(d.vod.sourceType.name, d.vod.id, sId, ep) },
+                shape = RoundedCornerShape(6.dp),
+                containerColor = CinemaRed,
+                contentColor = Color.White,
+                focusedContainerColor = Color.White,
+                focusedContentColor = CinemaBlack,
+                focusBorder = false,
+                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 9.dp),
+            ) { Text("▶ 續播第${ep}集", fontWeight = FontWeight.Bold, fontSize = 14.sp) }
             ActionButton("刪除記錄", false) { onDeleteHistory() }
         }
     }
@@ -522,31 +506,14 @@ private fun MetaLine(label: String, value: String, isTV: Boolean = true) {
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ActionButton(label: String, active: Boolean, onClick: () -> Unit) {
-    val isTV = LocalIsTelevision.current
-    var f by remember { mutableStateOf(false) }
-    if (isTV) {
-        Button(
-            onClick = onClick,
-            modifier = Modifier.onFocusChanged { f = it.isFocused },
-            shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
-            colors = ButtonDefaults.colors(
-                containerColor = if (active) CinemaRedDim else CinemaSurface,
-                focusedContainerColor = CinemaRed
-            ),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 9.dp)
-        ) { Text(label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
-    } else {
-        androidx.compose.material3.Button(
-            onClick = onClick,
-            modifier = Modifier,
-            shape = RoundedCornerShape(6.dp),
-            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                containerColor = if (active) CinemaRedDim else CinemaSurface,
-                contentColor = Color.White,
-            ),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 9.dp)
-        ) { Text(label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
-    }
+    DoplyButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(6.dp),
+        containerColor = if (active) CinemaRedDim else CinemaSurface,
+        contentColor = Color.White,
+        focusBorder = false,
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 9.dp),
+    ) { Text(label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -601,34 +568,27 @@ private fun EpisodeGrid(
                     // bare ep.number which loses the named-arc context. Truncate
                     // instead so anime users still see "聖光篇…" rather than "1".
                     val label = if (rawLabel.length > 5) "${rawLabel.take(5)}…" else rawLabel
-                    if (isTV) {
-                        Button(
-                            onClick = { onEpClick(group.sourceId, ep.number) },
-                            modifier = Modifier.weight(1f).heightIn(min = 36.dp).onFocusChanged { f = it.isFocused },
-                            shape = ButtonDefaults.shape(shape = RoundedCornerShape(4.dp)),
-                            colors = ButtonDefaults.colors(containerColor = epColor, focusedContainerColor = CinemaRed),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
-                        ) {
-                            Text(label,
-                                fontSize = 12.sp, color = Color.White,
-                                fontWeight = if (cur || f) FontWeight.Bold else FontWeight.Normal,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false,
-                                textAlign = TextAlign.Center)
-                        }
-                    } else {
-                        androidx.compose.material3.Button(
-                            onClick = { onEpClick(group.sourceId, ep.number) },
-                            modifier = Modifier.weight(1f).heightIn(min = 36.dp),
-                            shape = RoundedCornerShape(4.dp),
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = epColor, contentColor = Color.White),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
-                        ) {
-                            Text(label,
-                                fontSize = 12.sp, color = Color.White,
-                                fontWeight = if (cur) FontWeight.Bold else FontWeight.Normal,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false,
-                                textAlign = TextAlign.Center)
-                        }
+                    // 集數按鈕排得很密，focusBorder 關掉；焦點時要加粗字重，
+                    // 那個沒辦法用顏色表達，所以仍然自己接 onFocusChanged。
+                    DoplyButton(
+                        onClick = { onEpClick(group.sourceId, ep.number) },
+                        modifier = Modifier.weight(1f).heightIn(min = 36.dp)
+                            .onFocusChanged { f = it.isFocused },
+                        shape = RoundedCornerShape(4.dp),
+                        containerColor = epColor,
+                        contentColor = Color.White,
+                        focusedContainerColor = CinemaRed,
+                        focusedContentColor = Color.White,
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+                        focusBorder = false,
+                    ) {
+                        Text(
+                            label,
+                            fontSize = 12.sp, color = Color.White,
+                            fontWeight = if (cur || f) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false,
+                            textAlign = TextAlign.Center,
+                        )
                     }
                     } // key
                 }
@@ -657,23 +617,17 @@ private fun DetailSourceChip(label: String, selected: Boolean, onClick: () -> Un
         f -> CinemaRed.copy(0.5f)
         else -> CinemaSurface
     }
-    if (isTV) {
-        Button(
-            onClick = onClick,
-            modifier = Modifier.onFocusChanged { f = it.isFocused },
-            shape = ButtonDefaults.shape(shape = RoundedCornerShape(20.dp)),
-            colors = ButtonDefaults.colors(containerColor = container, focusedContainerColor = CinemaRed),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-        ) { Text(label, color = Color.White, fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) }
-    } else {
-        androidx.compose.material3.Button(
-            onClick = onClick,
-            shape = RoundedCornerShape(20.dp),
-            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                containerColor = container, contentColor = Color.White),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-        ) { Text(label, color = Color.White, fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) }
+    DoplyButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        containerColor = if (selected) CinemaRed else CinemaSurface,
+        contentColor = Color.White,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+        focusBorder = false,
+    ) {
+        Text(
+            label, color = Color.White, fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+        )
     }
 }

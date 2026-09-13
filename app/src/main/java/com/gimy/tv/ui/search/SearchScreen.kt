@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gimy.tv.ui.components.FocusableChip
+import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import com.gimy.tv.ui.components.RefreshIconButton
 import com.gimy.tv.ui.components.RefreshLoadingBar
@@ -368,57 +370,24 @@ fun SearchScreen(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun SourceFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    val isTV = LocalIsTelevision.current
-    var f by remember { mutableStateOf(false) }
-    val container = when {
-        selected -> CinemaRed
-        f -> CinemaRed.copy(0.6f)
-        else -> CinemaSurface
-    }
-    val textColor = if (selected || f) Color.White else CinemaTextMuted
-    if (isTV) {
-        Button(
-            onClick = onClick,
-            modifier = Modifier.onFocusChanged { f = it.isFocused },
-            shape = ButtonDefaults.shape(shape = RoundedCornerShape(20.dp)),
-            colors = ButtonDefaults.colors(containerColor = container, focusedContainerColor = CinemaRed),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
-        ) { Text(label, color = textColor, fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) }
-    } else {
-        androidx.compose.material3.Button(
-            onClick = onClick,
-            shape = RoundedCornerShape(20.dp),
-            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                containerColor = container, contentColor = Color.White),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
-        ) { Text(label, color = textColor, fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) }
+    // 原本自己接 onFocusChanged 算出「有焦點時用 CinemaRed.copy(0.6f)」，但兩個分支都
+    // 同時設了 focusedContainerColor = CinemaRed，焦點狀態一律蓋過去，那個半透明色其實
+    // 從來沒被畫出來過。焦點顏色交給 DoplyButton 表達即可。
+    DoplyButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        containerColor = if (selected) CinemaRed else CinemaSurface,
+        contentColor = if (selected) Color.White else CinemaTextMuted,
+        focusedContainerColor = CinemaRed,
+        focusedContentColor = Color.White,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
+        focusBorder = false,
+    ) {
+        Text(
+            label,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+        )
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun FocusableChip(label: String, primary: Boolean = false, onClick: () -> Unit) {
-    val isTV = LocalIsTelevision.current
-    var f by remember { mutableStateOf(false) }
-    val chipColor = if (primary) CinemaRed else CinemaSurface
-    val textColor = if (f || primary) Color.White else CinemaTextMuted
-    val textWeight = if (primary) FontWeight.Bold else FontWeight.Medium
-    if (isTV) {
-        Button(
-            onClick = onClick,
-            modifier = Modifier.onFocusChanged { f = it.isFocused },
-            shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
-            colors = ButtonDefaults.colors(containerColor = chipColor, focusedContainerColor = CinemaRed),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
-        ) { Text(label, color = textColor, fontSize = 14.sp, fontWeight = textWeight) }
-    } else {
-        androidx.compose.material3.Button(
-            onClick = onClick,
-            shape = RoundedCornerShape(6.dp),
-            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = chipColor, contentColor = Color.White),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
-        ) { Text(label, color = if (primary) Color.White else CinemaTextMuted, fontSize = 14.sp, fontWeight = textWeight) }
-    }
-}

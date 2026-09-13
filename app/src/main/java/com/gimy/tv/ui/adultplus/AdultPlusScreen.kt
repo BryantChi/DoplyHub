@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import com.gimy.tv.ui.components.RefreshableContainer
@@ -288,20 +289,14 @@ private fun LoadMoreCard(loading: Boolean, onClick: () -> Unit) {
 private fun RetryChip(onClick: () -> Unit) {
     var f by remember { mutableStateOf(false) }
     val isTV = LocalIsTelevision.current
-    if (isTV) {
-        Button(
-            onClick = onClick,
-            modifier = Modifier.onFocusChanged { f = it.isFocused },
-            shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
-            colors = ButtonDefaults.colors(containerColor = if (f) CinemaRed else CinemaSurface, focusedContainerColor = CinemaRed),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 5.dp),
-        ) { Text("重試", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-    } else {
-        androidx.compose.material3.Button(
-            onClick = onClick,
-            shape = RoundedCornerShape(6.dp),
-            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = CinemaRed, contentColor = Color.White),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 5.dp),
-        ) { Text("重試", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-    }
+    // TV 未取得焦點時是 CinemaSurface，手機沒有焦點概念所以一律 CinemaRed——
+    // 這個差異保留，用 containerColor 與 focusedContainerColor 表達。
+    DoplyButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(6.dp),
+        containerColor = if (isTV) CinemaSurface else CinemaRed,
+        contentColor = Color.White,
+        focusBorder = false,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 5.dp),
+    ) { Text("重試", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
 }

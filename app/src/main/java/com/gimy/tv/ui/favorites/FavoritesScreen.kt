@@ -83,19 +83,14 @@ fun PageHeader(
     val dims = LocalDimensions.current
     Row(Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding), verticalAlignment = Alignment.CenterVertically) {
         var f by remember { mutableStateOf(false) }
-        if (LocalIsTelevision.current) {
-            Button(onClick = onBack, modifier = Modifier.onFocusChanged { f = it.isFocused },
-                shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
-                colors = ButtonDefaults.colors(containerColor = CinemaSurface, focusedContainerColor = CinemaRed),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)
-            ) { Text("返回", color = Color.White, fontSize = 13.sp) }
-        } else {
-            androidx.compose.material3.Button(onClick = onBack,
-                shape = RoundedCornerShape(6.dp),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = CinemaSurface, contentColor = Color.White),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)
-            ) { Text("返回", color = Color.White, fontSize = 13.sp) }
-        }
+        DoplyButton(
+            onClick = onBack,
+            shape = RoundedCornerShape(6.dp),
+            containerColor = CinemaSurface,
+            contentColor = Color.White,
+            focusBorder = false,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp),
+        ) { Text("返回", color = Color.White, fontSize = 13.sp) }
         Spacer(Modifier.width(16.dp))
         Box(Modifier.width(3.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(CinemaRed))
         Spacer(Modifier.width(10.dp))
