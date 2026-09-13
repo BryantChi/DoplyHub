@@ -33,7 +33,9 @@ import androidx.media3.ui.PlayerView
 import androidx.tv.material3.*
 import com.gimy.tv.ui.theme.*
 import com.gimy.tv.ui.theme.LocalIsTelevision
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -103,6 +105,8 @@ fun PlayerScreen(
 
     // Error retry limiter — prevent infinite prepare() loop
     var errorRetryCount by remember { mutableIntStateOf(0) }
+    // 重試的等待要在協程裡做；離開播放器時這個 scope 會連同 composition 一起取消。
+    val retryScope = rememberCoroutineScope()
 
     // Info bar visibility with auto-hide counter
     var infoVisible by remember { mutableStateOf(true) }
@@ -219,12 +223,32 @@ fun PlayerScreen(
                 }
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                if (errorRetryCount < 3) {
-                    errorRetryCount++
-                    exoPlayer.prepare()
-                    return
+                // 4xx 要分辨得出來才能決定值不值得重試——重試一個 404 三次，
+                // 得到的還是 404，只是把換線硬生生延後。
+                val httpStatus = generateSequence(error.cause as? Throwable) { it.cause }
+                    .filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>()
+                    .firstOrNull()?.responseCode
+                when (playbackRetryFor(error.errorCode, httpStatus, errorRetryCount)) {
+                    PlaybackRetry.SeekToLiveThenRetry -> {
+                        errorRetryCount++
+                        exoPlayer.seekToDefaultPosition()
+                        exoPlayer.prepare()
+                        return
+                    }
+                    PlaybackRetry.RetryAfterDelay -> {
+                        val wait = playbackRetryDelayMs(errorRetryCount)
+                        errorRetryCount++
+                        // 退到協程去等。listener 不能阻塞，而且退出播放器時 scope 會被取消，
+                        // 已排隊的重試不會打到已經 release 的 player。
+                        retryScope.launch {
+                            delay(wait)
+                            runCatching { exoPlayer.prepare() }
+                        }
+                        return
+                    }
+                    PlaybackRetry.GiveUp -> Unit
                 }
-                // 重試三次仍失敗。原本這裡直接放棄，畫面就永遠停在全黑——使用者不知道發生
+                // 重試無望或已經試夠。原本這裡直接放棄，畫面就永遠停在全黑——使用者不知道發生
                 // 什麼事，除錯也只能接 adb 撈 ExoPlayer 的 stack trace（CDN 換根憑證那次就是
                 // 這樣才找到的）。改成記一筆 log 並把原因往上報，讓 ViewModel 換線或顯示出來。
                 // 一定要連網址一起印：這類失敗幾乎都是「某一個 CDN 有問題」，
@@ -234,11 +258,10 @@ fun PlayerScreen(
                     .firstOrNull()?.dataSpec?.uri
                 android.util.Log.w(
                     "PlayerFallback",
-                    "playback failed after 3 retries: ${error.errorCodeName} url=$failedUri",
+                    "playback failed (retries=$errorRetryCount): ${error.errorCodeName} http=$httpStatus url=$failedUri",
                     error,
                 )
                 viewModel.onPlaybackFailed(describePlaybackError(error))
-                // After 3 retries, stop — avoid infinite loop on non-recoverable errors
             }
         }
         exoPlayer.addListener(listener)
