@@ -140,6 +140,41 @@ fun PlayerScreen(
     // seek 到片尾就直接觸發 STATE_ENDED，畫面會自己跳下一集，使用者會以為這集被吃掉。
     var pendingResumeMs by remember { mutableLongStateOf(0L) }
 
+    // 快捷選單的狀態。純 UI，不進 ViewModel——process death 後重新叫出來即可。
+    var menuState by remember { mutableStateOf(QuickMenuState()) }
+    // 每次按鍵都更新，用來重新計算自動隱藏的 8 秒。
+    var menuTouchedAt by remember { mutableLongStateOf(0L) }
+
+    // 線路直接用 state 既有的 allSources；集數是當前線路那一組，不必另外存一份。
+    val menuSourceGroups = uiState.allSources
+    val menuEpisodeList = menuSourceGroups
+        .firstOrNull { it.sourceId == uiState.sourceId }
+        ?.episodes
+        ?: emptyList()
+    val menuSources = menuSourceGroups.map {
+        QuickMenuItem(label = it.sourceName, isCurrent = it.sourceId == uiState.sourceId)
+    }
+    val menuEpisodes = menuEpisodeList.map {
+        QuickMenuItem(
+            label = it.title.ifBlank { "第${it.number}集" },
+            isCurrent = it.number == uiState.episodeNum,
+        )
+    }
+    val menuCtx = QuickMenuContext(
+        sourceCount = menuSources.size,
+        episodeCount = menuEpisodes.size,
+        currentSourceIndex = menuSources.indexOfFirst { it.isCurrent }.coerceAtLeast(0),
+        currentEpisodeIndex = menuEpisodes.indexOfFirst { it.isCurrent }.coerceAtLeast(0),
+    )
+
+    // 8 秒沒動作就收起來。任何按鍵都會更新 menuTouchedAt，key 一變就重新計時。
+    LaunchedEffect(menuState.open, menuTouchedAt) {
+        if (menuState.open) {
+            delay(8000)
+            menuState = menuState.copy(open = false)
+        }
+    }
+
     // Load media
     LaunchedEffect(uiState.streamUrl) {
         val url = uiState.streamUrl ?: return@LaunchedEffect
@@ -276,6 +311,27 @@ fun PlayerScreen(
                             // YouTube / Netflix TV experience.
                             setOnKeyListener { _, keyCode, event ->
                                 if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+
+                                // 選單的按鍵優先。只有 reduceMenuKey 回 PassThrough
+                                // （＝選單關著且不是開啟鍵）才輪到下面的播放器操作。
+                                val menuResult = reduceMenuKey(menuState, keyCode, menuCtx)
+                                if (menuResult.action != MenuAction.PassThrough) {
+                                    menuState = menuResult.state
+                                    menuTouchedAt = System.currentTimeMillis()
+                                    // 選單開著時把 media3 控制列收掉，免得兩層 UI 疊在一起。
+                                    if (menuState.open) hideController()
+                                    when (val a = menuResult.action) {
+                                        is MenuAction.PickSource ->
+                                            menuSourceGroups.getOrNull(a.index)
+                                                ?.let { viewModel.switchSource(it.sourceId) }
+                                        is MenuAction.PickEpisode ->
+                                            menuEpisodeList.getOrNull(a.index)
+                                                ?.let { viewModel.switchEpisode(it.number) }
+                                        else -> Unit
+                                    }
+                                    return@setOnKeyListener true
+                                }
+
                                 when (keyCode) {
                                     KeyEvent.KEYCODE_BACK -> {
                                         viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
@@ -349,6 +405,14 @@ fun PlayerScreen(
                     }
                 }
             }
+
+            // ── 快捷選單（按上鍵叫出，換集／換線）──
+            PlayerQuickMenu(
+                state = menuState,
+                sources = menuSources,
+                episodes = menuEpisodes,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         } else {
             // === MOBILE PLAYER ===
             if (uiState.streamUrl != null && !uiState.isLoading) {
