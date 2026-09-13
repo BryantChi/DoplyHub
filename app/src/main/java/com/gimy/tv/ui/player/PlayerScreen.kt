@@ -175,6 +175,12 @@ fun PlayerScreen(
         }
     }
 
+    // controller 的啟用狀態要跟著選單走。按鍵那條路徑已經設過一次，但自動隱藏
+    // 不經過 listener，少了這裡的話選單收起後控制列就再也叫不出來了。
+    LaunchedEffect(menuState.open) {
+        playerView?.useController = !menuState.open
+    }
+
     // Load media
     LaunchedEffect(uiState.streamUrl) {
         val url = uiState.streamUrl ?: return@LaunchedEffect
@@ -318,8 +324,13 @@ fun PlayerScreen(
                                 if (menuResult.action != MenuAction.PassThrough) {
                                     menuState = menuResult.state
                                     menuTouchedAt = System.currentTimeMillis()
-                                    // 選單開著時把 media3 控制列收掉，免得兩層 UI 疊在一起。
-                                    if (menuState.open) hideController()
+                                    // 選單開著時把 media3 控制列整個停用。
+                                    // 光呼叫 hideController() 不夠——PlayerView.dispatchKeyEvent
+                                    // 處理完按鍵後會再 maybeShowController() 把它叫回來，
+                                    // 實測就是控制列與選單疊在一起、底部文字互相重疊。
+                                    // 停用還有個附帶好處：useController 為 false 時 media3
+                                    // 不再攔截 DPAD，選單內的按鍵一次就進得來。
+                                    useController = !menuState.open
                                     when (val a = menuResult.action) {
                                         is MenuAction.PickSource ->
                                             menuSourceGroups.getOrNull(a.index)
