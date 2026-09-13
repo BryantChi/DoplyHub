@@ -26,6 +26,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -252,7 +253,7 @@ class EndpointResolver @Inject constructor(
         runCatching {
             withTimeout(FETCH_TIMEOUT_MS) {
                 val req = Request.Builder().url(REMOTE_URL).get().build()
-                okHttpClient.newCall(req).execute().use { resp ->
+                okHttpClient.newCall(req).withBudget(FETCH_TIMEOUT_MS).execute().use { resp ->
                     if (!resp.isSuccessful) return@withTimeout null
                     val body = resp.body?.string() ?: return@withTimeout null
                     parseConfig(body)
@@ -326,7 +327,7 @@ class EndpointResolver @Inject constructor(
                 runCatching {
                     withTimeout(PROBE_TIMEOUT_MS) {
                         val req = Request.Builder().url(candidate.url).head().build()
-                        okHttpClient.newCall(req).execute().use { resp ->
+                        okHttpClient.newCall(req).withBudget(PROBE_TIMEOUT_MS).execute().use { resp ->
                             candidate.url.takeIf { resp.isSuccessful }
                         }
                     }
@@ -335,6 +336,18 @@ class EndpointResolver @Inject constructor(
         }.awaitAll().filterNotNull().toSet()
         candidates.firstOrNull { it.url in successful }
     }
+}
+
+/**
+ * 把探測預算真的套到這個 call 上。
+ *
+ * coroutine 的 withTimeout 只在掛起點生效，中斷不了阻塞的 execute()，所以上面宣告的
+ * 3 秒／6 秒實際上吃的是主 client 的 20 秒 callTimeout。11 個來源並行探測時，光是這件事
+ * 就能把 dispatcher 的 maxRequests = 10 佔滿，讓首頁與「清除快取」的 8 秒重整一起排隊等待。
+ * OkHttp 自己的計時器才攔得住。
+ */
+internal fun Call.withBudget(ms: Long): Call = apply {
+    timeout().timeout(ms, java.util.concurrent.TimeUnit.MILLISECONDS)
 }
 
 /** Pure selection: returns the first candidate (by priority order) whose probe count >= minItems;
