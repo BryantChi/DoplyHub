@@ -88,8 +88,14 @@ fun UpdateOverlay(viewModel: UpdateViewModel = hiltViewModel()) {
                 settingsUnavailable = settingsUnavailable,
             )
         } else {
-            // Installer launched successfully — state will return to Idle on next launchInstaller()
-            // No-op UI, system installer dialog has taken over
+            // 安裝器已經被拉到前景，這個對話框會被它蓋住；使用者若在系統安裝畫面按返回
+            // 或安裝失敗，回到這裡就看得到它。這個入口是必要的——launchInstaller 不再把
+            // 狀態收回 Idle，沒有它的話使用者會停在空畫面，那份下載好的 APK 再也裝不了。
+            ReadyDialog(
+                version = s.info.latestVersion.toString(),
+                onInstall = { if (!viewModel.launchInstaller()) needsInstallPermission = true },
+                onLater = if (s.info.isMandatory) null else ({ viewModel.dismiss() }),
+            )
         }
 
         is UpdateState.Error -> ErrorDialog(message = s.message, onClose = { viewModel.dismiss() })
@@ -202,6 +208,44 @@ private fun DownloadingDialog(
                     containerColor = CinemaSurface,
                     shape = RoundedCornerShape(6.dp),
                 ) { Text("取消", color = Color.White, fontSize = 13.sp) }
+            }
+        },
+    )
+}
+
+@Composable
+private fun ReadyDialog(
+    version: String,
+    onInstall: () -> Unit,
+    onLater: (() -> Unit)?,
+) {
+    AlertDialog(
+        onDismissRequest = { onLater?.invoke() },
+        containerColor = CinemaSurface,
+        shape = RoundedCornerShape(12.dp),
+        title = { Text("已下載完成", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                "v$version 已經下載好了。若剛才的安裝畫面被取消，可以直接再裝一次，不用重新下載。",
+                color = CinemaTextPrimary.copy(0.85f),
+                fontSize = 13.sp,
+                lineHeight = 20.sp,
+            )
+        },
+        confirmButton = {
+            DoplyButton(
+                onClick = onInstall,
+                containerColor = CinemaRed,
+                shape = RoundedCornerShape(6.dp),
+            ) { Text("立即安裝", color = Color.White, fontSize = 13.sp) }
+        },
+        dismissButton = onLater?.let {
+            {
+                DoplyButton(
+                    onClick = it,
+                    containerColor = CinemaSurface,
+                    shape = RoundedCornerShape(6.dp),
+                ) { Text("稍後", color = Color.White, fontSize = 13.sp) }
             }
         },
     )

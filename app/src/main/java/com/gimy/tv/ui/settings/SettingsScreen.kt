@@ -87,9 +87,11 @@ fun SettingsScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         val checking = state is UpdateState.Checking
                         val downloading = state is UpdateState.Downloading
+                        // 已經下載完成時也不給按：查更新會把狀態洗掉，那份 APK 就得重下。
+                        val readyToInstall = state is UpdateState.ReadyToInstall
                         DoplyButton(
                             onClick = { vm.check() },
-                            enabled = !checking && !downloading,
+                            enabled = !checking && !downloading && !readyToInstall,
                             containerColor = CinemaRed,
                             shape = RoundedCornerShape(6.dp),
                         ) {

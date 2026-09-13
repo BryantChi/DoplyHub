@@ -64,7 +64,12 @@ class UpdateController @Inject constructor(
      *               Manual checks from the settings page should pass false to surface the error.
      */
     fun checkForUpdate(silent: Boolean = false) {
-        if (_state.value is UpdateState.Checking || _state.value is UpdateState.Downloading) return
+        // ReadyToInstall 也要擋：APK 已經下載好了，這時候去查更新會把狀態洗成 Checking，
+        // 那份檔案的參照就此遺失，使用者得整包重下。
+        if (_state.value is UpdateState.Checking ||
+            _state.value is UpdateState.Downloading ||
+            _state.value is UpdateState.ReadyToInstall
+        ) return
         _state.value = UpdateState.Checking
         scope.launch {
             when (val info = updateService.checkForUpdate()) {
@@ -126,9 +131,12 @@ class UpdateController @Inject constructor(
 
     /** Launch the system installer for an already-downloaded APK.
      *  Returns false if "install unknown apps" permission is missing — caller should call
-     *  [requestInstallPermission] then retry. */
+     *  [requestInstallPermission] then retry.
+     *
+     *  沒有 APK 可裝時也回 false：以前回 true（宣稱成功），於是「重試安裝」會把權限
+     *  對話框收掉卻什麼都沒裝，看起來就是按了沒反應。 */
     fun launchInstaller(): Boolean {
-        val ready = (_state.value as? UpdateState.ReadyToInstall) ?: return true
+        val ready = (_state.value as? UpdateState.ReadyToInstall) ?: return false
         if (!context.packageManager.canRequestPackageInstalls()) return false
 
         val uri: Uri = FileProvider.getUriForFile(
@@ -141,8 +149,9 @@ class UpdateController @Inject constructor(
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
         context.startActivity(intent)
-        // Reset state — the installer takes over from here.
-        _state.value = UpdateState.Idle
+        // 這裡刻意「不」把狀態收回 Idle。使用者在系統安裝畫面按返回、或安裝失敗時，
+        // 狀態一旦是 Idle，那份已經下載好的 APK 就再也接不回來，只能整包重下。
+        // 保留 ReadyToInstall 讓呼叫端可以原地重試；要收掉由使用者按「稍後」(dismiss)。
         return true
     }
 
