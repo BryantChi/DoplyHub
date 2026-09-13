@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.gimy.tv.data.local.dao.FavoriteDao
 import com.gimy.tv.data.local.dao.WatchHistoryDao
@@ -26,10 +27,11 @@ private val Context.repairDataStore: DataStore<Preferences> by preferencesDataSt
  * once and rewrites the ones that come back different.
  *
  * Two deliberate choices:
- *  - Any failed row leaves the repair unmarked. A row whose slug is unknown cannot be
- *    resolved yet — the slug map only started being persisted in this same release — and a
- *    Cloudflare challenge that has not cleared yet fails the same way. Leaving the flag
- *    unset lets a later launch finish the job instead of giving up permanently.
+ *  - Any failed row leaves the repair unmarked, so a later launch can finish the job. A row
+ *    whose slug is unknown cannot be resolved yet — the slug map only started being
+ *    persisted in this same release — and a Cloudflare challenge that has not cleared yet
+ *    fails the same way. 重試次數有上限（MAX_REPAIR_ATTEMPTS），否則站台永久連不上時
+ *    每次冷啟動都會把整批重跑一遍。
  *  - Requests are serialised with a gap. These sites rate-limit, and a burst at startup on
  *    behalf of a screen the user may not even open is not worth it.
  */
@@ -44,7 +46,11 @@ class JableTitleRepair @Inject constructor(
     private val source = SourceType.JABLE_TV.name
 
     suspend fun repairOnce() {
-        if (runCatching { dataStore.data.first()[DONE_KEY] }.getOrNull() == true) return
+        val prefs = runCatching { dataStore.data.first() }.getOrNull()
+        val attempts = prefs?.get(ATTEMPT_KEY) ?: 0
+        if (!shouldAttemptRepair(done = prefs?.get(DONE_KEY) == true, attempts = attempts)) return
+        // 先記次數再開工。在中途被系統殺掉時這次仍然算數，否則上限形同虛設。
+        runCatching { dataStore.edit { it[ATTEMPT_KEY] = attempts + 1 } }
 
         val favorites = runCatching { favoriteDao.getBySource(source) }.getOrDefault(emptyList())
         val history = runCatching { watchHistoryDao.getBySource(source) }.getOrDefault(emptyList())
@@ -87,6 +93,7 @@ class JableTitleRepair @Inject constructor(
 
     private companion object {
         val DONE_KEY = booleanPreferencesKey("jable_title_repair_done")
+        val ATTEMPT_KEY = intPreferencesKey("jable_title_repair_attempts")
         const val REQUEST_GAP_MS = 1_200L
     }
 }
