@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import com.gimy.tv.ui.components.RefreshableContainer
@@ -52,7 +53,7 @@ fun AdultPlusScreen(
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
     ) {
-        val refreshingAll by vm.isRefreshing.collectAsState()
+        val refreshingAll by vm.isRefreshing.collectAsStateWithLifecycle()
         PageHeader("進階", onBack) {
             RefreshIconButton(isRefreshing = refreshingAll, onClick = { vm.refreshAll() })
         }
@@ -70,14 +71,14 @@ fun AdultPlusScreen(
             FocusableChip("📂 全部分類") { onCategoriesClick() }
         }
 
-        val isRefreshing by vm.isRefreshing.collectAsState()
+        val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
         RefreshableContainer(
             isRefreshing = isRefreshing,
             onRefresh = { vm.refreshAll() },
             enabled = isAtTop,
         ) {
-            val history by vm.adultHistory.collectAsState()
-            val favorites by vm.adultFavorites.collectAsState()
+            val history by vm.adultHistory.collectAsStateWithLifecycle()
+            val favorites by vm.adultFavorites.collectAsStateWithLifecycle()
 
             LazyColumn(
                 state = listState,
@@ -124,7 +125,7 @@ private fun AdultPlusRowSection(
     onMoreClick: () -> Unit,
 ) {
     val dims = LocalDimensions.current
-    val state by vm.rowState(row).collectAsState()
+    val state by vm.rowState(row).collectAsStateWithLifecycle()
 
     Column(Modifier.padding(top = 20.dp)) {
         // Section header (matches HomeScreen style)

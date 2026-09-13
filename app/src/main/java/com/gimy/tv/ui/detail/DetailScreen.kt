@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import com.gimy.tv.ui.components.RefreshIconButton
 import com.gimy.tv.ui.components.RefreshLoadingBar
@@ -47,7 +48,7 @@ fun DetailScreen(
 ) {
     val dims = LocalDimensions.current
     val isTV = LocalIsTelevision.current
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))) {
         RefreshLoadingBar(

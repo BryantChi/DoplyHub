@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
 import com.gimy.tv.ui.components.RefreshIconButton
@@ -36,7 +37,7 @@ fun BrowseScreen(
     vm: BrowseViewModel = hiltViewModel()
 ) {
     val dims = LocalDimensions.current
-    val uiState by vm.uiState.collectAsState()
+    val uiState by vm.uiState.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     val browseIsAtTop by remember {
         derivedStateOf {

@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.tv.material3.*
@@ -50,8 +51,8 @@ class FavoritesViewModel @Inject constructor(
 @Composable
 fun FavoritesScreen(onVodClick: (SourceType, Long) -> Unit, onBack: () -> Unit, vm: FavoritesViewModel = hiltViewModel()) {
     val dims = LocalDimensions.current
-    val favs by vm.favorites.collectAsState()
-    val staleCount by vm.staleCount.collectAsState()
+    val favs by vm.favorites.collectAsStateWithLifecycle()
+    val staleCount by vm.staleCount.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))) {
         PageHeader("我的收藏", onBack) {
             if (staleCount > 0) {

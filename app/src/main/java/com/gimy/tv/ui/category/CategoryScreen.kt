@@ -9,7 +9,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.PinInputDialog
 import com.gimy.tv.ui.settings.AdultContentViewModel
@@ -58,11 +58,11 @@ fun CategoryScreen(
     adultVm: AdultContentViewModel = hiltViewModel(),
 ) {
     val dims = LocalDimensions.current
-    val adultEnabled by adultVm.enabled.collectAsState()
-    val pinRequired by adultVm.pinRequired.collectAsState()
-    val pinHash by adultVm.pinHash.collectAsState()
-    val unlocked by adultVm.unlocked.collectAsState()
-    val lockedUntilMs by adultVm.lockedUntilMs.collectAsState()
+    val adultEnabled by adultVm.enabled.collectAsStateWithLifecycle()
+    val pinRequired by adultVm.pinRequired.collectAsStateWithLifecycle()
+    val pinHash by adultVm.pinHash.collectAsStateWithLifecycle()
+    val unlocked by adultVm.unlocked.collectAsStateWithLifecycle()
+    val lockedUntilMs by adultVm.lockedUntilMs.collectAsStateWithLifecycle()
 
     var showPinDialog by remember { mutableStateOf(false) }
     var pinErrorMsg by remember { mutableStateOf<String?>(null) }

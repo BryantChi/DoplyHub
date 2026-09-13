@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.DoplyLoadingIndicator
@@ -34,7 +35,7 @@ fun AdultPlusBrowseScreen(
     vm: AdultPlusBrowseViewModel = hiltViewModel(),
 ) {
     val dims = LocalDimensions.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     val isAtTop by remember {
         derivedStateOf {

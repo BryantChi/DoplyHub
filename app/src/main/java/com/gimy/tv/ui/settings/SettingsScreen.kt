@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gimy.tv.data.update.UpdateState
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.displayName
@@ -43,16 +44,16 @@ fun SettingsScreen(
 ) {
     val dims = LocalDimensions.current
     val ctx = LocalContext.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     val versionName = remember { currentVersionName(ctx) }
-    val enabledSources by settingsVm.enabledSources.collectAsState()
-    val endpointHealth by settingsVm.endpointHealth.collectAsState()
-    val cacheClearing by settingsVm.cacheClearing.collectAsState()
-    val cacheClearResult by settingsVm.cacheClearResult.collectAsState()
-    val adultEnabled by adultVm.enabled.collectAsState()
-    val pinRequired by adultVm.pinRequired.collectAsState()
-    val pinHash by adultVm.pinHash.collectAsState()
-    val adultPlusEnabled by adultVm.adultPlusEnabled.collectAsState()
+    val enabledSources by settingsVm.enabledSources.collectAsStateWithLifecycle()
+    val endpointHealth by settingsVm.endpointHealth.collectAsStateWithLifecycle()
+    val cacheClearing by settingsVm.cacheClearing.collectAsStateWithLifecycle()
+    val cacheClearResult by settingsVm.cacheClearResult.collectAsStateWithLifecycle()
+    val adultEnabled by adultVm.enabled.collectAsStateWithLifecycle()
+    val pinRequired by adultVm.pinRequired.collectAsStateWithLifecycle()
+    val pinHash by adultVm.pinHash.collectAsStateWithLifecycle()
+    val adultPlusEnabled by adultVm.adultPlusEnabled.collectAsStateWithLifecycle()
     var showSetPinDialog by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
     var pinSetupStep by remember { mutableStateOf(0) }       // 0 = entering, 1 = confirming

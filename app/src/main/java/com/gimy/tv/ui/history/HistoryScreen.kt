@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.tv.material3.*
@@ -54,8 +55,8 @@ class HistoryViewModel @Inject constructor(
 fun HistoryScreen(onVodClick: (SourceType, Long) -> Unit, onBack: () -> Unit, vm: HistoryViewModel = hiltViewModel()) {
     val dims = LocalDimensions.current
     val isTV = LocalIsTelevision.current
-    val history by vm.history.collectAsState()
-    val staleCount by vm.staleCount.collectAsState()
+    val history by vm.history.collectAsStateWithLifecycle()
+    val staleCount by vm.staleCount.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<WatchHistoryEntry?>(null) }
 
     Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))) {

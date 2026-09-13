@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gimy.tv.data.update.UpdateState
 import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.theme.*
@@ -30,7 +31,7 @@ import com.gimy.tv.ui.theme.*
  */
 @Composable
 fun UpdateOverlay(viewModel: UpdateViewModel = hiltViewModel()) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     var needsInstallPermission by remember { mutableStateOf(false) }
     // 「重試安裝」按下去卻還是沒權限時，要讓畫面有反應——否則按鈕看起來完全沒作用。
     var retryFailed by remember { mutableStateOf(false) }

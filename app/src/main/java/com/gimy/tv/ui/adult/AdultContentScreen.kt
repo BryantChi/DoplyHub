@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.DoplyButton
@@ -40,8 +41,8 @@ fun AdultContentScreen(
     vm: AdultContentScreenViewModel = hiltViewModel(),
 ) {
     val dims = LocalDimensions.current
-    val enabledSources by vm.enabledSources.collectAsState()
-    val adultPlusEnabled by vm.adultPlusEnabled.collectAsState()
+    val enabledSources by vm.enabledSources.collectAsStateWithLifecycle()
+    val adultPlusEnabled by vm.adultPlusEnabled.collectAsStateWithLifecycle()
     val tabs = remember(enabledSources) { vm.adultTabs(enabledSources) }
     var selectedTab by remember { mutableStateOf<AdultTab?>(null) }
 
@@ -55,7 +56,7 @@ fun AdultContentScreen(
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
     ) {
-        val refreshingAll by vm.isRefreshing.collectAsState()
+        val refreshingAll by vm.isRefreshing.collectAsStateWithLifecycle()
         PageHeader("18+", onBack) {
             // Refreshes every tab, not just the visible one — see refreshAll's docs.
             RefreshIconButton(
@@ -113,7 +114,7 @@ fun AdultContentScreen(
                     gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
                 }
             }
-            val rowState by vm.rowFor(current).collectAsState()
+            val rowState by vm.rowFor(current).collectAsStateWithLifecycle()
 
             // Infinite scroll: when within 4 items of the bottom and we know there's more, fetch next page.
             // Re-keyed on `current.key` so switching tabs doesn't cross-trigger the previous tab's loadMore.
