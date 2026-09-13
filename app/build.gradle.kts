@@ -74,6 +74,12 @@ android {
     }
 }
 
+// Room 的 schema JSON 輸出位置。開了 exportSchema 卻不指定這個會出編譯警告，
+// 而且 MigrationTestHelper 要靠這些檔案才跑得起來，所以 app/schemas 要進版控。
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     // Compose BOM
     val composeBom = platform(libs.compose.bom)

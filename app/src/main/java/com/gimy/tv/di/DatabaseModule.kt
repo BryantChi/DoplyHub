@@ -103,7 +103,13 @@ object DatabaseModule {
             GimyDatabase::class.java,
             "gimy_tv.db"
         ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
-         .fallbackToDestructiveMigration()
+         // 只在「降版」時才允許砍表重建。
+         //
+         // 原本是無條件的 fallbackToDestructiveMigration()：目前 1→6 的 migration 是連續的，
+         // 所以升級路徑上不會觸發，但它涵蓋的是「找不到對應 migration」這整類情況——
+         // 將來哪次漏寫一條，使用者的收藏與觀看紀錄就會被默默清掉，而且完全沒有提示。
+         // 改成只保留降版那條路之後，漏寫 migration 會直接 crash，在自己機器上就會發現。
+         .fallbackToDestructiveMigrationOnDowngrade()
          .build()
     }
 
