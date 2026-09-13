@@ -1,6 +1,36 @@
 package com.gimy.tv.ui.player
 
 import android.view.KeyEvent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.gimy.tv.ui.theme.CinemaRed
+import com.gimy.tv.ui.theme.CinemaTextMuted
 
 /** 選單目前停在哪一列。 */
 enum class MenuRow { SOURCE, EPISODE }
@@ -106,5 +136,106 @@ fun reduceMenuKey(
         KeyEvent.KEYCODE_BACK -> MenuKeyResult(state.copy(open = false), MenuAction.Consumed)
 
         else -> MenuKeyResult(state, MenuAction.Consumed)
+    }
+}
+
+/** 選單裡一個可選項目的顯示資料。 */
+data class QuickMenuItem(val label: String, val isCurrent: Boolean)
+
+/**
+ * 播放中的快捷選單。**純顯示**——不含 focusable / onKeyEvent / FocusRequester。
+ *
+ * 焦點始終留在 PlayerView 上，按鍵由 PlayerScreen 的 setOnKeyListener 統一分派。
+ * 這是刻意的：Compose 與 View 的焦點交接是這個播放器出過最多問題的地方，
+ * 再放一個會搶焦點的 Compose 元件進來等於把同一個坑重挖一次。
+ */
+@Composable
+fun PlayerQuickMenu(
+    state: QuickMenuState,
+    sources: List<QuickMenuItem>,
+    episodes: List<QuickMenuItem>,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = state.open,
+        enter = slideInVertically { it } + fadeIn(),
+        exit = slideOutVertically { it } + fadeOut(),
+        modifier = modifier,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(Color.Black.copy(alpha = 0.85f))
+                .padding(horizontal = 48.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            QuickMenuRow(
+                label = "線路",
+                items = sources,
+                focusedIndex = if (state.row == MenuRow.SOURCE) state.index else -1,
+            )
+            QuickMenuRow(
+                label = "集數",
+                items = episodes,
+                focusedIndex = if (state.row == MenuRow.EPISODE) state.index else -1,
+            )
+            Text(
+                "▲▼ 切換　◀▶ 移動　OK 選定　BACK 關閉",
+                color = CinemaTextMuted,
+                fontSize = 11.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuickMenuRow(
+    label: String,
+    items: List<QuickMenuItem>,
+    focusedIndex: Int,
+) {
+    val listState = rememberLazyListState()
+    // 游標移到哪就捲到哪。一叫出選單時，這會讓集數列直接停在目前那一集——
+    // 265 集的番不必從第 1 集捲起。
+    LaunchedEffect(focusedIndex) {
+        if (focusedIndex >= 0 && focusedIndex < items.size) {
+            listState.scrollToItem(focusedIndex)
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            color = CinemaTextMuted,
+            fontSize = 12.sp,
+            modifier = Modifier.width(48.dp),
+        )
+        LazyRow(
+            state = listState,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(items.size) { i ->
+                val item = items[i]
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (item.isCurrent) CinemaRed else Color.White.copy(alpha = 0.12f))
+                        // 沒有真正的 View 焦點，游標得自己畫：
+                        //   正在播的 → 紅底（與詳情頁集數格線一致）
+                        //   游標所在 → 白框
+                        .border(
+                            BorderStroke(1.5.dp, if (i == focusedIndex) Color.White else Color.Transparent),
+                            RoundedCornerShape(6.dp),
+                        )
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        item.label,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = if (item.isCurrent) FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
+            }
+        }
     }
 }
