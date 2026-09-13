@@ -780,10 +780,14 @@ class VodRepositoryImpl @Inject constructor(
             endpointResolver.forceRefreshAsync()
         }
         val rows = coroutineScope {
-            val categories = listOf(
-                20 to "韓劇", 13 to "陸劇", 16 to "美劇", 15 to "日劇",
-                1 to "電影", 4 to "動漫", 14 to "台劇", 21 to "港劇",
-                29 to "綜藝", 22 to "紀錄片"
+            val categories = SourceType.GIMYTV.categoryRows(
+                listOf(
+                    StandardCategory.KOREAN, StandardCategory.CHINESE,
+                    StandardCategory.AMERICAN, StandardCategory.JAPANESE,
+                    StandardCategory.MOVIE, StandardCategory.ANIME,
+                    StandardCategory.TAIWAN, StandardCategory.HK,
+                    StandardCategory.VARIETY, StandardCategory.DOCUMENTARY,
+                )
             )
             categories.map { (typeId, name) ->
                 async {
@@ -819,10 +823,16 @@ class VodRepositoryImpl @Inject constructor(
             endpointResolver.forceRefreshAsync()
         }
         val rows = coroutineScope {
-            val categories = listOf(
-                101 to "熱門電影", 201 to "韓劇", 202 to "陸劇",
-                203 to "美劇", 204 to "日劇", 205 to "動漫",
-                207 to "台劇", 208 to "港劇", 206 to "綜藝"
+            val categories = SourceType.MOVIEFFM.categoryRows(
+                listOf(
+                    StandardCategory.MOVIE, StandardCategory.KOREAN,
+                    StandardCategory.CHINESE, StandardCategory.AMERICAN,
+                    StandardCategory.JAPANESE, StandardCategory.ANIME,
+                    StandardCategory.TAIWAN, StandardCategory.HK,
+                    StandardCategory.VARIETY,
+                ),
+                // movieffm 的 101 是熱門電影榜，不是一般電影分類
+                labelOverrides = mapOf(StandardCategory.MOVIE to "熱門電影"),
             )
             // All parallel — OkHttp's per-host limit handles throttling
             categories.map { (typeId, name) ->

@@ -140,7 +140,7 @@ fun HomeScreen(
                             MoreSourceRow(
                                 sourceType = source,
                                 typeId = typeId,
-                                title = "${source.displayName} · ${categoryDisplayName(cat)}",
+                                title = "${source.displayName} · ${cat.displayName}",
                                 onItemClick = { onVodClick(it.sourceType, it.id) },
                                 onMoreClick = { onBrowseClick(source, typeId) },
                                 viewModel = viewModel,
@@ -568,20 +568,6 @@ private val MORE_SOURCES: List<Pair<SourceType, StandardCategory>> = listOf(
     SourceType.EYNY_TV to StandardCategory.MOVIE,
 )
 
-private fun categoryDisplayName(c: StandardCategory): String = when (c) {
-    StandardCategory.MOVIE -> "電影"
-    StandardCategory.SERIES -> "劇集"
-    StandardCategory.ANIME -> "動漫"
-    StandardCategory.VARIETY -> "綜藝"
-    StandardCategory.KOREAN -> "韓劇"
-    StandardCategory.CHINESE -> "陸劇"
-    StandardCategory.HK -> "港劇"
-    StandardCategory.TAIWAN -> "台劇"
-    StandardCategory.JAPANESE -> "日劇"
-    StandardCategory.AMERICAN -> "美劇"
-    StandardCategory.DOCUMENTARY -> "紀錄片"
-    StandardCategory.ADULT -> "倫理"
-}
 
 @Composable
 private fun MoreSourcesHeader() {

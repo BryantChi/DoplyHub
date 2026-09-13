@@ -2,6 +2,8 @@ package com.gimy.tv.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gimy.tv.domain.model.categoryMap
+import com.gimy.tv.domain.model.StandardCategory
 import com.gimy.tv.domain.model.*
 import com.gimy.tv.domain.repository.HomeRowData
 import com.gimy.tv.domain.repository.VodRepository
@@ -85,11 +87,18 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // Movieffm typeId → matching gimymax typeId for interleaving
-    private val ffmToGimyMap = mapOf(
-        101 to 1, 201 to 20, 202 to 13, 203 to 16, 204 to 21,
-        205 to 4, 207 to 14, 208 to 15, 206 to 29
-    )
+    /**
+     * movieffm typeId → 對應的 gimy typeId，用來把 FFM 的列插在同分類的 gimy 列後面。
+     *
+     * 由兩張 categoryMap 推導，不再手寫。手寫的那一份把 204（日劇）配到 gimy 21（港劇）、
+     * 208（港劇）配到 gimy 15（日劇），正是 2026-09-13 那個對調錯誤的同一個形狀，
+     * 只是躲在另一個檔案裡，連測試都沒蓋到。
+     */
+    private val ffmToGimyMap: Map<Int, Int> = StandardCategory.entries.mapNotNull { cat ->
+        val ffm = SourceType.MOVIEFFM.categoryMap.typeIdFor(cat)
+        val gimy = SourceType.GIMYTV.categoryMap.typeIdFor(cat)
+        if (ffm > 0 && gimy > 0) ffm to gimy else null
+    }.toMap()
 
     init {
         loadHome()

@@ -23,6 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gimy.tv.domain.model.displayName
+import com.gimy.tv.domain.model.categoryMap
+import com.gimy.tv.domain.model.SourceType
+import com.gimy.tv.domain.model.StandardCategory
 import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.PinInputDialog
 import com.gimy.tv.ui.settings.AdultContentViewModel
@@ -37,19 +41,35 @@ data class CategoryItem(
     val emoji: String,
 )
 
-private val categories = listOf(
-    CategoryItem("GIMYTV", 2, "電視劇", "📺"),
-    CategoryItem("GIMYTV", 1, "電影", "🎬"),
-    CategoryItem("GIMYTV", 4, "動漫", "🎌"),
-    CategoryItem("GIMYTV", 29, "綜藝", "🎤"),
-    CategoryItem("GIMYTV", 20, "韓劇", "🇰🇷"),
-    CategoryItem("GIMYTV", 13, "陸劇", "🇨🇳"),
-    CategoryItem("GIMYTV", 16, "美劇", "🇺🇸"),
-    CategoryItem("GIMYTV", 15, "日劇", "🇯🇵"),
-    CategoryItem("GIMYTV", 14, "台劇", "🇹🇼"),
-    CategoryItem("GIMYTV", 21, "港劇", "🇭🇰"),
-    CategoryItem("GIMYTV", 22, "紀錄片", "🎥"),
+/**
+ * 分類瀏覽的排列順序與圖示。
+ *
+ * 只有 emoji 是這個畫面自己的資料；typeId 與名稱都從 [categoryMap] 與 [displayName] 推出來，
+ * 不再手寫第二份——手寫的那份一旦與來源的編號表對不上，畫面就會「標題是甲、內容是乙」，
+ * 而且不會有任何編譯錯誤。
+ */
+private val categoryOrder: List<Pair<StandardCategory, String>> = listOf(
+    StandardCategory.SERIES to "📺",
+    StandardCategory.MOVIE to "🎬",
+    StandardCategory.ANIME to "🎌",
+    StandardCategory.VARIETY to "🎤",
+    StandardCategory.KOREAN to "🇰🇷",
+    StandardCategory.CHINESE to "🇨🇳",
+    StandardCategory.AMERICAN to "🇺🇸",
+    StandardCategory.JAPANESE to "🇯🇵",
+    StandardCategory.TAIWAN to "🇹🇼",
+    StandardCategory.HK to "🇭🇰",
+    StandardCategory.DOCUMENTARY to "🎥",
 )
+
+/** 分類瀏覽固定走 GIMYTV（首頁主力來源），其他來源從首頁的「更多來源」列進入。 */
+private val categoryBrowseSource = SourceType.GIMYTV
+
+internal val categories: List<CategoryItem> = categoryOrder.mapNotNull { (cat, emoji) ->
+    categoryBrowseSource.categoryMap.typeIdFor(cat).takeIf { it > 0 }?.let { typeId ->
+        CategoryItem(categoryBrowseSource.name, typeId, cat.displayName, emoji)
+    }
+}
 
 @Composable
 fun CategoryScreen(
