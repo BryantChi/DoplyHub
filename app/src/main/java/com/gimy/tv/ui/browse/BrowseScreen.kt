@@ -161,12 +161,22 @@ fun BrowseScreen(
                                 if (uiState.isLoadingMore) {
                                     DoplyLoadingIndicator(28.dp)
                                 } else {
+                                    // 前一頁失敗時要講出來。照舊顯示「載入更多」的話，
+                                    // 使用者按下去什麼也沒發生，只會以為是自己按錯。
+                                    val loadMoreFailed = uiState.error != null
                                     val loadMoreContent: @Composable () -> Unit = {
                                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text("↓", fontSize = 24.sp, color = CinemaRed)
+                                                Text(
+                                                    if (loadMoreFailed) "↻" else "↓",
+                                                    fontSize = 24.sp, color = CinemaRed,
+                                                )
                                                 Spacer(Modifier.height(4.dp))
-                                                Text("載入更多", fontSize = 13.sp, color = CinemaTextPrimary, fontWeight = FontWeight.Bold)
+                                                Text(
+                                                    if (loadMoreFailed) "載入失敗，再試一次" else "載入更多",
+                                                    fontSize = 13.sp, color = CinemaTextPrimary,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
                                             }
                                         }
                                     }
