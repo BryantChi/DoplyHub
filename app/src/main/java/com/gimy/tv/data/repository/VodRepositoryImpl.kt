@@ -201,9 +201,20 @@ class VodRepositoryImpl @Inject constructor(
 
     // ── Cross-source search ──
 
-    /** Search across enabled sources in parallel. Order = display priority (stability/popularity).
-     *  User-disabled sources are filtered out via SourcePreferencesRepository.enabledSources.
-     *  Each source has its own 5s timeout — slow/failing sources don't block fast ones. */
+    /**
+     * 跨站搜尋的來源順序＝顯示優先序（穩定度／熱門度）。
+     *
+     * 這份清單原本在 [searchOrder] 與 [searchAllSources] 各寫一次。加新來源時只改到一邊，
+     * 兩條路徑的來源集合就會悄悄分岔——聚合搜尋找得到、跨站增益卻找不到，而且從畫面上
+     * 完全看不出來。改成單一來源，分岔在結構上就不可能發生。
+     */
+    private val searchSourceOrder: List<SiteSource> by lazy {
+        listOf(
+            gimyTvSource, gimyMaxSource, imapleTvSource, gimyTwSource,
+            eynyTvSource, momovodSource, kubo123Source, movieffmSource,
+        )
+    }
+
     /**
      * Suspend-based source list — calls snapshot() so cold-start callers wait for
      * DataStore's first emission rather than racing against the StateFlow seed.
@@ -212,10 +223,7 @@ class VodRepositoryImpl @Inject constructor(
      */
     private suspend fun searchOrder(): List<SiteSource> {
         val enabled = sourcePreferencesRepository.snapshot()
-        return listOf(
-            gimyTvSource, gimyMaxSource, imapleTvSource, gimyTwSource,
-            eynyTvSource, momovodSource, kubo123Source, movieffmSource,
-        ).filter { it.sourceType in enabled }
+        return searchSourceOrder.filter { it.sourceType in enabled }
     }
 
     /** Best-effort adult-content filter for non-18+ paths.
@@ -242,10 +250,8 @@ class VodRepositoryImpl @Inject constructor(
         val cacheKey = "${normalizeSearchKey(keyword)}|$page|$enabledFp"
         searchCacheGet(cacheKey)?.let { return it }
 
-        val sources = listOf(
-            gimyTvSource, gimyMaxSource, imapleTvSource, gimyTwSource,
-            eynyTvSource, momovodSource, kubo123Source, movieffmSource,
-        ).filter { it.sourceType in enabled }
+        // enabled 上面已經 snapshot 過（指紋要用），這裡直接沿用，不再多問一次 DataStore。
+        val sources = searchSourceOrder.filter { it.sourceType in enabled }
 
         val result = coroutineScope {
             val deferreds = sources.map { src ->
