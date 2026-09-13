@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+（API 31 以上）的備份/轉移規則。API 28~30 走 backup_rules.xml，兩份要一起維護。
+
+  cloud-backup（上 Google 雲端）與 device-transfer（換機直傳，資料只在兩台裝置間走）
+  風險不同，所以分開設定：
+
+  - gimy_tv.db 含 18+ 觀看紀錄，不上雲；但換機直傳留著，使用者換手機時收藏與觀看紀錄才不會整個消失。
+  - adult_content 存的是 PIN 的 SHA-256（4 位數字、無鹽，拿到雜湊等於拿到 PIN），兩種都排除。
+    少了這個檔案時 adult_enabled 預設 false，還原後成人區是全關的狀態，不會反而變成沒鎖。
+  - cf_cookies 是 Cloudflare 綁 IP/UA 發的憑證，換裝置後本來就失效，帶過去只會造成莫名的取流失敗。
+
+  只列 exclude 代表其餘（source_preferences、endpoint_resolver、repair_flags 等）照常備份。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="gimy_tv.db" />
+        <exclude domain="database" path="gimy_tv.db-wal" />
+        <exclude domain="database" path="gimy_tv.db-shm" />
+        <exclude domain="file" path="datastore/adult_content.preferences_pb" />
+        <exclude domain="file" path="datastore/cf_cookies.preferences_pb" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/adult_content.preferences_pb" />
+        <exclude domain="file" path="datastore/cf_cookies.preferences_pb" />
+    </device-transfer>
+</data-extraction-rules>
