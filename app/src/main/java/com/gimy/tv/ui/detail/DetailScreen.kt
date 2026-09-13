@@ -34,6 +34,7 @@ import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.domain.model.VodDetail
 import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.VodCard
+import com.gimy.tv.ui.components.VodCover
 import com.gimy.tv.ui.theme.*
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -178,9 +179,8 @@ fun DetailScreen(
                                     .padding(horizontal = dims.screenHorizontalPadding, vertical = 32.dp)
                             ) {
                                 // Cover
-                                AsyncImage(
-                                    model = d.vod.coverUrl, contentDescription = null,
-                                    contentScale = ContentScale.Crop,
+                                VodCover(
+                                    url = d.vod.coverUrl,
                                     modifier = Modifier
                                         .width(coverW)
                                         .height(coverH)
@@ -209,10 +209,8 @@ fun DetailScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 // Cover image
-                                AsyncImage(
-                                    model = d.vod.coverUrl,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
+                                VodCover(
+                                    url = d.vod.coverUrl,
                                     modifier = Modifier
                                         .width(coverW)
                                         .height(coverH)

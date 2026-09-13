@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -20,7 +19,6 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Border
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import coil.compose.AsyncImage
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
 
@@ -53,11 +51,7 @@ private fun sourceBadgeFor(sourceType: SourceType): Pair<String, Color> = when (
 @Composable
 private fun VodCardContent(vod: Vod) {
     Box {
-        AsyncImage(
-            model = vod.coverUrl, contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        VodCover(url = vod.coverUrl, modifier = Modifier.fillMaxSize())
         // Bottom gradient for text readability
         Box(
             Modifier
