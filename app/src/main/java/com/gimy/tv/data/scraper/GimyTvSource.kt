@@ -105,13 +105,7 @@ class GimyTvSource @Inject constructor(
         }
     }
 
-    private fun fetchHtml(url: String): String {
-        val req = Request.Builder().url(url).build()
-        return client.newCall(req).execute().use { r ->
-            if (!r.isSuccessful) throw ScraperException("HTTP ${r.code}: $url")
-            r.body?.string() ?: throw ScraperException("Empty: $url")
-        }
-    }
+    private fun fetchHtml(url: String): String = client.fetchHtml(url)
 
-    private fun fetchDocument(url: String): Document = Jsoup.parse(fetchHtml(url), url)
+    private fun fetchDocument(url: String): Document = client.fetchDocument(url)
 }

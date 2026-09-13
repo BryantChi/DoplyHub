@@ -106,15 +106,7 @@ class GimyMaxSource @Inject constructor(
         }
     }
 
-    private fun fetchHtml(url: String): String {
-        val req = Request.Builder().url(url).build()
-        return client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) throw ScraperException("HTTP ${resp.code}: $url")
-            resp.body?.string() ?: throw ScraperException("Empty body: $url")
-        }
-    }
+    private fun fetchHtml(url: String): String = client.fetchHtml(url)
 
-    private fun fetchDocument(url: String): Document = Jsoup.parse(fetchHtml(url), url)
+    private fun fetchDocument(url: String): Document = client.fetchDocument(url)
 }
-
-class ScraperException(message: String) : Exception(message)

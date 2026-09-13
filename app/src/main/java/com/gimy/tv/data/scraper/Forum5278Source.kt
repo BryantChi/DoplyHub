@@ -5,8 +5,6 @@ import com.gimy.tv.domain.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -189,18 +187,9 @@ class Forum5278Source @Inject constructor(
 
     // ─── HTTP ───
 
-    private fun fetchHtml(url: String, referer: String): String {
-        val req = Request.Builder()
-            .url(url)
-            .header("User-Agent", userAgent)
-            .header("Referer", referer)
-            .build()
-        return client.newCall(req).execute().use { r ->
-            if (!r.isSuccessful) throw ScraperException("HTTP ${r.code}: $url")
-            r.body?.string() ?: throw ScraperException("Empty body: $url")
-        }
-    }
+    private fun fetchHtml(url: String, referer: String): String =
+        client.fetchHtml(url, userAgent = userAgent, referer = referer)
 
     private fun fetchDocument(url: String): Document =
-        Jsoup.parse(fetchHtml(url, baseUrl), url)
+        client.fetchDocument(url, userAgent = userAgent, referer = baseUrl)
 }

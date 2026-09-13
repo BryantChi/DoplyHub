@@ -131,18 +131,10 @@ abstract class MacCmsListBasedSource(
 
     // ─── HTTP ───
 
-    protected fun fetchHtml(url: String): String {
-        val req = Request.Builder()
-            .url(url)
-            .header("User-Agent", userAgent)
-            .build()
-        return client.newCall(req).execute().use { r ->
-            if (!r.isSuccessful) throw ScraperException("HTTP ${r.code}: $url")
-            r.body?.string() ?: throw ScraperException("Empty body: $url")
-        }
-    }
+    protected fun fetchHtml(url: String): String = client.fetchHtml(url, userAgent = userAgent)
 
-    protected fun fetchDocument(url: String): Document = Jsoup.parse(fetchHtml(url), url)
+    protected fun fetchDocument(url: String): Document =
+        client.fetchDocument(url, userAgent = userAgent)
 
     protected fun resolveUrl(url: String): String = when {
         url.isBlank() -> ""
