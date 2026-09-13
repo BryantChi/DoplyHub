@@ -3,6 +3,7 @@ package com.gimy.tv.ui.player
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gimy.tv.ui.UiText
 import com.gimy.tv.domain.model.*
 import com.gimy.tv.domain.repository.VodRepository
 import com.gimy.tv.domain.repository.WatchHistoryEntry
@@ -163,7 +164,7 @@ class PlayerViewModel @Inject constructor(
                 }
                 enrichWithCrossSource()
             } catch (e: java.io.IOException) {
-                _uiState.update { it.copy(isLoading = false, error = "網路連線失敗，請檢查網路後重試") }
+                _uiState.update { it.copy(isLoading = false, error = UiText.NETWORK_ERROR) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = "播放失敗: ${e.message}") }
             }

@@ -2,6 +2,7 @@ package com.gimy.tv.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gimy.tv.ui.UiText
 import com.gimy.tv.domain.model.categoryMap
 import com.gimy.tv.domain.model.StandardCategory
 import com.gimy.tv.domain.model.*
@@ -210,7 +211,7 @@ class HomeViewModel @Inject constructor(
                         if (isRefresh && previousRows.isNotEmpty()) {
                             state.copy(isLoading = false, isRefreshing = false, rows = previousRows)
                         } else {
-                            state.copy(isLoading = false, isRefreshing = false, error = "無法載入內容，請檢查網路連線")
+                            state.copy(isLoading = false, isRefreshing = false, error = UiText.NETWORK_ERROR)
                         }
                     } else {
                         state.copy(isLoading = false, isRefreshing = false)
@@ -227,7 +228,7 @@ class HomeViewModel @Inject constructor(
                         isRefresh && state.rows.isEmpty() && previousRows.isNotEmpty() ->
                             state.copy(isLoading = false, isRefreshing = false, rows = previousRows)
                         state.rows.isEmpty() && state.isLoading ->
-                            state.copy(isLoading = false, isRefreshing = false, error = "無法載入內容，請檢查網路連線")
+                            state.copy(isLoading = false, isRefreshing = false, error = UiText.NETWORK_ERROR)
                         else ->
                             state.copy(isLoading = false, isRefreshing = false)
                     }

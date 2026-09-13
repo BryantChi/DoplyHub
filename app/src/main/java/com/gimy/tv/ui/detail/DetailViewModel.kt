@@ -3,6 +3,7 @@ package com.gimy.tv.ui.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gimy.tv.ui.UiText
 import com.gimy.tv.domain.model.*
 import com.gimy.tv.domain.repository.FavoriteRepository
 import com.gimy.tv.domain.repository.VodRepository
@@ -170,7 +171,7 @@ class DetailViewModel @Inject constructor(
                 // On refresh: keep existing detail visible, drop the spinner silently.
                 _uiState.update {
                     if (isRefresh) it.copy(isRefreshing = false, isEnriching = false)
-                    else it.copy(isLoading = false, isEnriching = false, error = "網路連線失敗，請檢查網路後重試")
+                    else it.copy(isLoading = false, isEnriching = false, error = UiText.NETWORK_ERROR)
                 }
             } catch (e: Exception) {
                 // 走到這裡多半是 404（ScraperException，不是 IOException）。最常見的成因是
