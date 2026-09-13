@@ -115,6 +115,22 @@ interface WatchHistoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(history: WatchHistoryEntity)
 
+    /** 以 (vodId, sourceType) 為鍵的 upsert。
+     *
+     *  這張表的主鍵是 autoGenerate 的 id，(vodId, sourceType) 上沒有 UNIQUE 約束，
+     *  所以 REPLACE 只認 id——得先查出既有的 id 再帶進去寫。但 read-then-write 本身
+     *  是競態：退出播放器時 BACK、生命週期的 ON_STOP、composition 的 onDispose 都會
+     *  發出存檔，第一次觀看那筆會三個都讀到 null，於是插出三列一模一樣的紀錄
+     *  （首頁「繼續觀看」和歷史頁都沒有去重，會直接看到重複的卡）。
+     *
+     *  包成 @Transaction 就能靠 Room 的單執行緒 transaction executor 把它們排成序列，
+     *  不必動 schema、不需要 migration。 */
+    @Transaction
+    suspend fun upsertByVod(history: WatchHistoryEntity) {
+        val existing = getByVod(history.vodId, history.sourceType)
+        upsert(if (existing != null) history.copy(id = existing.id) else history)
+    }
+
     @Query("DELETE FROM watch_history WHERE id = :id")
     suspend fun delete(id: Long)
 

@@ -39,10 +39,11 @@ class WatchHistoryRepositoryImpl @Inject constructor(
     }
 
     override suspend fun saveProgress(entry: WatchHistoryEntry) {
-        val existing = dao.getByVod(entry.vodId, entry.sourceType.name)
-        dao.upsert(
+        // 交給 DAO 的 @Transaction 版本：先查後寫這段必須是原子的，否則退出播放器時
+        // 同時發出的幾筆存檔會各自讀到 null，插出重複列。
+        dao.upsertByVod(
             WatchHistoryEntity(
-                id = existing?.id ?: 0,
+                id = 0,
                 vodId = entry.vodId,
                 sourceType = entry.sourceType.name,
                 title = entry.title,
