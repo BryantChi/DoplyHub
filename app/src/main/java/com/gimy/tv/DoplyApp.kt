@@ -34,6 +34,9 @@ class DoplyApp : Application(), ImageLoaderFactory {
 
     @Inject lateinit var jableTitleRepair: com.gimy.tv.data.repair.JableTitleRepair
 
+    @Inject lateinit var adultContentPreferences:
+        com.gimy.tv.data.preferences.AdultContentPreferencesRepository
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -48,12 +51,19 @@ class DoplyApp : Application(), ImageLoaderFactory {
         appScope.launch {
             runCatching {
                 cfCookieStore.warmUp()
-                cloudflareGateway.warmUp(
-                    siteSources.get().values.mapNotNull { it.cloudflareWarmUpUrl }
-                )
-                // After the warm-up: jable is behind Cloudflare, so a repair attempted
-                // before the clearance exists would fail every row and achieve nothing.
-                jableTitleRepair.repairOnce()
+                // 目前唯一需要預解挑戰的是 jable，而 jable 只在成人進階區進得去。
+                // 那個開關預設關閉，所以原本的寫法等於每次冷啟動都為了一個使用者根本
+                // 到不了的來源，在主執行緒建一個 WebView（實測會多開一個 chromium
+                // renderer 行程）再花 6-20 秒解挑戰。關著就整段跳過。
+                if (adultContentPreferences.isAdultPlusEnabledNow()) {
+                    cloudflareGateway.warmUp(
+                        siteSources.get().values.mapNotNull { it.cloudflareWarmUpUrl }
+                    )
+                    // After the warm-up: jable is behind Cloudflare, so a repair attempted
+                    // before the clearance exists would fail every row and achieve nothing.
+                    // 進階區關著時那些列也不會顯示，修了看不到，一起跳過。
+                    jableTitleRepair.repairOnce()
+                }
             }
         }
 

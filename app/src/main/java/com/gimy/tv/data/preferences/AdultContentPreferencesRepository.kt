@@ -79,6 +79,15 @@ class AdultContentPreferencesRepository @Inject constructor(
         .map { it[KEY_ADULT_PLUS_ENABLED] ?: false }
         .stateIn(scope, SharingStarted.Eagerly, false)
 
+    /**
+     * 一次性讀取，給冷啟動用。
+     *
+     * 不能用 [adultPlusEnabled].value：那是 stateIn 的 StateFlow，DataStore 還沒讀完之前
+     * 拿到的是初始佔位值 false，在 Application.onCreate 這種時間點幾乎必定讀錯。
+     */
+    suspend fun isAdultPlusEnabledNow(): Boolean =
+        runCatching { dataStore.data.first()[KEY_ADULT_PLUS_ENABLED] }.getOrNull() ?: false
+
     /** In-memory only — resets to false on cold start. Set when user passes PIN this session. */
     private val _unlocked = MutableStateFlow(false)
     val unlocked: StateFlow<Boolean> = _unlocked.asStateFlow()
