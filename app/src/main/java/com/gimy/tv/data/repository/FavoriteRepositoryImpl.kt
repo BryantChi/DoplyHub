@@ -3,6 +3,7 @@ package com.gimy.tv.data.repository
 import com.gimy.tv.data.local.dao.FavoriteDao
 import com.gimy.tv.data.local.entity.FavoriteEntity
 import com.gimy.tv.domain.model.SourceType
+import com.gimy.tv.domain.model.isAdultOnly
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.domain.repository.FavoriteRepository
 import kotlinx.coroutines.flow.Flow
@@ -14,9 +15,6 @@ import javax.inject.Singleton
 class FavoriteRepositoryImpl @Inject constructor(
     private val dao: FavoriteDao
 ) : FavoriteRepository {
-
-    /** Sources whose entire content is treated as adult — used to auto-tag isAdult on insert. */
-    private val adultOnlySources = setOf(SourceType.JABLE_TV, SourceType.XNXX, SourceType.FORUM5278)
 
     override fun getFavorites(): Flow<List<Vod>> {
         return dao.getAll().map { entities ->
@@ -44,7 +42,7 @@ class FavoriteRepositoryImpl @Inject constructor(
                 category = vod.category,
                 year = vod.year,
                 status = vod.status,
-                isAdult = vod.sourceType in adultOnlySources,
+                isAdult = vod.sourceType.isAdultOnly,
             )
         )
     }

@@ -3,6 +3,7 @@ package com.gimy.tv.data.repository
 import com.gimy.tv.data.local.dao.WatchHistoryDao
 import com.gimy.tv.data.local.entity.WatchHistoryEntity
 import com.gimy.tv.domain.model.SourceType
+import com.gimy.tv.domain.model.isAdultOnly
 import com.gimy.tv.domain.repository.WatchHistoryEntry
 import com.gimy.tv.domain.repository.WatchHistoryRepository
 import kotlinx.coroutines.flow.Flow
@@ -14,9 +15,6 @@ import javax.inject.Singleton
 class WatchHistoryRepositoryImpl @Inject constructor(
     private val dao: WatchHistoryDao
 ) : WatchHistoryRepository {
-
-    /** Sources whose entire content is treated as adult — auto-tag isAdult on save. */
-    private val adultOnlySources = setOf(SourceType.JABLE_TV, SourceType.XNXX, SourceType.FORUM5278)
 
     override fun getRecentHistory(limit: Int): Flow<List<WatchHistoryEntry>> {
         return dao.getRecent(limit).map { entities ->
@@ -53,7 +51,7 @@ class WatchHistoryRepositoryImpl @Inject constructor(
                 sourceId = entry.sourceId,
                 positionMs = entry.positionMs,
                 durationMs = entry.durationMs,
-                isAdult = entry.sourceType in adultOnlySources,
+                isAdult = entry.sourceType.isAdultOnly,
                 // Only record playedSourceType when it differs from primary —
                 // null is the "no special routing needed" marker. Saves a DB
                 // string + simplifies the read path's null check.

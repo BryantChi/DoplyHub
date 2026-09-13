@@ -32,6 +32,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * 單一來源搜尋失敗時，要不要改用 movieffm 的結果頂上。
+ *
+ * movieffm 自己失敗當然不能退回自己；成人來源也不行——使用者在成人區搜尋卻跳出一般片單，
+ * 既分不出是站掛了還是關鍵字沒東西，也拿到完全無關的內容，寧可讓錯誤往上冒到 UI。
+ */
+fun shouldFallbackToMovieffm(sourceType: SourceType): Boolean =
+    sourceType != SourceType.MOVIEFFM && !sourceType.isAdultOnly
+
+/**
  * Compute cross-site aggregated status from POST-normalize episodes and the
  * already-fallback-applied per-site metadata. Extracted so the rule can be
  * unit-tested independently of the full repository wiring.
@@ -186,7 +195,7 @@ class VodRepositoryImpl @Inject constructor(
         } catch (e: kotlin.coroutines.cancellation.CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (sourceType != SourceType.MOVIEFFM) movieffmSource.search(keyword, page) else throw e
+            if (shouldFallbackToMovieffm(sourceType)) movieffmSource.search(keyword, page) else throw e
         }
     }
 

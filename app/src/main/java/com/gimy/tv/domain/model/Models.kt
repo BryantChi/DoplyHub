@@ -20,6 +20,14 @@ val SourceType.displayName: String get() = when (this) {
     SourceType.FORUM5278 -> "5278"
 }
 
+/**
+ * 整站都是成人內容的來源。收藏／觀看紀錄用它自動標 isAdult，搜尋失敗時用它擋掉
+ * 退回一般站台的備援。這份名單原本在兩個 repository 各寫一次，加新來源時很容易只改一邊，
+ * 所以放在 SourceType 旁邊當唯一來源。
+ */
+val SourceType.isAdultOnly: Boolean
+    get() = this == SourceType.JABLE_TV || this == SourceType.XNXX || this == SourceType.FORUM5278
+
 data class Category(
     val id: Int,
     val name: String,
