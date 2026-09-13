@@ -179,6 +179,14 @@ interface MovieffmSlugDao {
     @Query("SELECT contentType FROM movieffm_slugs WHERE vodId = :vodId LIMIT 1")
     suspend fun getContentType(vodId: Long): String?
 
+    /** 反查：這個 slug 之前配到的是哪個 id。
+     *
+     *  沒有這支查詢的話，registerSlug 只看得到記憶體的對照表——process 重啟後那張表
+     *  是空的，碰撞遞增會從頭跑一次，同一個 slug 可能算出跟已經寫進 movieffm_slugs、
+     *  而且使用者收藏／觀看紀錄裡存著的那個不一樣的 id。 */
+    @Query("SELECT vodId FROM movieffm_slugs WHERE slug = :slug LIMIT 1")
+    suspend fun getVodId(slug: String): Long?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(slugs: List<MovieffmSlugEntity>)
 

@@ -26,27 +26,44 @@ class MovieffmSource @Inject constructor(
 
     // Bidirectional slug <-> ID mapping (in-memory cache, backed by Room).
     // Bounded LRU (2000 each) via shared TtlLruCache — see app/data/cache/TtlLruCache.kt.
-    // Eviction is safe: registerSlug recomputes an evicted slug to the same id
-    // (deterministic hash), and `idToSlug` falls back to the Room slugDao at the
-    // call site (line ~87).
+    //
+    // 兩個方向都以 Room 為準，被 LRU 淘汰或 process 重啟都還原得回來：
+    //   id → slug：fetchVodDetail 回查 slugDao.getSlug
+    //   slug → id：registerSlug 回查 slugDao.getVodId
+    // 後者是必要的。原本這裡只寫「淘汰沒關係，反正雜湊是確定性的會算出同一個 id」，
+    // 但那句話只在「從來沒發生過碰撞」時成立——碰撞遞增的結果取決於當下記憶體裡
+    // 有哪些對手，重啟後那張表是空的，同一個 slug 就可能算出不同的 id，
+    // 而收藏與觀看紀錄存的正是 id。
     private val slugCacheCapacity = 2000
     private val slugToId = com.gimy.tv.data.cache.TtlLruCache<String, Long>(slugCacheCapacity)
     private val idToSlug = com.gimy.tv.data.cache.TtlLruCache<Long, String>(slugCacheCapacity)
     private val idToContentType = com.gimy.tv.data.cache.TtlLruCache<Long, String>(slugCacheCapacity)
 
-    private fun registerSlug(slug: String, contentType: String): Long {
-        return slugToId.getOrPut(slug) {
-            var id = slug.hashCode().toLong() and Long.MAX_VALUE
-            // Handle hash collisions: if ID is taken by a different slug, increment.
-            while (true) {
-                val existing = idToSlug.get(id)
-                if (existing == null || existing == slug) break
-                id = (id + 1) and Long.MAX_VALUE
-            }
-            idToSlug.put(id, slug)
-            idToContentType.put(id, contentType)
-            id
+    private suspend fun registerSlug(slug: String, contentType: String): Long {
+        slugToId.get(slug)?.let { return it }
+
+        // 記憶體沒有就先問 Room。這一步是必要的：process 重啟後 idToSlug 是空的，
+        // 下面的碰撞遞增會從頭跑一次，於是同一個 slug 可能算出跟「已經寫進
+        // movieffm_slugs、而且使用者的收藏與觀看紀錄裡存著的那個」不一樣的 id——
+        // 使用者看到的就是「收藏過的片顯示沒收藏」，而且不會自己好。
+        slugDao.getVodId(slug)?.let { known ->
+            slugToId.put(slug, known)
+            idToSlug.put(known, slug)
+            idToContentType.put(known, contentType)
+            return known
         }
+
+        var id = slug.hashCode().toLong() and Long.MAX_VALUE
+        // Handle hash collisions: if ID is taken by a different slug, increment.
+        while (true) {
+            val existing = idToSlug.get(id)
+            if (existing == null || existing == slug) break
+            id = (id + 1) and Long.MAX_VALUE
+        }
+        slugToId.put(slug, id)
+        idToSlug.put(id, slug)
+        idToContentType.put(id, contentType)
+        return id
     }
 
     // typeId → (basePath, queryParams) mapping for subcategories
@@ -315,7 +332,7 @@ class MovieffmSource @Inject constructor(
      * Drama: same + .dramacbox with status/type/cast
      * Video URLs: embedded JavaScript `videourls:[...]`
      */
-    private fun parseVodDetail(doc: Document, vodId: Long, relatedSlugs: MutableList<MovieffmSlugEntity>): VodDetail {
+    private suspend fun parseVodDetail(doc: Document, vodId: Long, relatedSlugs: MutableList<MovieffmSlugEntity>): VodDetail {
         val title = doc.selectFirst("h1")?.text()?.trim() ?: "Unknown"
 
         // Cover image
@@ -531,7 +548,7 @@ class MovieffmSource @Inject constructor(
      * Parse related vods from #single_relacionados_b section.
      * <article><a href="/movies/slug/"><img alt="Title" data-lazy-src="IMG"></a></article>
      */
-    private fun parseRelatedVods(doc: Document, outSlugs: MutableList<MovieffmSlugEntity>): List<Vod> {
+    private suspend fun parseRelatedVods(doc: Document, outSlugs: MutableList<MovieffmSlugEntity>): List<Vod> {
         val container = doc.selectFirst("#single_relacionados_b") ?: return emptyList()
         val items = mutableListOf<Vod>()
 
@@ -559,7 +576,7 @@ class MovieffmSource @Inject constructor(
      * Tries #single_relacionados_a, .sbox:has(h2:contains(series)), .sbox:has(h2:contains(Serie)).
      * Uses the same article-parsing logic as parseRelatedVods.
      */
-    private fun parseSeriesVods(doc: Document, outSlugs: MutableList<MovieffmSlugEntity>): List<Vod> {
+    private suspend fun parseSeriesVods(doc: Document, outSlugs: MutableList<MovieffmSlugEntity>): List<Vod> {
         val container = doc.selectFirst("#single_relacionados_a")
             ?: doc.selectFirst(".sbox:has(h2:contains(series))")
             ?: doc.selectFirst(".sbox:has(h2:contains(Serie))")
