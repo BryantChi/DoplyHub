@@ -215,6 +215,13 @@ class UpdateController @Inject constructor(
                         onProgress(totalRead, total)
                     }
                 }
+                // sink 關掉之後落檔大小才算數。對不上就是下載被截斷（連線斷了但沒拋
+                // 例外、或磁碟寫不下）——這種半截 APK 丟給系統安裝器，使用者只會看到
+                // 「解析套件時發生問題」，完全看不出是下載壞了。這裡拋出去，交給外層
+                // catch 統一刪檔。
+                if (total > 0 && target.length() != total) {
+                    error("下載不完整（${target.length()} / $total bytes）")
+                }
             }
         } catch (e: Throwable) {
             // 取消或失敗都別留半截檔。目錄雖然會在下次下載開頭清掉，但在那之前
