@@ -8,9 +8,11 @@ import com.gimy.tv.domain.repository.VodRepository
 import com.gimy.tv.domain.repository.WatchHistoryEntry
 import com.gimy.tv.domain.repository.WatchHistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
@@ -260,23 +262,30 @@ class PlayerViewModel @Inject constructor(
         // Keep resumePositionMs in sync so rotation uses the latest value
         _uiState.update { it.copy(resumePositionMs = positionMs) }
         viewModelScope.launch {
-            watchHistoryRepository.saveProgress(
-                WatchHistoryEntry(
-                    vodId = id,
-                    sourceType = sourceType,
-                    title = state.vodTitle,
-                    coverUrl = vodDetail?.vod?.coverUrl ?: "",
-                    episodeNum = state.episodeNum,
-                    episodeTitle = state.episodeTitle,
-                    sourceId = state.sourceId,
-                    positionMs = positionMs,
-                    durationMs = durationMs,
-                    // Persist the actual scraper that played so future "繼續觀看"
-                    // can route the user back to the same enriched line.
-                    playedSourceType = state.playedSourceType,
-                    episodeKind = state.episodeKind,
+            // 退出播放器那一筆存檔會死在半路：onDispose 發出它之後幾微秒，ViewModel 就被
+            // clear、viewModelScope 隨之取消，而 repository 第一步的 Room 查詢是掛起點，
+            // 一掛起就再也回不來，後面的 upsert 根本沒機會執行。
+            // NonCancellable 讓這段寫入不受 scope 取消影響；viewModelScope 跑在
+            // Main.immediate，launch 的 block 會立刻開始，所以一定進得了這個區塊。
+            withContext(NonCancellable) {
+                watchHistoryRepository.saveProgress(
+                    WatchHistoryEntry(
+                        vodId = id,
+                        sourceType = sourceType,
+                        title = state.vodTitle,
+                        coverUrl = vodDetail?.vod?.coverUrl ?: "",
+                        episodeNum = state.episodeNum,
+                        episodeTitle = state.episodeTitle,
+                        sourceId = state.sourceId,
+                        positionMs = positionMs,
+                        durationMs = durationMs,
+                        // Persist the actual scraper that played so future "繼續觀看"
+                        // can route the user back to the same enriched line.
+                        playedSourceType = state.playedSourceType,
+                        episodeKind = state.episodeKind,
+                    )
                 )
-            )
+            }
         }
     }
 
