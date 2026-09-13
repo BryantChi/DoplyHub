@@ -142,9 +142,6 @@ dependencies {
     // Window Size Class
     implementation(libs.material3.window.size)
 
-    // WorkManager
-    implementation(libs.work.runtime)
-
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.truth)
