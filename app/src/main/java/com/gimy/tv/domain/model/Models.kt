@@ -144,5 +144,12 @@ data class PaginatedResult<T>(
     val items: List<T>,
     val currentPage: Int,
     val totalPages: Int,
-    val hasMore: Boolean
+    val hasMore: Boolean,
+    /** 聚合搜尋專用：所有來源都沒有回應（斷網、鏡像全掛）。
+     *
+     *  「站台全掛」與「真的沒有這部片」在結果上都是空清單，但該跟使用者說的話
+     *  完全不同——前者要叫他重試，後者叫他換關鍵字。這個旗標本來在 repository
+     *  內部算出來就丟掉了，UI 只好把兩種都顯示成「找不到」。
+     *  有預設值，其他建構點不受影響。 */
+    val allSourcesFailed: Boolean = false,
 )

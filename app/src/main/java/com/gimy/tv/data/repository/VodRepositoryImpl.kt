@@ -265,6 +265,9 @@ class VodRepositoryImpl @Inject constructor(
                 currentPage = page,
                 totalPages = answered.maxOfOrNull { it.totalPages } ?: 0,
                 hasMore = answered.any { it.hasMore },
+                // 一個來源都沒回應。這個訊號要一路帶到 UI，否則「全掛」和
+                // 「真的搜不到」都只會顯示「找不到」。
+                allSourcesFailed = answered.isEmpty(),
             )
         }
         val (anySourceAnswered, searchResult) = result

@@ -299,6 +299,18 @@ fun SearchScreen(
                     }
                 }
             }
+            // 一個來源都沒回應時，空結果的原因不是「沒有這部片」，叫使用者換關鍵字
+            // 只會讓他一直換一直搜。這裡要講的是「連不上，請重試」。
+            uiState.hasSearched && uiState.allSourcesFailed -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("所有來源都連不上", color = CinemaTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        Text("這次搜尋沒有任何站台回應，不是查無此片。", color = CinemaTextMuted, fontSize = 14.sp)
+                        Text("請檢查網路後再搜尋一次。", color = CinemaTextMuted.copy(0.6f), fontSize = 13.sp)
+                    }
+                }
+            }
             uiState.hasSearched -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {

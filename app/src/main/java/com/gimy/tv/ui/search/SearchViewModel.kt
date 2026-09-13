@@ -24,7 +24,10 @@ data class SearchUiState(
     val isLoadingMore: Boolean = false,
     /** A gated source is solving its Cloudflare challenge right now. Shown so the first
      *  search reads as "verifying" rather than quietly returning fewer sources. */
-    val isVerifying: Boolean = false
+    val isVerifying: Boolean = false,
+    /** 這次搜尋一個來源都沒回應（斷網、鏡像全掛）。結果同樣是空清單，但要跟
+     *  使用者說「重試」而不是「換關鍵字」。 */
+    val allSourcesFailed: Boolean = false
 )
 
 @HiltViewModel
@@ -74,11 +77,11 @@ class SearchViewModel @Inject constructor(
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             searchHistoryRepository.addSearch(q)
-            _uiState.update { it.copy(isSearching = true, error = null, hasSearched = true, results = emptyList(), currentPage = 1, hasMore = false) }
+            _uiState.update { it.copy(isSearching = true, error = null, hasSearched = true, results = emptyList(), currentPage = 1, hasMore = false, allSourcesFailed = false) }
             try {
                 val result = vodRepository.searchAllSources(q, 1)
                 val unique = result.items.distinctBy { "${it.sourceType}_${it.id}" }
-                _uiState.update { it.copy(isSearching = false, results = unique, currentPage = 1, hasMore = result.hasMore) }
+                _uiState.update { it.copy(isSearching = false, results = unique, currentPage = 1, hasMore = result.hasMore, allSourcesFailed = result.allSourcesFailed) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSearching = false, error = e.message, results = emptyList()) }
             }
@@ -104,7 +107,7 @@ class SearchViewModel @Inject constructor(
 
     fun clearResults() {
         searchJob?.cancel()
-        _uiState.update { it.copy(results = emptyList(), hasSearched = false, error = null, currentPage = 1, hasMore = false, isLoadingMore = false) }
+        _uiState.update { it.copy(results = emptyList(), hasSearched = false, error = null, currentPage = 1, hasMore = false, isLoadingMore = false, allSourcesFailed = false) }
     }
 
     fun refresh() {
