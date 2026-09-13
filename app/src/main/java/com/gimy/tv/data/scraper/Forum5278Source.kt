@@ -105,14 +105,14 @@ class Forum5278Source @Inject constructor(
             )
         }
 
-    override suspend fun fetchPlayerData(episodeUrl: String): PlayerData =
+    override suspend fun fetchPlayerData(episodeUrl: String, deadlineMs: Long?): PlayerData =
         withContext(Dispatchers.IO) {
             val vodId = episodeUrl.removePrefix("embed:").toLongOrNull()
                 ?: throw ScraperException("Invalid embed url: $episodeUrl")
             val threadUrl = "$baseUrl/thread-$vodId-1-1.html"
 
             // Layer 1: thread HTML → grab cc5278_player iframe src
-            val threadHtml = fetchHtml(threadUrl, baseUrl)
+            val threadHtml = fetchHtml(threadUrl, baseUrl, deadlineMs)
             val iframeMatch = Regex("""<iframe[^>]*class="cc5278_player"[^>]*src="([^"]+)"""")
                 .find(threadHtml)
                 ?: throw ScraperException("cc5278_player iframe not found in thread $vodId")
@@ -121,7 +121,8 @@ class Forum5278Source @Inject constructor(
             }
 
             // Layer 2: player.hboav.com → grab m3u8 URL
-            val playerHtml = fetchHtml(playerUrl, threadUrl)
+            // 第二層沿用同一個截止時間，總時間才不會變成「每層各 8 秒」
+            val playerHtml = fetchHtml(playerUrl, threadUrl, deadlineMs)
             val m3u8Match = Regex("""(https?://[^"'\s<>]+\.m3u8[^"'\s<>]*)""").find(playerHtml)
                 ?: throw ScraperException("m3u8 not found in player page")
 
@@ -187,8 +188,11 @@ class Forum5278Source @Inject constructor(
 
     // ─── HTTP ───
 
-    private fun fetchHtml(url: String, referer: String): String =
-        client.fetchHtml(url, userAgent = userAgent, referer = referer)
+    private fun fetchHtml(url: String, referer: String, deadlineMs: Long? = null): String =
+        client.fetchHtml(
+            url, userAgent = userAgent, referer = referer,
+            budgetMs = remainingBudget(deadlineMs),
+        )
 
     private fun fetchDocument(url: String): Document =
         client.fetchDocument(url, userAgent = userAgent, referer = baseUrl)

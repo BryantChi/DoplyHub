@@ -111,10 +111,10 @@ abstract class MacCmsListBasedSource(
             parseVodDetail(fetchDocument("$baseUrl$detailUrlPath/$vodId.html"), vodId)
         }
 
-    override suspend fun fetchPlayerData(episodeUrl: String): PlayerData =
+    override suspend fun fetchPlayerData(episodeUrl: String, deadlineMs: Long?): PlayerData =
         withContext(Dispatchers.IO) {
             val url = if (episodeUrl.startsWith("http")) episodeUrl else "$baseUrl$episodeUrl"
-            parsePlayerAaaa(fetchHtml(url))
+            parsePlayerAaaa(fetchHtml(url, deadlineMs))
         }
 
     override open suspend fun search(keyword: String, page: Int): PaginatedResult<Vod> =
@@ -131,7 +131,8 @@ abstract class MacCmsListBasedSource(
 
     // ─── HTTP ───
 
-    protected fun fetchHtml(url: String): String = client.fetchHtml(url, userAgent = userAgent)
+    protected fun fetchHtml(url: String, deadlineMs: Long? = null): String =
+        client.fetchHtml(url, userAgent = userAgent, budgetMs = remainingBudget(deadlineMs))
 
     protected fun fetchDocument(url: String): Document =
         client.fetchDocument(url, userAgent = userAgent)

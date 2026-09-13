@@ -120,7 +120,7 @@ class MovieffmSource @Inject constructor(
             detail
         }
 
-    override suspend fun fetchPlayerData(episodeUrl: String): PlayerData {
+    override suspend fun fetchPlayerData(episodeUrl: String, deadlineMs: Long?): PlayerData {
         // movieffm URLs are direct m3u8/mp4, no encryption needed
         return PlayerData(streamUrl = episodeUrl, encrypt = 0, from = "movieffm")
     }

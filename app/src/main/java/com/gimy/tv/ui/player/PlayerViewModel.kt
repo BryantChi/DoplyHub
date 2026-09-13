@@ -40,6 +40,15 @@ data class PlayerUiState(
     val episodeKind: String? = null,
 )
 
+/**
+ * 每條線路的取流預算。
+ *
+ * 不只是外層 withTimeout 的參數，同一個值會一路傳到 OkHttp 的 call 上：
+ * coroutine 的 withTimeout 中斷不了阻塞的 execute()，只包一層的話實際等的是
+ * 網路層 20 秒的絕對上限。
+ */
+private const val PLAY_BUDGET_MS = 8_000L
+
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -208,10 +217,14 @@ class PlayerViewModel @Inject constructor(
                 // EnyTV's slug-based playUrl fed to GimyTV's regex). Suspected root cause
                 // of the "all lines fail" reports for cross-source content.
                 val effectiveSourceType = src.sourceType ?: sourceType
-                // 8s per-line timeout — slow/stuck sources used to block the whole chain
-                // for 30+ seconds (OkHttp default read timeout) before we moved on.
-                val data = withTimeout(8_000) {
-                    vodRepository.getPlayerData(effectiveSourceType, ep.playUrl)
+                // 每條線路 8 秒。這個秒數必須傳進去讓 OkHttp 自己計時——外面的 withTimeout
+                // 中斷不了阻塞的 execute()，只包一層的話實際等的是網路層 20 秒的絕對上限，
+                // 五條線路試下來就是 100 秒的「正在連接…」。
+                // withTimeout 仍然留著，它負責擋住 HTTP 以外的部分（解析、DB 查詢）。
+                val data = withTimeout(PLAY_BUDGET_MS) {
+                    vodRepository.getPlayerData(
+                        effectiveSourceType, ep.playUrl, budgetMs = PLAY_BUDGET_MS,
+                    )
                 }
                 _uiState.update {
                     it.copy(
@@ -230,7 +243,7 @@ class PlayerViewModel @Inject constructor(
                 }
                 return null
             } catch (e: TimeoutCancellationException) {
-                lastErr = "${src.sourceName}: 連線逾時（>8s）"
+                lastErr = "${src.sourceName}: 連線逾時（>${PLAY_BUDGET_MS / 1000} 秒）"
                 android.util.Log.w("PlayerFallback",
                     "${src.sourceName} ep${ep.number} url=${ep.playUrl.take(120)} → TIMEOUT")
                 continue

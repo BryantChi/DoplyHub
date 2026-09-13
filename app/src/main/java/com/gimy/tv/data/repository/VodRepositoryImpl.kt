@@ -178,12 +178,17 @@ class VodRepositoryImpl @Inject constructor(
         return raw.copy(aggregatedStatus = singleSiteAggregated)
     }
 
-    override suspend fun getPlayerData(sourceType: SourceType, episodeUrl: String): PlayerData {
+    override suspend fun getPlayerData(
+        sourceType: SourceType, episodeUrl: String, budgetMs: Long?,
+    ): PlayerData {
         // Direct m3u8 URLs from movieffm — handle without contacting any source
         if (episodeUrl.startsWith("http") && (episodeUrl.contains(".m3u8") || episodeUrl.contains("/video/"))) {
             return PlayerData(streamUrl = episodeUrl, encrypt = 0, from = "movieffm")
         }
-        return getSource(sourceType).fetchPlayerData(episodeUrl)
+        // 在這裡才把「願意等幾秒」換算成絕對截止時間：對呼叫端來說秒數比較自然，
+        // 對 scraper 來說截止時間才擋得住「一次取流要打好幾層請求」的情況。
+        val deadline = budgetMs?.let { System.currentTimeMillis() + it }
+        return getSource(sourceType).fetchPlayerData(episodeUrl, deadlineMs = deadline)
     }
 
     override suspend fun search(

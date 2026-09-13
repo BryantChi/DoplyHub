@@ -63,10 +63,10 @@ class GimyTvSource @Inject constructor(
             parser.parseVodDetail(fetchDocument("$baseUrl${paths.detail}/$vodId.html"), vodId, baseUrl)
         }
 
-    override suspend fun fetchPlayerData(episodeUrl: String): PlayerData =
+    override suspend fun fetchPlayerData(episodeUrl: String, deadlineMs: Long?): PlayerData =
         withContext(Dispatchers.IO) {
             val url = if (episodeUrl.startsWith("http")) episodeUrl else "$baseUrl$episodeUrl"
-            parseGimyPlayerData(fetchHtml(url))
+            parseGimyPlayerData(fetchHtml(url, deadlineMs))
         }
 
     /**
@@ -105,7 +105,8 @@ class GimyTvSource @Inject constructor(
         }
     }
 
-    private fun fetchHtml(url: String): String = client.fetchHtml(url)
+    private fun fetchHtml(url: String, deadlineMs: Long? = null): String =
+        client.fetchHtml(url, budgetMs = remainingBudget(deadlineMs))
 
     private fun fetchDocument(url: String): Document = client.fetchDocument(url)
 }

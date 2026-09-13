@@ -41,3 +41,13 @@ internal fun OkHttpClient.fetchDocument(
     referer: String? = null,
     budgetMs: Long? = null,
 ): Document = Jsoup.parse(fetchHtml(url, userAgent, referer, budgetMs), url)
+
+/**
+ * 距離 [deadlineMs] 還剩多少毫秒，可以直接餵給 [fetchHtml] 的 budgetMs。
+ *
+ * 用絕對截止時間而不是「每次請求幾秒」，是因為 5278 這類來源一次取流要打好幾層請求：
+ * 給每層各 8 秒的話總時間會變成 24 秒，上層宣告的上限就又不成立了。
+ * 已經超時就回 1 而不是 0 或負數——OkHttp 把 0 當成「不設限」，那正好相反。
+ */
+internal fun remainingBudget(deadlineMs: Long?): Long? =
+    deadlineMs?.let { (it - System.currentTimeMillis()).coerceAtLeast(1L) }

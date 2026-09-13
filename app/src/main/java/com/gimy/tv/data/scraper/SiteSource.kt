@@ -9,7 +9,14 @@ interface SiteSource {
     suspend fun fetchCategories(): List<Category>
     suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod>
     suspend fun fetchVodDetail(vodId: Long): VodDetail
-    suspend fun fetchPlayerData(episodeUrl: String): PlayerData
+    /**
+     * 取得這一集的播放位址。
+     *
+     * [deadlineMs] 是 `System.currentTimeMillis()` 基準的絕對截止時間，null 代表不設限。
+     * 取流會在多條線路之間輪流嘗試，一條卡住就得盡快換下一條；而 coroutine 的 withTimeout
+     * 中斷不了阻塞的 execute()，所以上層宣告的秒數必須一路傳到 OkHttp 的 call 上才算數。
+     */
+    suspend fun fetchPlayerData(episodeUrl: String, deadlineMs: Long? = null): PlayerData
     suspend fun search(keyword: String, page: Int): PaginatedResult<Vod>
 
     /**

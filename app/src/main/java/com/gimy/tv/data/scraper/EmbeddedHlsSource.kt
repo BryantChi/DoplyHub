@@ -162,7 +162,7 @@ abstract class EmbeddedHlsSource(
     /** Subclasses construct the canonical detail URL from a vodId. */
     protected abstract fun detailUrlFor(vodId: Long): String
 
-    override suspend fun fetchPlayerData(episodeUrl: String): PlayerData =
+    override suspend fun fetchPlayerData(episodeUrl: String, deadlineMs: Long?): PlayerData =
         withContext(Dispatchers.IO) {
             // Strip our "embed:{vodId}" sentinel and refetch the detail page to extract m3u8
             val vodId = episodeUrl.removePrefix("embed:").toLongOrNull()
@@ -170,7 +170,7 @@ abstract class EmbeddedHlsSource(
             // "繼續觀看" can jump straight here without opening the detail screen first,
             // so this path needs the slug restored too.
             ensureSlugCached(vodId)
-            val html = fetchHtml(detailUrlFor(vodId))
+            val html = fetchHtml(detailUrlFor(vodId), deadlineMs)
             val match = hlsRegex.find(html)
                 ?: throw ScraperException("hlsUrl not found on detail page")
             val url = match.groupValues[1]
@@ -186,8 +186,11 @@ abstract class EmbeddedHlsSource(
 
     // ─── HTTP ───
 
-    protected fun fetchHtml(url: String): String =
-        client.fetchHtml(url, userAgent = userAgent, referer = baseUrl)
+    protected fun fetchHtml(url: String, deadlineMs: Long? = null): String =
+        client.fetchHtml(
+            url, userAgent = userAgent, referer = baseUrl,
+            budgetMs = remainingBudget(deadlineMs),
+        )
 
     protected fun fetchDocument(url: String): Document =
         client.fetchDocument(url, userAgent = userAgent, referer = baseUrl)

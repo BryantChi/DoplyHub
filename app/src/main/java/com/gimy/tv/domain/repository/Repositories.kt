@@ -14,7 +14,15 @@ interface VodRepository {
     suspend fun getCategories(sourceType: SourceType): List<Category>
     suspend fun getVodList(sourceType: SourceType, typeId: Int, page: Int): PaginatedResult<Vod>
     suspend fun getVodDetail(sourceType: SourceType, vodId: Long): VodDetail
-    suspend fun getPlayerData(sourceType: SourceType, episodeUrl: String): PlayerData
+    /**
+     * 取得播放位址。[budgetMs] 是這一次取流願意等多久，null 代表照用網路層的預設上限。
+     *
+     * 會傳這個值是因為取流會在多條線路之間輪流嘗試，一條卡住就得盡快換下一條；
+     * 而 coroutine 的 withTimeout 中斷不了阻塞的 HTTP 呼叫，秒數得一路傳到 OkHttp 才算數。
+     */
+    suspend fun getPlayerData(
+        sourceType: SourceType, episodeUrl: String, budgetMs: Long? = null,
+    ): PlayerData
     suspend fun search(sourceType: SourceType, keyword: String, page: Int): PaginatedResult<Vod>
 
     // Series search
