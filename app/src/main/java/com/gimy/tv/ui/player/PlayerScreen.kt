@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.media.audiofx.LoudnessEnhancer
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -176,6 +179,28 @@ fun PlayerScreen(
             loudnessEnhancer?.release()
             exoPlayer.release()
         }
+    }
+
+    // 退到背景（按 HOME、被別的 App 蓋掉）時暫停並存檔。
+    //
+    // PlayerScreen 是 NavHost 內的 composable，按 HOME 只會走 Activity 的 onStop，
+    // composition 不 dispose，所以上面那個 onDispose 不會觸發。實測按 HOME 之後 12 秒，
+    // App 仍持有 audio focus（gain: GAIN、loss: none），背景 10 秒吃掉 5.57 秒 CPU
+    // ——影片還在全速解碼，聲音也繼續播。
+    //
+    // 刻意不做「回到前景自動續播」：使用者可能本來就是按了暫停才切出去的，自動播
+    // 反而違反意圖。恢復交給 media3——暫停狀態下 controllerAutoShow 會把控制列叫出來，
+    // 按 OK 就能繼續。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, exoPlayer) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
+                exoPlayer.pause()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
