@@ -9,8 +9,7 @@ plugins {
 }
 
 // Load release-signing credentials from keystore.properties (gitignored).
-// File is generated locally; back up alongside release.keystore. If absent (fresh clone),
-// release falls back to the debug keystore so the project still builds for dev.
+// File is generated locally; back up alongside release.keystore.
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) load(keystorePropertiesFile.inputStream())
@@ -30,17 +29,14 @@ android {
 
     signingConfigs {
         create("release") {
+            // 缺 keystore.properties 時刻意留空，交給下面的 taskGraph 檢查直接讓建置失敗。
+            // 原本這裡會退回 debug keystore，結果是 BUILD SUCCESSFUL 卻打出一個
+            // 裝不上既有機器、App 內自我更新也整條斷掉的 APK——沉默的錯比失敗更貴。
             if (keystorePropertiesFile.exists()) {
                 storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
-            } else {
-                // Fallback for fresh clones without release credentials
-                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
             }
         }
     }
@@ -71,6 +67,21 @@ android {
 
     lint {
         checkReleaseBuilds = false
+    }
+}
+
+// 沒有簽章憑證就不該打包 release。檢查放在 taskGraph（執行前、設定後）而不是設定期，
+// 新 clone 才能照常跑 assembleDebug、跑測試、做 IDE 同步，只有真的要打 release 時才擋下來。
+gradle.taskGraph.whenReady {
+    val packagingRelease = allTasks.any { task ->
+        task.name.contains("Release") &&
+            listOf("assemble", "bundle", "package", "install").any { task.name.startsWith(it) }
+    }
+    if (packagingRelease && !keystorePropertiesFile.exists()) {
+        throw GradleException(
+            "找不到 keystore.properties，無法簽 release。" +
+                "請從備份還原 keystore.properties 與 release.keystore 再重試。"
+        )
     }
 }
 
