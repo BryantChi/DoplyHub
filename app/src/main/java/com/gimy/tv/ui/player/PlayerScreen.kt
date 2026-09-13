@@ -1,6 +1,7 @@
 package com.gimy.tv.ui.player
 
 import android.view.KeyEvent
+import android.view.ViewGroup
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -181,7 +182,10 @@ fun PlayerScreen(
         if (isTV) {
             // === TV PLAYER ===
             // ── Player ──
-            if (uiState.streamUrl != null && !uiState.isLoading) {
+            // error == null 是必要的：onPlaybackFailed 只設 error、不清 streamUrl，
+            // 少了這個條件 PlayerView 會留在錯誤遮罩底下繼續佔著焦點，
+            // 「切換線路重試」按鈕就按不到。
+            if (uiState.streamUrl != null && !uiState.isLoading && uiState.error == null) {
                 AndroidView(
                     factory = { ctx ->
                         PlayerView(ctx).apply {
@@ -190,6 +194,15 @@ fun PlayerScreen(
                             controllerAutoShow = true
                             controllerShowTimeoutMs = 5000
                             setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
+                            // 按鍵是沿著焦點鏈派發的：PlayerView 自己沒有焦點時，
+                            // 下面那個 setOnKeyListener 一次都不會被呼叫——快轉與 BACK
+                            // 分支等於死碼（實測按 30 次右鍵，播放位置只前進了自然播放的秒數）。
+                            // BLOCK_DESCENDANTS 則是不讓 media3 控制列的按鈕把焦點吸走：
+                            // 它預設是 FOCUS_AFTER_DESCENDANTS，控制列一顯示焦點就會跑進
+                            // 播放鍵，之後左右鍵變成按鈕導航而不是 seek。
+                            // 控制列仍然照常顯示，只是純粹當狀態指示，不參與焦點。
+                            isFocusable = true
+                            descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
                             // Let PlayerView handle ALL key events natively (D-pad seek, play/pause)
                             setControllerVisibilityListener(
                                 PlayerView.ControllerVisibilityListener { vis ->
@@ -239,6 +252,11 @@ fun PlayerScreen(
                             }
                             playerView = this
                         }
+                    },
+                    update = { view ->
+                        // factory 階段 View 還沒 attach，requestFocus 會失敗；放在 update
+                        // 才拿得到。已經有焦點時是 no-op，重組不會互搶。
+                        if (!view.hasFocus()) view.requestFocus()
                     },
                     modifier = Modifier.fillMaxSize()
                 )
