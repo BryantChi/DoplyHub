@@ -27,6 +27,9 @@ class GimyMaxSource @Inject constructor(
     // Paths and template follow whichever mirror EndpointResolver settled on, so a
     // fallback to a differently-shaped mirror parses correctly instead of silently
     // returning nothing. Cached per profile — rebuilding compiles regexes each time.
+    // @Volatile：@Singleton 之下多條 IO coroutine 會同時讀寫這個欄位。快取寫壞最多重建一次，
+    // 但沒有它就是 data race，JMM 不保證另一條執行緒讀得到完整的物件。
+    @Volatile
     private var mirrorCache: Pair<String?, Pair<GimyPaths, GimyParser>>? = null
 
     private fun mirror(): Pair<GimyPaths, GimyParser> {
