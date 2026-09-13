@@ -119,7 +119,12 @@ fun PlayerScreen(
         while (isActive) {
             delay(10_000)
             try {
-                if (exoPlayer.isPlaying) {
+                // 換線途中不要存：state 的 streamUrl 已經換成新的，但 ExoPlayer 還在播
+                // 舊的那條，這時存下去會把舊線路的位置寫進新的一輪。比對兩邊是否指向
+                // 同一個來源即可，不必另外拉一個旗標（旗標漏清會變成永遠不再存檔）。
+                val playingCurrent = exoPlayer.currentMediaItem
+                    ?.localConfiguration?.uri?.toString() == uiState.streamUrl
+                if (exoPlayer.isPlaying && playingCurrent) {
                     viewModel.saveProgress(exoPlayer.currentPosition, exoPlayer.duration)
                 }
             } catch (_: IllegalStateException) {
@@ -128,15 +133,20 @@ fun PlayerScreen(
         }
     }
 
+    // 待續播的位置，等 STATE_READY 才真的 seek。
+    //
+    // prepare() 之後 duration 還是 TIME_UNSET，此時 seek 沒辦法判斷會不會超過片長。
+    // 換線時尤其危險：新線路的同一集可能比較短（片頭長度、合集切法都不一樣），
+    // seek 到片尾就直接觸發 STATE_ENDED，畫面會自己跳下一集，使用者會以為這集被吃掉。
+    var pendingResumeMs by remember { mutableLongStateOf(0L) }
+
     // Load media
     LaunchedEffect(uiState.streamUrl) {
         val url = uiState.streamUrl ?: return@LaunchedEffect
         errorRetryCount = 0
         exoPlayer.setMediaItem(MediaItem.fromUri(url))
         exoPlayer.prepare()
-        if (uiState.resumePositionMs > 0) {
-            exoPlayer.seekTo(uiState.resumePositionMs)
-        }
+        pendingResumeMs = uiState.resumePositionMs
         infoTrigger++
     }
 
@@ -144,6 +154,24 @@ fun PlayerScreen(
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY && pendingResumeMs > 0) {
+                    val target = pendingResumeMs
+                    pendingResumeMs = 0L
+                    val dur = exoPlayer.duration
+                    when {
+                        // 直播或還拿不到片長，只能照舊直接 seek。
+                        dur <= 0 -> exoPlayer.seekTo(target)
+                        // 已經看過九成五就當作看完，從頭播。不這樣處理的話，
+                        // STATE_ENDED 存下的 position = duration 會讓每次點進來
+                        // 都停在結尾前那幾秒。
+                        target >= dur * 0.95 -> Unit
+                        // 留 15 秒緩衝：直接 seek 到很接近片尾的位置容易立刻
+                        // 觸發 STATE_ENDED，畫面就自己跳下一集了。
+                        else -> exoPlayer.seekTo(
+                            target.coerceAtMost(dur - 15_000).coerceAtLeast(0)
+                        )
+                    }
+                }
                 if (state == Player.STATE_ENDED) {
                     viewModel.saveProgress(exoPlayer.duration, exoPlayer.duration)
                     viewModel.nextEpisode()

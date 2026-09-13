@@ -311,13 +311,17 @@ class PlayerViewModel @Inject constructor(
         if (ordered.isEmpty()) return
         val target = ordered.first()
         val episodeNum = _uiState.value.episodeNum
+        // 換線不該讓進度歸零——CDN 中途掛掉時使用者可能已經看了半小時，自動換線
+        // 卻從第 0 秒重播。resumePositionMs 由自動存檔每 10 秒同步，是最近一次
+        // 確實播到的位置。超出新線路片長的情況由播放端在 STATE_READY 時夾住。
+        val resumeMs = _uiState.value.resumePositionMs
         viewModelScope.launch {
             _uiState.update { it.copy(
                 isLoading = true,
                 error = null,
                 loadingMessage = "正在切換至「${target.sourceName}」…",
             ) }
-            val err = playWithFallback(ordered, episodeNum, resumeMs = 0L)
+            val err = playWithFallback(ordered, episodeNum, resumeMs = resumeMs)
             if (err != null) {
                 _uiState.update { it.copy(
                     isLoading = false,
