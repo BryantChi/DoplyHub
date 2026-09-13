@@ -6,10 +6,13 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,6 +48,16 @@ class UpdateController @Inject constructor(
 
     private var downloadJob: Job? = null
 
+    /** 每次下載的身分序號，取消或重新開始時遞增。
+     *
+     *  下載迴圈是阻塞的 okio read，`Job.cancel()` 之後那條執行緒還會活一段時間，
+     *  期間仍會吐出數十次進度回呼（節流 200ms）。單看狀態擋不住——`cancelDownload`
+     *  把狀態設回 Available，而首次回呼本來就要從 Available 轉成 Downloading，
+     *  兩者長得一樣。所以改用序號認身分：不是當前這輪的回呼一律不准碰狀態。
+     *  跨執行緒讀寫（回呼在 IO、取消在呼叫端），必須 volatile。 */
+    @Volatile
+    private var downloadToken = 0L
+
     /**
      * @param silent when true, network errors are swallowed back to Idle (used by cold-start check
      *               so first launch doesn't surface a "更新失敗" dialog when the user's just offline).
@@ -73,22 +86,38 @@ class UpdateController @Inject constructor(
     fun startDownload() {
         val available = (_state.value as? UpdateState.Available) ?: return
         downloadJob?.cancel()
+        val token = ++downloadToken
         downloadJob = scope.launch {
             try {
                 val apkFile = downloadApk(available.info) { downloaded, total ->
+                    if (token != downloadToken) return@downloadApk
                     _state.update { prev ->
-                        if (prev is UpdateState.Downloading) prev.copy(downloaded = downloaded, total = total)
-                        else UpdateState.Downloading(available.info, downloaded, total)
+                        when (prev) {
+                            is UpdateState.Downloading -> prev.copy(downloaded = downloaded, total = total)
+                            // 首次回呼時狀態還是 Available，在這裡完成轉換。
+                            is UpdateState.Available -> UpdateState.Downloading(available.info, downloaded, total)
+                            else -> prev
+                        }
                     }
                 }
+                if (token != downloadToken) return@launch
                 _state.value = UpdateState.ReadyToInstall(available.info, apkFile)
+            } catch (e: CancellationException) {
+                // 取消不是錯誤。以前被下面那個 catch 一起接走，使用者按了取消之後
+                // 會看到「下載失敗: StandaloneCoroutine was cancelled」。
+                throw e
             } catch (e: Exception) {
-                _state.value = UpdateState.Error("下載失敗: ${e.message ?: "未知錯誤"}")
+                if (token == downloadToken) {
+                    _state.value = UpdateState.Error("下載失敗: ${e.message ?: "未知錯誤"}")
+                }
             }
         }
     }
 
     fun cancelDownload() {
+        // 先讓仍在路上的回呼失效，再取消 job：阻塞中的 read 停不下來，
+        // 這行是「畫面不會被復活成下載中」的唯一保證。
+        downloadToken++
         downloadJob?.cancel()
         downloadJob = null
         val available = (_state.value as? UpdateState.Downloading)?.info
@@ -148,30 +177,41 @@ class UpdateController @Inject constructor(
 
         val target = File(dir, "DoplyHub-v${info.latestVersion}.apk")
         val req = Request.Builder().url(info.downloadUrl).get().build()
-        okHttpClient.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) error("HTTP ${resp.code}")
-            val body = resp.body ?: error("空白回應")
-            val total = if (body.contentLength() > 0) body.contentLength() else info.sizeBytes
-            target.sink().buffer().use { sink ->
-                body.source().use { source ->
-                    val buf = okio.Buffer()
-                    var totalRead = 0L
-                    var lastNotify = 0L
-                    while (true) {
-                        val read = source.read(buf, 64 * 1024)
-                        if (read == -1L) break
-                        sink.write(buf, read)
-                        totalRead += read
-                        // Throttle progress callbacks to ~5/s
-                        val now = System.currentTimeMillis()
-                        if (now - lastNotify > 200) {
-                            onProgress(totalRead, total)
-                            lastNotify = now
+        try {
+            okHttpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) error("HTTP ${resp.code}")
+                val body = resp.body ?: error("空白回應")
+                val total = if (body.contentLength() > 0) body.contentLength() else info.sizeBytes
+                target.sink().buffer().use { sink ->
+                    body.source().use { source ->
+                        val buf = okio.Buffer()
+                        var totalRead = 0L
+                        var lastNotify = 0L
+                        while (true) {
+                            // 阻塞的 read 吃不到 coroutine 取消，每輪主動檢查一次。
+                            // 最壞的延遲是一次 read 回來的時間（受 readTimeout 約束），
+                            // 但至少不會像以前那樣整條下載跑到完。
+                            currentCoroutineContext().ensureActive()
+                            val read = source.read(buf, 64 * 1024)
+                            if (read == -1L) break
+                            sink.write(buf, read)
+                            totalRead += read
+                            // Throttle progress callbacks to ~5/s
+                            val now = System.currentTimeMillis()
+                            if (now - lastNotify > 200) {
+                                onProgress(totalRead, total)
+                                lastNotify = now
+                            }
                         }
+                        onProgress(totalRead, total)
                     }
-                    onProgress(totalRead, total)
                 }
             }
+        } catch (e: Throwable) {
+            // 取消或失敗都別留半截檔。目錄雖然會在下次下載開頭清掉，但在那之前
+            // 這個檔名看起來就是「已經下載好的那一版」，白佔 cacheDir 也容易誤判。
+            target.delete()
+            throw e
         }
         target
     }
