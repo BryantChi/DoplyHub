@@ -103,7 +103,13 @@ class UpdateController @Inject constructor(
         _state.value = UpdateState.Checking
         scope.launch {
             when (val info = updateService.checkForUpdate()) {
-                is UpdateInfo.UpToDate -> _state.value = UpdateState.UpToDate
+                is UpdateInfo.UpToDate -> {
+                    // 已經是最新版，之前下載的 APK 留著也沒用了。挑這個時機清是因為
+                    // 安裝成功後 App 會重啟並跑一次冷啟動檢查，剛好落在這裡；
+                    // 不能在 launchInstaller 之後就刪——那時系統安裝器還在讀這個檔。
+                    clearDownloadedApks()
+                    _state.value = UpdateState.UpToDate
+                }
                 is UpdateInfo.Available -> _state.value = UpdateState.Available(info)
                 is UpdateInfo.Error -> _state.value =
                     if (silent) UpdateState.Idle else UpdateState.Error(info.message)
@@ -206,13 +212,18 @@ class UpdateController @Inject constructor(
         return false
     }
 
+    /** 清掉 cacheDir 裡殘留的 APK。 */
+    private fun clearDownloadedApks() {
+        File(context.cacheDir, "apk").listFiles()?.forEach { it.delete() }
+    }
+
     private suspend fun downloadApk(
         info: UpdateInfo.Available,
         onProgress: (downloaded: Long, total: Long) -> Unit,
     ): File = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "apk").apply { mkdirs() }
         // Clear stale APKs before downloading new one
-        dir.listFiles()?.forEach { it.delete() }
+        clearDownloadedApks()
 
         val target = File(dir, "DoplyHub-v${info.latestVersion}.apk")
         val req = Request.Builder().url(info.downloadUrl).get().build()
