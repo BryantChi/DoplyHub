@@ -229,6 +229,15 @@ fun PlayerScreen(
                                         onBack()
                                         true
                                     }
+                                    // 控制列的按鈕因為 BLOCK_DESCENDANTS 拿不到焦點，
+                                    // 所以暫停得自己接。預設行為只會把控制列叫出來。
+                                    KeyEvent.KEYCODE_DPAD_CENTER,
+                                    KeyEvent.KEYCODE_ENTER,
+                                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                                        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                        showController()
+                                        true
+                                    }
                                     KeyEvent.KEYCODE_DPAD_LEFT,
                                     KeyEvent.KEYCODE_MEDIA_REWIND -> {
                                         val target = (exoPlayer.currentPosition - 10_000).coerceAtLeast(0)
