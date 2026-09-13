@@ -233,13 +233,20 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
     val dims = LocalDimensions.current
     val isTV = LocalIsTelevision.current
     var idx by remember { mutableIntStateOf(0) }
+    // 焦點是否停在下面那顆「觀看詳情」上。放在這一層而不是跟著按鈕，是因為自動
+    // 輪播要讀它。
+    var btnFocused by remember { mutableStateOf(false) }
 
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val coroutineScope = rememberCoroutineScope()
 
     // Auto-rotate (guard against empty list after recomposition)
-    LaunchedEffect(idx, items.size) {
-        if (items.isEmpty()) return@LaunchedEffect
+    //
+    // 焦點停在按鈕上時不要換。遇過的誤操作：畫面停在 A 片、使用者盯著猶豫超過
+    // 7 秒，輪播把它換成 B 片，按下去就進了 B 的詳情頁——TV 上這種猶豫很常見。
+    // 焦點移開後 key 變動，會重新從 7 秒開始數。
+    LaunchedEffect(idx, items.size, btnFocused) {
+        if (items.isEmpty() || btnFocused) return@LaunchedEffect
         delay(7000)
         idx = (idx + 1) % items.size
     }
@@ -360,7 +367,6 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
 
         // ── Button: outside Crossfade so focus persists across transitions (TV only) ──
         if (isTV) {
-            var btnFocused by remember { mutableStateOf(false) }
             Button(
                 onClick = { items.getOrNull(idx)?.let(onItemClick) },
                 modifier = Modifier
