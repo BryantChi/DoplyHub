@@ -44,6 +44,7 @@ import com.gimy.tv.ui.components.ExitConfirmHandler
 import com.gimy.tv.ui.components.RefreshIconButton
 import com.gimy.tv.ui.components.RefreshLoadingBar
 import com.gimy.tv.ui.components.RefreshableContainer
+import com.gimy.tv.ui.components.FocusableChip
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.theme.*
 import com.gimy.tv.ui.theme.LocalDimensions
@@ -483,24 +484,9 @@ private val MovieffmBlue = Color(0xFF3B82F6)
 @Composable
 private fun ContentRow(title: String, typeId: Int, rowSourceType: SourceType, items: List<Vod>, onItemClick: (Vod) -> Unit, onMoreClick: () -> Unit) {
     val dims = LocalDimensions.current
-    val isMovieffm = rowSourceType == SourceType.MOVIEFFM
-    val accentColor = if (isMovieffm) MovieffmBlue else CinemaRed
 
     Column(Modifier.padding(top = 20.dp)) {
-        Row(Modifier.padding(start = dims.screenHorizontalPadding, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.width(3.dp).height(16.dp).clip(RoundedCornerShape(2.dp)).background(accentColor))
-            Spacer(Modifier.width(10.dp))
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CinemaTextPrimary, letterSpacing = 0.3.sp)
-            if (isMovieffm) {
-                Spacer(Modifier.width(8.dp))
-                Box(
-                    Modifier.background(MovieffmBlue.copy(0.85f), RoundedCornerShape(3.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text("FFM", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
+        RowHeader(title, rowSourceType)
         LazyRow(contentPadding = PaddingValues(horizontal = dims.screenHorizontalPadding), horizontalArrangement = Arrangement.spacedBy(dims.cardSpacing)) {
             items(items, key = { "${it.sourceType}_${it.id}" }) { vod ->
                 VodCard(vod = vod, onClick = { onItemClick(vod) })
@@ -626,12 +612,88 @@ private fun MoreSourceRow(
 ) {
     // collectAsState binds to ViewModel-cached StateFlow; first access kicks off fetch,
     // subsequent recompositions reuse cached items. refresh() clears the cache.
-    val items by viewModel.moreSourceRow(sourceType, typeId).collectAsState()
-    if (items.isEmpty()) return  // hide row until data arrives or after fetch fail
-    ContentRow(title, typeId, sourceType, items,
-        onItemClick = onItemClick,
-        onMoreClick = onMoreClick,
-    )
+    val state by viewModel.moreSourceRow(sourceType, typeId).collectAsState()
+    when (val s = state) {
+        MoreSourceRowState.Loading -> RowSkeleton(title, sourceType)
+        MoreSourceRowState.Failed -> RowLoadFailed(title, sourceType) {
+            viewModel.retryMoreSourceRow(sourceType, typeId)
+        }
+        // 真的空的就不佔版面——那代表「這個來源沒有這個分類」，不是出錯。
+        is MoreSourceRowState.Loaded -> if (s.items.isNotEmpty()) {
+            ContentRow(title, typeId, sourceType, s.items,
+                onItemClick = onItemClick,
+                onMoreClick = onMoreClick,
+            )
+        }
+    }
+}
+
+/**
+ * 列標題。ContentRow、骨架、載入失敗三種狀態共用，避免同一列在不同狀態下
+ * 標題位置或樣式跑掉。
+ */
+@Composable
+private fun RowHeader(title: String, rowSourceType: SourceType) {
+    val dims = LocalDimensions.current
+    val isMovieffm = rowSourceType == SourceType.MOVIEFFM
+    val accentColor = if (isMovieffm) MovieffmBlue else CinemaRed
+    Row(
+        Modifier.padding(start = dims.screenHorizontalPadding, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(3.dp).height(16.dp).clip(RoundedCornerShape(2.dp)).background(accentColor))
+        Spacer(Modifier.width(10.dp))
+        Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CinemaTextPrimary, letterSpacing = 0.3.sp)
+        if (isMovieffm) {
+            Spacer(Modifier.width(8.dp))
+            Box(
+                Modifier.background(MovieffmBlue.copy(0.85f), RoundedCornerShape(3.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text("FFM", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+/** 載入中的骨架。留住版面高度，捲動位置才不會在資料回來時整個跳一下。 */
+@Composable
+private fun RowSkeleton(title: String, rowSourceType: SourceType) {
+    val dims = LocalDimensions.current
+    Column(Modifier.padding(top = 20.dp)) {
+        RowHeader(title, rowSourceType)
+        Row(
+            Modifier.padding(horizontal = dims.screenHorizontalPadding),
+            horizontalArrangement = Arrangement.spacedBy(dims.cardSpacing),
+        ) {
+            repeat(5) {
+                Box(
+                    Modifier
+                        .width(dims.cardWidth)
+                        .height(dims.cardHeight)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(CinemaCard)
+                )
+            }
+        }
+    }
+}
+
+/** 抓取失敗。只讓這一列重試，不動其他已經載好的列。 */
+@Composable
+private fun RowLoadFailed(title: String, rowSourceType: SourceType, onRetry: () -> Unit) {
+    val dims = LocalDimensions.current
+    Column(Modifier.padding(top = 20.dp)) {
+        RowHeader(title, rowSourceType)
+        Row(
+            Modifier.padding(horizontal = dims.screenHorizontalPadding, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("這個來源載入失敗", fontSize = 13.sp, color = CinemaTextMuted)
+            Spacer(Modifier.width(12.dp))
+            FocusableChip("重試", onClick = onRetry)
+        }
+    }
 }
 
 @Composable

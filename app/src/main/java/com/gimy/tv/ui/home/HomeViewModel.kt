@@ -47,21 +47,40 @@ class HomeViewModel @Inject constructor(
      * Phase 3.1 lets the home page surface the 5 new MacCMS sources without blocking
      * the primary load — the rows materialize as the user scrolls down.
      */
-    private val moreSourceCache = mutableMapOf<String, MutableStateFlow<List<Vod>>>()
+    private val moreSourceCache = mutableMapOf<String, MutableStateFlow<MoreSourceRowState>>()
 
-    fun moreSourceRow(sourceType: SourceType, typeId: Int): StateFlow<List<Vod>> {
+    fun moreSourceRow(sourceType: SourceType, typeId: Int): StateFlow<MoreSourceRowState> {
         val key = "${sourceType.name}_$typeId"
         return moreSourceCache.getOrPut(key) {
-            MutableStateFlow<List<Vod>>(emptyList()).also { flow ->
-                viewModelScope.launch {
-                    try {
-                        flow.value = vodRepository.getVodList(sourceType, typeId, 1).items.take(15)
-                    } catch (e: Exception) {
-                        // 失敗時那一列就是空的，畫面上與「這個來源沒有這個分類」無法區分。
-                        android.util.Log.w("HomeLoad", "更多來源 $sourceType($typeId) failed", e)
-                        flow.value = emptyList()
-                    }
-                }
+            MutableStateFlow<MoreSourceRowState>(MoreSourceRowState.Loading).also { flow ->
+                fetchMoreSourceRow(sourceType, typeId, flow)
+            }
+        }
+    }
+
+    /** 讓失敗的那一列自己重來，不必整個首頁重新整理（其他列是好的，不該一起丟掉）。 */
+    fun retryMoreSourceRow(sourceType: SourceType, typeId: Int) {
+        val flow = moreSourceCache["${sourceType.name}_$typeId"] ?: return
+        if (flow.value == MoreSourceRowState.Loading) return
+        flow.value = MoreSourceRowState.Loading
+        fetchMoreSourceRow(sourceType, typeId, flow)
+    }
+
+    private fun fetchMoreSourceRow(
+        sourceType: SourceType,
+        typeId: Int,
+        flow: MutableStateFlow<MoreSourceRowState>,
+    ) {
+        viewModelScope.launch {
+            flow.value = try {
+                MoreSourceRowState.Loaded(
+                    vodRepository.getVodList(sourceType, typeId, 1).items.take(15)
+                )
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("HomeLoad", "更多來源 $sourceType($typeId) failed", e)
+                MoreSourceRowState.Failed
             }
         }
     }
@@ -227,4 +246,17 @@ class HomeViewModel @Inject constructor(
         }
         return result
     }
+}
+
+/**
+ * 「更多來源」單一列的狀態。
+ *
+ * 原本只有 List<Vod>：載入中與抓取失敗都是空陣列，那一列就整個從畫面上消失，
+ * 使用者分不出「還在載」「這個來源沒有這個分類」「站台掛了」三件事，
+ * 也沒有任何重試的出口。
+ */
+sealed interface MoreSourceRowState {
+    data object Loading : MoreSourceRowState
+    data class Loaded(val items: List<Vod>) : MoreSourceRowState
+    data object Failed : MoreSourceRowState
 }
