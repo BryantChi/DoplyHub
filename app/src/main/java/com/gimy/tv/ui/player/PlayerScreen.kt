@@ -94,7 +94,11 @@ fun PlayerScreen(
             }
     }
 
-    // Boost audio output by +15 dB via LoudnessEnhancer
+    // LoudnessEnhancer 固定加 +18 dB。
+    //
+    // 註解原本寫 +15 dB 但程式是 1800 毫貝（＝+18 dB），兩邊對不上。以程式為準——
+    // 這個值是實際調出來的，不是註解。固定值不分內容：本來就響的片會被推到接近削波，
+    // 要更好得看內容做動態調整，但那是另一個題目。
     val loudnessEnhancer = remember(exoPlayer) {
         try {
             LoudnessEnhancer(exoPlayer.audioSessionId).apply {
