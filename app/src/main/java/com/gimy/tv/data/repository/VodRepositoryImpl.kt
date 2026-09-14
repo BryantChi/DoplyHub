@@ -730,12 +730,6 @@ class VodRepositoryImpl @Inject constructor(
 
     // ── Home page mixed content ──
 
-    // Movieffm typeId → matching gimymax typeId for interleaving
-    private val ffmToGimyMap = mapOf(
-        101 to 1, 201 to 20, 202 to 13, 203 to 16, 204 to 21,
-        205 to 4, 207 to 14, 208 to 15, 206 to 29
-    )
-
     override suspend fun findByTitle(title: String, preferredSource: SourceType): TitleLookup {
         val key = parseTitleKey(title)
         // 先問原來源。網域換了但站還是同一個時，片子多半還在、只是 id 不同，這一步就會中。
