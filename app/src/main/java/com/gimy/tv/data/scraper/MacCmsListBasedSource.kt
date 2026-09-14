@@ -12,6 +12,7 @@ import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.net.URLEncoder
+import com.gimy.tv.data.scraper.parser.attrText
 
 /**
  * Base class for MacCMS V10 myui-template sites where:
@@ -165,7 +166,7 @@ abstract class MacCmsListBasedSource(
         for (card in scope.select("a.myui-vodlist__thumb, a[class*=video-pic][data-original]")) {
             val href = card.attr("href")
             val id = detailHrefRegex.find(href)?.groupValues?.get(1)?.toLongOrNull() ?: continue
-            val title = card.attr("title").trim().ifBlank {
+            val title = card.attrText("title").ifBlank {
                 card.parent()?.selectFirst(".myui-vodlist__detail h4 a")?.text()?.trim().orEmpty()
             }
             if (title.isBlank()) continue

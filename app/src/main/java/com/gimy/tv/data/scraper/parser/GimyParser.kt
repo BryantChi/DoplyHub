@@ -78,9 +78,9 @@ class GimyParser(
         val items = mutableListOf<Vod>()
         for (card in doc.select(cardSelector)) {
             val id = vodIdRegex.find(card.attr("href"))?.groupValues?.get(1)?.toLongOrNull() ?: continue
-            val title = card.attr("aria-label")
+            val title = card.attrText("aria-label")
                 .ifBlank { card.selectFirst("h3.poster__title")?.text().orEmpty() }
-                .ifBlank { card.selectFirst("img")?.attr("alt").orEmpty() }
+                .ifBlank { card.selectFirst("img")?.attrText("alt").orEmpty() }
                 .ifBlank { card.parent()?.selectFirst("a.card__body h3.card__title")?.text().orEmpty() }
                 .trim()
             if (title.isBlank()) continue
@@ -111,9 +111,9 @@ class GimyParser(
         for (thumb in doc.select(searchCardSelector)) {
             val id = vodIdRegex.find(thumb.attr("href"))?.groupValues?.get(1)?.toLongOrNull() ?: continue
             val card = thumb.parents().firstOrNull { it.hasClass("search-item") }
-            val title = thumb.attr("aria-label")
+            val title = thumb.attrText("aria-label")
                 .ifBlank { card?.selectFirst("h2.search-item__title")?.text().orEmpty() }
-                .ifBlank { thumb.selectFirst("img")?.attr("alt").orEmpty() }
+                .ifBlank { thumb.selectFirst("img")?.attrText("alt").orEmpty() }
                 .trim()
             if (title.isBlank()) continue
             val cover = resolveUrl(thumb.selectFirst("img")?.attr("src").orEmpty(), baseUrl)

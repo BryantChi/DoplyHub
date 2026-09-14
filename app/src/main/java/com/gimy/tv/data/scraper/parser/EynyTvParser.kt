@@ -25,7 +25,7 @@ object EynyTvParser {
             val href = item.selectFirst("a[href*=/voddetail/]")?.attr("href").orEmpty()
             val id = vodIdRegex.find(href)?.groupValues?.get(1)?.toLongOrNull() ?: continue
             val title = item.selectFirst("h3 a")?.text()?.trim().orEmpty()
-                .ifBlank { item.selectFirst("a[href*=/voddetail/]")?.attr("title")?.trim().orEmpty() }
+                .ifBlank { item.selectFirst("a[href*=/voddetail/]")?.attrText("title").orEmpty() }
             if (title.isBlank()) continue
             // src 是 lazyload 的佔位圖（loading.png），真正的封面在 data-src。取錯不會有
             // 任何錯誤跡象，只會整頁變成同一張灰圖。
@@ -50,8 +50,8 @@ object EynyTvParser {
         for (item in doc.select(".module-item")) {
             val link = item.selectFirst("a[href*=/voddetail/]") ?: continue
             val id = vodIdRegex.find(link.attr("href"))?.groupValues?.get(1)?.toLongOrNull() ?: continue
-            val title = link.attr("title").trim().ifBlank {
-                item.selectFirst("img")?.attr("alt")?.trim().orEmpty()
+            val title = link.attrText("title").ifBlank {
+                item.selectFirst("img")?.attrText("alt").orEmpty()
             }
             if (title.isBlank()) continue
             val img = item.selectFirst("img")

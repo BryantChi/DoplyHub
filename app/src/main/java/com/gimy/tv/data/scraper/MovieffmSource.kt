@@ -14,6 +14,7 @@ import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import javax.inject.Inject
+import com.gimy.tv.data.scraper.parser.attrText
 
 class MovieffmSource @Inject constructor(
     private val client: OkHttpClient,
@@ -554,7 +555,7 @@ class MovieffmSource @Inject constructor(
             val slug = match.groupValues[2]
 
             val img = article.selectFirst("img") ?: continue
-            val title = img.attr("alt").trim()
+            val title = img.attrText("alt")
             if (title.isBlank()) continue
             val cover = img.attr("data-lazy-src").ifBlank { img.attr("src") }.let { resolveUrl(it) }
 
@@ -585,7 +586,7 @@ class MovieffmSource @Inject constructor(
             val slug = match.groupValues[2]
 
             val img = article.selectFirst("img") ?: continue
-            val title = img.attr("alt").trim()
+            val title = img.attrText("alt")
             if (title.isBlank()) continue
             val cover = img.attr("data-lazy-src").ifBlank { img.attr("src") }.let { resolveUrl(it) }
 

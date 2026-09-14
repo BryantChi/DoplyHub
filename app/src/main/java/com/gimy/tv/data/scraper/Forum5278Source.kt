@@ -8,6 +8,7 @@ import okhttp3.OkHttpClient
 import org.jsoup.nodes.Document
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.gimy.tv.data.scraper.parser.attrText
 
 /**
  * 5278.cc — Discuz BBS forum aggregator.
@@ -170,7 +171,7 @@ class Forum5278Source @Inject constructor(
             val threadId = match.groupValues[1].toLongOrNull() ?: continue
             if (!seen.add(threadId)) continue
 
-            val title = titleAnchor.attr("title").trim().ifBlank { titleAnchor.text().trim() }
+            val title = titleAnchor.attrText("title").ifBlank { titleAnchor.text().trim() }
             if (title.isBlank() || title.length < 5) continue
             if (title.contains("更新") && title.length < 20) continue
             if (titleBlockKeywords.any { title.contains(it, ignoreCase = true) }) continue

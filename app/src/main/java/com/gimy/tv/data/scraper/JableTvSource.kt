@@ -7,6 +7,7 @@ import okhttp3.OkHttpClient
 import org.jsoup.nodes.Document
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.gimy.tv.data.scraper.parser.attrText
 
 /**
  * Jable.tv — JAV aggregator.
@@ -84,7 +85,7 @@ class JableTvSource @Inject constructor(
         // Secondary title source: any anchor with a non-placeholder title attribute
         for (a in doc.select("a[href*=/videos/][title]")) {
             val slug = slugFrom(a.attr("href")) ?: continue
-            val attrTitle = a.attr("title").trim()
+            val attrTitle = a.attrText("title")
             if (attrTitle.isNotBlank() && attrTitle !in placeholderTitles) titleBySlug.putIfAbsent(slug, attrTitle)
         }
 

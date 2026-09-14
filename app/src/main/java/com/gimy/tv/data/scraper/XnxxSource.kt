@@ -7,6 +7,7 @@ import okhttp3.OkHttpClient
 import org.jsoup.nodes.Document
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.gimy.tv.data.scraper.parser.attrText
 
 /**
  * XNXX.com — international tube site with surprisingly broad Asian content in best/.
@@ -82,7 +83,7 @@ class XnxxSource @Inject constructor(
 
             val key = "$videoId/$slug"
 
-            val title = titleLink.attr("title").trim().ifBlank { titleLink.text().trim() }
+            val title = titleLink.attrText("title").ifBlank { titleLink.text().trim() }
             if (title.isBlank() ||
                 title in setOf("Video", "視頻", "视频", "影片", "加載中", "Loading"))
                 continue
