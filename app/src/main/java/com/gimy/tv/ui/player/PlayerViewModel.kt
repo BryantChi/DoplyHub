@@ -1,9 +1,12 @@
 package com.gimy.tv.ui.player
 
+import android.content.Context
+import com.gimy.tv.R
+import dagger.hilt.android.qualifiers.ApplicationContext
+
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gimy.tv.ui.UiText
 import com.gimy.tv.domain.model.*
 import com.gimy.tv.domain.repository.VodRepository
 import com.gimy.tv.domain.repository.WatchHistoryEntry
@@ -19,7 +22,9 @@ import javax.inject.Inject
 
 data class PlayerUiState(
     val isLoading: Boolean = true,
-    val loadingMessage: String = "正在載入播放資訊…",
+    /** 空字串代表「還沒有更具體的訊息」，畫面會退回 player_loading_playback。
+     *  這裡不能直接放文案：data class 的預設值取不到 Context。 */
+    val loadingMessage: String = "",
     val streamUrl: String? = null,
     val vodTitle: String = "",
     val episodeTitle: String = "",
@@ -65,6 +70,7 @@ class PlayerViewModel @Inject constructor(
      */
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     val mediaDataSourceFactory: androidx.media3.datasource.DataSource.Factory,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYTV"
@@ -94,10 +100,10 @@ class PlayerViewModel @Inject constructor(
 
     private fun loadPlayer() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = "正在載入影片資訊…") }
+            _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = context.getString(R.string.player_loading_vod)) }
             failedPlaybackSourceIds.clear()
             val id = vodId ?: run {
-                _uiState.update { it.copy(isLoading = false, error = "無效的影片 ID") }
+                _uiState.update { it.copy(isLoading = false, error = context.getString(R.string.common_invalid_vod_id)) }
                 return@launch
             }
             try {
@@ -117,15 +123,17 @@ class PlayerViewModel @Inject constructor(
                 // line, which lives only in the enriched detail; fetch enriched up front
                 // so 「繼續觀看」 lands on the right line instead of primary's first.
                 val detail = if (primary.episodes.isEmpty() || historyOnDifferentSource) {
-                    val msg = if (primary.episodes.isEmpty()) "主來源暫無線路，搜尋其他來源中…"
-                        else "從上次的線路繼續，搜尋來源中…"
+                    val msg = context.getString(
+                        if (primary.episodes.isEmpty()) R.string.player_searching_other_sources
+                        else R.string.player_resume_searching
+                    )
                     _uiState.update { it.copy(loadingMessage = msg) }
                     val enriched = try {
                         vodRepository.getEnrichedVodDetail(sourceType, id, cachedPrimary = primary)
                     } catch (_: Exception) { primary }
                     vodDetail = enriched
                     if (enriched.episodes.isEmpty()) {
-                        _uiState.update { it.copy(isLoading = false, error = "此影片暫無可用播放線路") }
+                        _uiState.update { it.copy(isLoading = false, error = context.getString(R.string.player_no_sources)) }
                         return@launch
                     }
                     enriched
@@ -158,15 +166,15 @@ class PlayerViewModel @Inject constructor(
                 if (err != null) {
                     _uiState.update { it.copy(
                         isLoading = false,
-                        error = "所有線路均無法播放\n（最後錯誤: $err）"
+                        error = context.getString(R.string.player_all_failed, err)
                     ) }
                     return@launch
                 }
                 enrichWithCrossSource()
             } catch (e: java.io.IOException) {
-                _uiState.update { it.copy(isLoading = false, error = UiText.NETWORK_ERROR) }
+                _uiState.update { it.copy(isLoading = false, error = context.getString(R.string.common_network_error)) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = "播放失敗: ${e.message}") }
+                _uiState.update { it.copy(isLoading = false, error = context.getString(R.string.player_play_failed, e.message ?: "")) }
             }
         }
     }
@@ -201,13 +209,13 @@ class PlayerViewModel @Inject constructor(
                 src.episodes.firstOrNull { it.number == episodeNum && it.kind == episodeKind }
             } else null) ?: src.episodes.firstOrNull { it.number == episodeNum }
             if (ep == null) {
-                lastErr = "「${src.sourceName}」無第${episodeNum}集"
+                lastErr = context.getString(R.string.player_source_no_ep, src.sourceName, episodeNum)
                 android.util.Log.w("PlayerFallback",
                     "${src.sourceName}: missing ep$episodeNum (has ${src.episodes.size} eps)")
                 continue
             }
-            val msg = if (i == 0) "正在連接「${src.sourceName}」線路…"
-                else "「${candidates[i - 1].sourceName}」無法播放，改用「${src.sourceName}」…"
+            val msg = if (i == 0) context.getString(R.string.player_connecting, src.sourceName)
+                else context.getString(R.string.player_fallback, candidates[i - 1].sourceName, src.sourceName)
             _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = msg) }
             try {
                 // Route through the ACTUAL scraper for this group. Cross-source enriched
@@ -244,7 +252,7 @@ class PlayerViewModel @Inject constructor(
                 }
                 return null
             } catch (e: TimeoutCancellationException) {
-                lastErr = "${src.sourceName}: 連線逾時（>${PLAY_BUDGET_MS / 1000} 秒）"
+                lastErr = context.getString(R.string.player_timeout_source, src.sourceName, PLAY_BUDGET_MS / 1000)
                 android.util.Log.w("PlayerFallback",
                     "${src.sourceName} ep${ep.number} url=${ep.playUrl.take(120)} → TIMEOUT")
                 continue
@@ -308,12 +316,12 @@ class PlayerViewModel @Inject constructor(
         failedPlaybackSourceIds.clear()
         val ordered = orderedSourcesFrom(detail.episodes, _uiState.value.sourceId)
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = "正在載入第${episodeNum}集…") }
+            _uiState.update { it.copy(isLoading = true, error = null, loadingMessage = context.getString(R.string.player_loading_ep, episodeNum)) }
             val err = playWithFallback(ordered, episodeNum, resumeMs = 0L)
             if (err != null) {
                 _uiState.update { it.copy(
                     isLoading = false,
-                    error = "所有線路均無法播放第${episodeNum}集\n（最後錯誤: $err）"
+                    error = context.getString(R.string.player_all_failed_ep, episodeNum, err)
                 ) }
             }
         }
@@ -333,13 +341,13 @@ class PlayerViewModel @Inject constructor(
             _uiState.update { it.copy(
                 isLoading = true,
                 error = null,
-                loadingMessage = "正在切換至「${target.sourceName}」…",
+                loadingMessage = context.getString(R.string.player_switching, target.sourceName),
             ) }
             val err = playWithFallback(ordered, episodeNum, resumeMs = resumeMs)
             if (err != null) {
                 _uiState.update { it.copy(
                     isLoading = false,
-                    error = "所有線路均無法播放\n（最後錯誤: $err）"
+                    error = context.getString(R.string.player_all_failed, err)
                 ) }
             }
         }
@@ -377,7 +385,7 @@ class PlayerViewModel @Inject constructor(
         if (next == null) {
             _uiState.update { it.copy(
                 isLoading = false,
-                error = "所有線路都無法播放\n（$reason）",
+                error = context.getString(R.string.player_all_failed_reason, reason),
             ) }
             return
         }

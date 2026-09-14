@@ -23,6 +23,8 @@ import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.FocusableChip
 import com.gimy.tv.ui.favorites.PageHeader
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 /**
  * Standalone "all categories" entry surfaced from the AdultPlus header.
@@ -44,7 +46,7 @@ fun AdultPlusCategoriesScreen(
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack))),
     ) {
-        PageHeader("全部分類", onBack)
+        PageHeader(stringResource(R.string.adultplus_all_categories), onBack)
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),

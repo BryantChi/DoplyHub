@@ -28,6 +28,8 @@ import androidx.tv.material3.*
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -75,14 +77,14 @@ fun BrowseScreen(
                 contentColor = Color.White,
                 focusBorder = false,
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp),
-            ) { Text("返回", color = Color.White, fontSize = 13.sp) }
+            ) { Text(stringResource(R.string.common_back), color = Color.White, fontSize = 13.sp) }
 
             Spacer(Modifier.width(16.dp))
             Text(uiState.title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CinemaTextPrimary)
 
             if (uiState.items.isNotEmpty()) {
                 Spacer(Modifier.width(12.dp))
-                Text("第${uiState.currentPage}頁", fontSize = 13.sp, color = CinemaTextMuted)
+                Text(stringResource(R.string.browse_page_n, uiState.currentPage), fontSize = 13.sp, color = CinemaTextMuted)
             }
 
             Spacer(Modifier.weight(1f))
@@ -96,19 +98,19 @@ fun BrowseScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         DoplyLoadingIndicator(dims.loadingIndicatorSize)
                         Spacer(Modifier.height(12.dp))
-                        Text("載入${uiState.title}…", color = CinemaTextMuted, fontSize = 14.sp)
+                        Text(stringResource(R.string.browse_loading, uiState.title), color = CinemaTextMuted, fontSize = 14.sp)
                     }
                 }
             }
             uiState.error != null && uiState.items.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("載入失敗", color = CinemaTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.common_load_failed), color = CinemaTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(4.dp))
                         Text(uiState.error!!, color = CinemaTextMuted, fontSize = 13.sp)
                         Spacer(Modifier.height(16.dp))
                         DoplyButton(onClick = { vm.loadPage(1) }, containerColor = CinemaRed) {
-                            Text("重試", color = Color.White)
+                            Text(stringResource(R.string.common_retry), color = Color.White)
                         }
                     }
                 }
@@ -120,17 +122,17 @@ fun BrowseScreen(
             !uiState.isLoading && uiState.items.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("這個分類沒有內容", color = CinemaTextPrimary,
+                        Text(stringResource(R.string.browse_empty), color = CinemaTextPrimary,
                             fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(4.dp))
-                        Text("可連上該站，但解析不到影片，來源可能已改版。",
+                        Text(stringResource(R.string.common_source_parse_failed),
                             color = CinemaTextMuted, fontSize = 13.sp)
                         Spacer(Modifier.height(4.dp))
-                        Text("可到「設定 → 來源管理」查看各來源狀態。",
+                        Text(stringResource(R.string.browse_empty_hint),
                             color = CinemaTextMuted.copy(0.7f), fontSize = 12.sp)
                         Spacer(Modifier.height(16.dp))
                         DoplyButton(onClick = { vm.refresh() }, containerColor = CinemaRed) {
-                            Text("重新整理", color = Color.White)
+                            Text(stringResource(R.string.browse_refresh), color = Color.White)
                         }
                     }
                 }
@@ -172,7 +174,7 @@ fun BrowseScreen(
                                                 )
                                                 Spacer(Modifier.height(4.dp))
                                                 Text(
-                                                    if (loadMoreFailed) "載入失敗，再試一次" else "載入更多",
+                                                    stringResource(if (loadMoreFailed) R.string.browse_load_more_failed else R.string.browse_load_more),
                                                     fontSize = 13.sp, color = CinemaTextPrimary,
                                                     fontWeight = FontWeight.Bold,
                                                 )

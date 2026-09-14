@@ -1,5 +1,6 @@
 package com.gimy.tv.ui.components
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -28,20 +29,23 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.gimy.tv.ui.navigation.Screen
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 data class NavItem(
     val route: String,
-    val label: String,
+    /** 標籤放 res id 而不是字串：這份清單是 top-level val，取不到 Composable 的 context。 */
+    @StringRes val labelRes: Int,
     val icon: ImageVector,
 )
 
 val navItems = listOf(
-    NavItem(Screen.Home.route, "首頁", Icons.Default.Home),
-    NavItem(Screen.Search.route, "搜尋", Icons.Default.Search),
-    NavItem(Screen.Categories.route, "分類", Icons.Default.VideoLibrary),
-    NavItem(Screen.Favorites.route, "收藏", Icons.Default.Favorite),
-    NavItem(Screen.History.route, "紀錄", Icons.Default.History),
-    NavItem(Screen.Settings.route, "設定", Icons.Default.Settings),
+    NavItem(Screen.Home.route, R.string.nav_home, Icons.Default.Home),
+    NavItem(Screen.Search.route, R.string.nav_search, Icons.Default.Search),
+    NavItem(Screen.Categories.route, R.string.nav_category, Icons.Default.VideoLibrary),
+    NavItem(Screen.Favorites.route, R.string.nav_favorites, Icons.Default.Favorite),
+    NavItem(Screen.History.route, R.string.nav_history, Icons.Default.History),
+    NavItem(Screen.Settings.route, R.string.nav_settings, Icons.Default.Settings),
 )
 
 @Composable
@@ -80,8 +84,8 @@ fun AdaptiveScaffold(
                             NavigationBarItem(
                                 selected = selected,
                                 onClick = { navigateToTab(navController, item.route) },
-                                icon = { Icon(item.icon, contentDescription = item.label) },
-                                label = { Text(item.label, fontSize = 11.sp) },
+                                icon = { Icon(item.icon, contentDescription = stringResource(item.labelRes)) },
+                                label = { Text(stringResource(item.labelRes), fontSize = 11.sp) },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = CinemaRed,
                                     selectedTextColor = CinemaRed,
@@ -109,8 +113,8 @@ fun AdaptiveScaffold(
                             NavigationRailItem(
                                 selected = selected,
                                 onClick = { navigateToTab(navController, item.route) },
-                                icon = { Icon(item.icon, contentDescription = item.label) },
-                                label = { Text(item.label, fontSize = 11.sp) },
+                                icon = { Icon(item.icon, contentDescription = stringResource(item.labelRes)) },
+                                label = { Text(stringResource(item.labelRes), fontSize = 11.sp) },
                                 colors = NavigationRailItemDefaults.colors(
                                     selectedIconColor = CinemaRed,
                                     selectedTextColor = CinemaRed,

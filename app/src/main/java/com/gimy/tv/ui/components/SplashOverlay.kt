@@ -18,6 +18,7 @@ import com.gimy.tv.R
 import com.gimy.tv.ui.theme.CinemaBlack
 import com.gimy.tv.ui.theme.CinemaRed
 import com.gimy.tv.ui.theme.CinemaTextMuted
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun SplashOverlay() {
@@ -53,7 +54,7 @@ fun SplashOverlay() {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "你的專屬追劇清單管家",
+                stringResource(R.string.splash_tagline),
                 color = CinemaTextMuted,
                 fontSize = 14.sp,
                 modifier = Modifier.alpha(textAlpha.value)

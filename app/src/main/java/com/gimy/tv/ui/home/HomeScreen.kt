@@ -52,6 +52,8 @@ import com.gimy.tv.ui.theme.LocalDimensions
 import com.gimy.tv.ui.theme.LocalIsTelevision
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -199,11 +201,11 @@ private fun TopBar(
                 modifier = Modifier.offset(y = (-2).dp).background(CinemaRed.copy(0.15f), RoundedCornerShape(3.dp)).padding(horizontal = 6.dp, vertical = 1.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            NavChip("搜尋", onSearch)
-            NavChip("分類", onCategories)
-            NavChip("收藏", onFav)
-            NavChip("歷史", onHistory)
-            NavChip("設定", onSettings)
+            NavChip(stringResource(R.string.nav_search), onSearch)
+            NavChip(stringResource(R.string.nav_category), onCategories)
+            NavChip(stringResource(R.string.nav_favorites), onFav)
+            NavChip(stringResource(R.string.home_rail_history), onHistory)
+            NavChip(stringResource(R.string.nav_settings), onSettings)
             RefreshIconButton(isRefreshing = isRefreshing, onClick = onRefresh)
         }
     }
@@ -361,7 +363,7 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
                             contentColor = Color.White,
                             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                         ) {
-                            Text("▶  觀看詳情", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(stringResource(R.string.home_view_detail), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }
@@ -397,7 +399,7 @@ private fun HeroBanner(items: List<Vod>, onItemClick: (Vod) -> Unit) {
                 contentPadding = PaddingValues(horizontal = 28.dp, vertical = 11.dp)
             ) {
                 Text(
-                    if (btnFocused) "◀  觀看詳情  ▶" else "▶  觀看詳情",
+                    stringResource(if (btnFocused) R.string.home_view_detail_focused else R.string.home_view_detail),
                     color = if (btnFocused) CinemaBlack else Color.White,
                     fontWeight = FontWeight.Bold, fontSize = 15.sp
                 )
@@ -431,7 +433,7 @@ private fun ContinueWatchingRow(
         Row(Modifier.padding(start = dims.screenHorizontalPadding, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(3.dp).height(16.dp).clip(RoundedCornerShape(2.dp)).background(CinemaRed))
             Spacer(Modifier.width(10.dp))
-            Text("繼續觀看", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CinemaTextPrimary, letterSpacing = 0.3.sp)
+            Text(stringResource(R.string.home_continue_watching), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CinemaTextPrimary, letterSpacing = 0.3.sp)
         }
         LazyRow(
             contentPadding = PaddingValues(horizontal = dims.screenHorizontalPadding),
@@ -459,7 +461,7 @@ private fun ContinueWatchingRow(
                                 .padding(horizontal = 5.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                "看到第${entry.episodeNum}集",
+                                stringResource(R.string.home_watched_to_ep, entry.episodeNum),
                                 color = Color.White,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Medium
@@ -513,7 +515,7 @@ private fun MoreCard(onClick: () -> Unit) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("▶", fontSize = 28.sp, color = if (f) CinemaRed else CinemaTextMuted)
                 Spacer(Modifier.height(8.dp))
-                Text("查看更多", fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                Text(stringResource(R.string.common_view_more), fontSize = 14.sp, fontWeight = FontWeight.Bold,
                     color = if (f) CinemaRed else CinemaTextPrimary)
             }
         }
@@ -549,7 +551,7 @@ private fun LoadingOverlay() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             DoplyLoadingIndicator(dims.loadingIndicatorSize)
             Spacer(Modifier.height(18.dp))
-            Text("正在載入…", color = CinemaTextMuted, fontSize = 14.sp)
+            Text(stringResource(R.string.home_loading), color = CinemaTextMuted, fontSize = 14.sp)
         }
     }
 }
@@ -581,10 +583,10 @@ private fun MoreSourcesHeader() {
     ) {
         Text("✨", fontSize = 16.sp)
         Spacer(Modifier.width(8.dp))
-        Text("更多來源", fontSize = 16.sp, fontWeight = FontWeight.Bold,
+        Text(stringResource(R.string.home_more_sources), fontSize = 16.sp, fontWeight = FontWeight.Bold,
             color = CinemaTextPrimary, letterSpacing = 0.4.sp)
         Spacer(Modifier.width(8.dp))
-        Text("｜內容池差異化推薦", fontSize = 11.sp, color = CinemaTextMuted)
+        Text(stringResource(R.string.home_more_sources_hint), fontSize = 11.sp, color = CinemaTextMuted)
     }
 }
 
@@ -678,9 +680,9 @@ private fun RowLoadFailed(title: String, rowSourceType: SourceType, onRetry: () 
             Modifier.padding(horizontal = dims.screenHorizontalPadding, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("這個來源載入失敗", fontSize = 13.sp, color = CinemaTextMuted)
+            Text(stringResource(R.string.home_row_load_failed), fontSize = 13.sp, color = CinemaTextMuted)
             Spacer(Modifier.width(12.dp))
-            FocusableChip("重試", onClick = onRetry)
+            FocusableChip(stringResource(R.string.common_retry), onClick = onRetry)
         }
     }
 }
@@ -689,12 +691,12 @@ private fun RowLoadFailed(title: String, rowSourceType: SourceType, onRetry: () 
 private fun ErrorOverlay(error: String, onRetry: () -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("載入失敗", color = CinemaTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.common_load_failed), color = CinemaTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
             Text(error, color = CinemaTextMuted, fontSize = 13.sp)
             Spacer(Modifier.height(20.dp))
             DoplyButton(onClick = onRetry, containerColor = CinemaRed) {
-                Text("重試", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.common_retry), color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }

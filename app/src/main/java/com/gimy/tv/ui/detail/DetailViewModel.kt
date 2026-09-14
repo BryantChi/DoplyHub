@@ -1,12 +1,15 @@
 package com.gimy.tv.ui.detail
 
+import android.content.Context
+import com.gimy.tv.R
+import dagger.hilt.android.qualifiers.ApplicationContext
+
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gimy.tv.domain.repository.SavedEntryRecoverer
 import com.gimy.tv.domain.repository.StaleEntryReporter
 import com.gimy.tv.domain.repository.CacheManager
-import com.gimy.tv.ui.UiText
 import com.gimy.tv.domain.model.*
 import com.gimy.tv.domain.repository.FavoriteRepository
 import com.gimy.tv.domain.repository.VodRepository
@@ -42,6 +45,7 @@ class DetailViewModel @Inject constructor(
     private val staleEntryReporter: StaleEntryReporter,
     private val cacheManager: CacheManager,
     private val savedEntryRecoverer: SavedEntryRecoverer,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYTV"
@@ -106,8 +110,8 @@ class DetailViewModel @Inject constructor(
             }
             val id = vodId ?: run {
                 _uiState.update {
-                    if (isRefresh) it.copy(isRefreshing = false, error = "無效的影片 ID")
-                    else it.copy(isLoading = false, error = "無效的影片 ID")
+                    if (isRefresh) it.copy(isRefreshing = false, error = context.getString(R.string.common_invalid_vod_id))
+                    else it.copy(isLoading = false, error = context.getString(R.string.common_invalid_vod_id))
                 }
                 return@launch
             }
@@ -174,7 +178,7 @@ class DetailViewModel @Inject constructor(
                 // On refresh: keep existing detail visible, drop the spinner silently.
                 _uiState.update {
                     if (isRefresh) it.copy(isRefreshing = false, isEnriching = false)
-                    else it.copy(isLoading = false, isEnriching = false, error = UiText.NETWORK_ERROR)
+                    else it.copy(isLoading = false, isEnriching = false, error = context.getString(R.string.common_network_error))
                 }
             } catch (e: Exception) {
                 // 走到這裡多半是 404（ScraperException，不是 IOException）。最常見的成因是
@@ -196,9 +200,9 @@ class DetailViewModel @Inject constructor(
                 }
                 val message =
                     if (plan is com.gimy.tv.domain.model.RecoveryPlan.MarkStale) {
-                        "這部片在來源站上已經找不到了。可到收藏或觀看紀錄頁按「清除失效」一次清掉。"
+                        context.getString(R.string.detail_vod_gone)
                     } else {
-                        "載入失敗: ${e.message}"
+                        context.getString(R.string.detail_load_failed_reason, e.message ?: "")
                     }
                 _uiState.update {
                     if (isRefresh) it.copy(isRefreshing = false, isEnriching = false)

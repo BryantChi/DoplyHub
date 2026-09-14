@@ -23,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gimy.tv.ui.theme.CinemaRed
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 // ═══════════════════════════════════════
 // Gesture mode state
@@ -157,7 +159,7 @@ fun SpeedOverlay(gestureMode: GestureMode) {
                     )
                 }
                 Text(
-                    text = "↕ 滑動調整",
+                    text = stringResource(R.string.player_gesture_hint),
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 11.sp,
                 )

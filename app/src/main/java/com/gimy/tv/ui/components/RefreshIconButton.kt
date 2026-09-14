@@ -32,6 +32,8 @@ import com.gimy.tv.ui.theme.CinemaSurface
 import com.gimy.tv.ui.theme.CinemaTextMuted
 import com.gimy.tv.ui.theme.CinemaTextPrimary
 import com.gimy.tv.ui.theme.LocalIsTelevision
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -89,7 +91,7 @@ fun RefreshIconButton(
         ) {
             Icon(
                 imageVector = Icons.Default.Refresh,
-                contentDescription = "刷新",
+                contentDescription = stringResource(R.string.common_refresh),
                 tint = if (focused) Color.White else CinemaTextMuted,
                 modifier = Modifier
                     .size(18.dp)
@@ -103,7 +105,7 @@ fun RefreshIconButton(
         ) {
             androidx.compose.material3.Icon(
                 imageVector = Icons.Default.Refresh,
-                contentDescription = "刷新",
+                contentDescription = stringResource(R.string.common_refresh),
                 tint = CinemaTextPrimary,
                 modifier = Modifier
                     .size(22.dp)

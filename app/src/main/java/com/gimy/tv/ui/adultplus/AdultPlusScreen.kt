@@ -31,6 +31,8 @@ import com.gimy.tv.ui.components.FocusableChip
 import com.gimy.tv.ui.components.RefreshIconButton
 import com.gimy.tv.ui.components.RefreshLoadingBar
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -55,7 +57,7 @@ fun AdultPlusScreen(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
     ) {
         val refreshingAll by vm.isRefreshing.collectAsStateWithLifecycle()
-        PageHeader("進階", onBack) {
+        PageHeader(stringResource(R.string.adultplus_title), onBack) {
             RefreshIconButton(isRefreshing = refreshingAll, onClick = { vm.refreshAll() })
         }
         RefreshLoadingBar(refreshingAll)
@@ -69,7 +71,7 @@ fun AdultPlusScreen(
                 .padding(horizontal = dims.screenHorizontalPadding, vertical = 4.dp),
             horizontalArrangement = Arrangement.End,
         ) {
-            FocusableChip("📂 全部分類") { onCategoriesClick() }
+            FocusableChip(stringResource(R.string.adultplus_menu_all_categories)) { onCategoriesClick() }
         }
 
         val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
@@ -89,7 +91,7 @@ fun AdultPlusScreen(
                 if (history.isNotEmpty()) {
                     item(key = "adult_history_row") {
                         AdultStaticRow(
-                            title = "📜 我的觀看歷史",
+                            title = stringResource(R.string.adultplus_menu_history),
                             items = history,
                             onItemClick = { vod -> onVodClick(vod.sourceType, vod.id) },
                         )
@@ -98,18 +100,19 @@ fun AdultPlusScreen(
                 if (favorites.isNotEmpty()) {
                     item(key = "adult_favorites_row") {
                         AdultStaticRow(
-                            title = "⭐ 我的收藏",
+                            title = stringResource(R.string.adultplus_menu_favorites),
                             items = favorites,
                             onItemClick = { vod -> onVodClick(vod.sourceType, vod.id) },
                         )
                     }
                 }
                 items(vm.rows, key = { "${it.sourceType.name}_${it.key}" }) { row ->
+                    val rowTitle = stringResource(row.titleRes)
                     AdultPlusRowSection(
                         row = row,
                         vm = vm,
                         onItemClick = { vod -> onVodClick(vod.sourceType, vod.id) },
-                        onMoreClick = { onMoreClick(row.sourceType, row.key, row.title) },
+                        onMoreClick = { onMoreClick(row.sourceType, row.key, rowTitle) },
                     )
                 }
             }
@@ -126,6 +129,7 @@ private fun AdultPlusRowSection(
     onMoreClick: () -> Unit,
 ) {
     val dims = LocalDimensions.current
+    val rowTitle = stringResource(row.titleRes)
     val state by vm.rowState(row).collectAsStateWithLifecycle()
     LaunchedEffect(row) { vm.ensureRow(row) }
 
@@ -143,7 +147,7 @@ private fun AdultPlusRowSection(
             )
             Spacer(Modifier.width(10.dp))
             Text(
-                row.title,
+                rowTitle,
                 fontSize = 16.sp, fontWeight = FontWeight.Bold,
                 color = CinemaTextPrimary, letterSpacing = 0.3.sp,
             )
@@ -161,7 +165,7 @@ private fun AdultPlusRowSection(
                     Modifier.padding(horizontal = dims.screenHorizontalPadding, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("載入失敗：${state.error}", color = CinemaTextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.adultplus_load_failed_reason, state.error ?: ""), color = CinemaTextMuted, fontSize = 12.sp)
                     Spacer(Modifier.width(12.dp))
                     RetryChip { vm.refreshRow(row) }
                 }
@@ -171,7 +175,7 @@ private fun AdultPlusRowSection(
                     Modifier.fillMaxWidth().padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("此分類暫無內容", color = CinemaTextMuted.copy(0.6f), fontSize = 12.sp)
+                    Text(stringResource(R.string.common_category_empty), color = CinemaTextMuted.copy(0.6f), fontSize = 12.sp)
                 }
             }
             else -> {
@@ -258,7 +262,7 @@ private fun LoadMoreCard(loading: Boolean, onClick: () -> Unit) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("▶", fontSize = 24.sp, color = if (f) CinemaRed else CinemaTextMuted)
                     Spacer(Modifier.height(6.dp))
-                    Text("更多", fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    Text(stringResource(R.string.common_more), fontSize = 13.sp, fontWeight = FontWeight.Bold,
                         color = if (f) CinemaRed else CinemaTextPrimary)
                 }
             }
@@ -299,5 +303,5 @@ private fun RetryChip(onClick: () -> Unit) {
         contentColor = Color.White,
         focusBorder = false,
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 5.dp),
-    ) { Text("重試", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+    ) { Text(stringResource(R.string.common_retry), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
 }

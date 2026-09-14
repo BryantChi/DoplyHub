@@ -1,5 +1,9 @@
 package com.gimy.tv.ui.settings
 
+import android.content.Context
+import com.gimy.tv.R
+import dagger.hilt.android.qualifiers.ApplicationContext
+
 import com.gimy.tv.domain.repository.SourceHealthMonitor
 import com.gimy.tv.domain.repository.CacheManager
 import com.gimy.tv.domain.model.EndpointHealth
@@ -17,6 +21,7 @@ class SettingsViewModel @Inject constructor(
     private val sourcePreferencesRepository: SourcePreferences,
     private val cacheManager: CacheManager,
     sourceHealth: SourceHealthMonitor,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     val enabledSources: StateFlow<Set<SourceType>> = sourcePreferencesRepository.enabledSources
@@ -40,8 +45,10 @@ class SettingsViewModel @Inject constructor(
             val refreshed = runCatching { cacheManager.clearAll() }.getOrDefault(false)
             _cacheClearing.value = false
             _cacheClearResult.value =
-                if (refreshed) "已清除快取，站點網址也重新檢查過了。"
-                else "已清除快取。站點網址仍在背景檢查，稍後再操作即可生效。"
+                context.getString(
+                    if (refreshed) R.string.settings_cache_cleared
+                    else R.string.settings_cache_cleared_bg
+                )
         }
     }
 

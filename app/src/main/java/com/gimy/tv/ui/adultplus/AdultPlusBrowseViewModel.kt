@@ -1,5 +1,9 @@
 package com.gimy.tv.ui.adultplus
 
+import android.content.Context
+import com.gimy.tv.R
+import dagger.hilt.android.qualifiers.ApplicationContext
+
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -40,6 +44,7 @@ data class AdultPlusBrowseState(
 class AdultPlusBrowseViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val adultPlusCatalog: AdultPlusCatalog,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AdultPlusBrowseState())
@@ -99,12 +104,12 @@ class AdultPlusBrowseViewModel @Inject constructor(
             } catch (_: TimeoutCancellationException) {
                 _state.value = _state.value.copy(loading = false, loadingMore = false,
                     isRefreshing = false,
-                    error = if (append) null else "載入超時，請重試",
+                    error = if (append) null else context.getString(R.string.common_load_timeout_retry),
                     hasMore = if (append) false else _state.value.hasMore)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(loading = false, loadingMore = false,
                     isRefreshing = false,
-                    error = if (append) null else (e.message ?: "載入失敗"),
+                    error = if (append) null else (e.message ?: context.getString(R.string.common_load_failed)),
                     hasMore = if (append) false else _state.value.hasMore)
             }
         }

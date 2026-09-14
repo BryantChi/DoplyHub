@@ -1,12 +1,233 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!--
-      只留 app_name（AndroidManifest 的 android:label 用得到）。
-
-      其餘 18 條在程式裡是零引用的死條目，而且已經與實際顯示的文案分歧：
-      這裡寫「網路連線失敗，請檢查網路設定」，畫面上其實顯示別的句子。
-      留著只會讓人改錯地方——以為改了文案，實際畫面完全沒變。
-      共用文案改放 ui/UiText.kt，理由見該檔說明。
-    -->
     <string name="app_name">Doply Hub</string>
+
+    <!--
+      UI 文案一律放這裡，程式碼裡不留中文字面量。
+
+      三類東西刻意不收進來，搬進來會直接壞掉或變難維護：
+      1. 解析用的比對字串與選擇器（EpisodeStatusParser 的「更新至第 N 集」、
+         GimyParser 的 a:contains(下一頁)）——那是抓取邏輯，不是給人看的。
+      2. Log 訊息——只給開發者看，翻譯沒有意義。
+      3. AdultPlusCategories 的分類清單——顯示名與站台路徑成對，拆開會變成
+         新增一列要改兩個檔案。
+
+      2026-09-14 之前這裡只有 app_name：舊的 18 條全是零引用死條目、內容還與畫面分歧。
+    -->
+    <string name="common_retry">重試</string>
+    <string name="common_load_failed">載入失敗</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_back">返回</string>
+    <string name="common_more">更多</string>
+    <string name="common_clear">清除</string>
+    <string name="common_delete">刪除</string>
+    <string name="common_close">關閉</string>
+    <string name="common_later">稍後</string>
+    <string name="common_refresh">刷新</string>
+    <string name="common_view_more">查看更多</string>
+    <string name="common_network_error">網路連線失敗，請檢查網路後重試</string>
+    <string name="common_load_timeout_retry">載入超時，請重試</string>
+    <string name="common_site_maintenance">站方維護中，稍後再試</string>
+    <string name="common_source_parse_failed">可連上該站，但解析不到影片，來源可能已改版。</string>
+    <string name="common_invalid_vod_id">無效的影片 ID</string>
+    <string name="common_category_empty">此分類暫無內容</string>
+    <string name="common_clear_stale">清除失效 %1$d 筆</string>
+    <string name="common_episode_n">第%1$d集</string>
+    <string name="common_delete_history">刪除記錄</string>
+    <string name="common_delete_history_confirm">確定要刪除「%1$s」的觀看記錄嗎？</string>
+    <string name="common_all_shown_count">已顯示全部 %1$d 部</string>
+
+    <!-- 底部／側邊導覽列 -->
+    <string name="nav_home">首頁</string>
+    <string name="nav_search">搜尋</string>
+    <string name="nav_category">分類</string>
+    <string name="nav_favorites">收藏</string>
+    <string name="nav_history">紀錄</string>
+    <string name="nav_settings">設定</string>
+
+    <!-- 共用元件 -->
+    <string name="exit_confirm_toast">再按一次返回鍵退出</string>
+    <string name="exit_confirm_title">確定要退出 Doply Hub？</string>
+    <string name="exit_confirm_ok">確定退出</string>
+    <string name="pin_locked">輸入錯誤過多，已鎖定 %1$s</string>
+    <string name="splash_tagline">你的專屬追劇清單管家</string>
+    <!-- 收藏 -->
+    <string name="favorites_title">我的收藏</string>
+    <string name="favorites_empty">還沒有收藏的內容</string>
+
+    <!-- 觀看歷史 -->
+    <string name="history_title">觀看歷史</string>
+    <string name="history_empty">還沒有觀看記錄</string>
+
+    <!-- 分類瀏覽 -->
+    <string name="category_title">分類瀏覽</string>
+    <string name="category_pin_prompt">請輸入 PIN</string>
+    <string name="category_pin_subtitle">進入 18+ 區</string>
+    <string name="category_pin_error">PIN 錯誤</string>
+    <!-- 分類瀏覽（列表頁） -->
+    <string name="browse_title_fallback">瀏覽</string>
+    <string name="browse_page_n">第%1$d頁</string>
+    <string name="browse_loading">載入%1$s…</string>
+    <string name="browse_empty">這個分類沒有內容</string>
+    <string name="browse_empty_hint">可到「設定 → 來源管理」查看各來源狀態。</string>
+    <string name="browse_refresh">重新整理</string>
+    <string name="browse_load_more">載入更多</string>
+    <string name="browse_load_more_failed">載入失敗，再試一次</string>
+    <!-- 搜尋 -->
+    <string name="search_hint">輸入關鍵字搜尋…</string>
+    <string name="search_first_time_verify">首次搜尋需通過站台驗證，請稍候…</string>
+    <string name="search_searching">搜尋「%1$s」中…</string>
+    <string name="search_failed">搜尋失敗</string>
+    <string name="search_result_count">找到 %1$d 個結果（總 %2$d）</string>
+    <string name="search_filter_all">全部 %1$d</string>
+    <string name="search_all_shown">已顯示全部結果</string>
+    <string name="search_all_sources_down">所有來源都連不上</string>
+    <string name="search_all_sources_down_desc">這次搜尋沒有任何站台回應，不是查無此片。</string>
+    <string name="search_all_sources_down_hint">請檢查網路後再搜尋一次。</string>
+    <string name="search_not_found">找不到「%1$s」</string>
+    <string name="search_tip_short_keyword">建議：用 2~3 個字的短關鍵字搜尋</string>
+    <string name="search_tip_example">例如「斗羅」而非「斗羅大陸」</string>
+    <string name="search_try_shorter">試試搜尋「%1$s」</string>
+    <string name="search_recent">最近搜尋</string>
+    <string name="search_empty">輸入關鍵字開始搜尋</string>
+    <!-- 設定 -->
+    <string name="settings_title">設定</string>
+    <string name="settings_about">關於</string>
+    <string name="settings_app_name_label">應用名稱</string>
+    <string name="settings_version">版本</string>
+    <string name="settings_version_value">v%1$s</string>
+    <string name="settings_update">更新</string>
+    <string name="settings_checking">檢查中…</string>
+    <string name="settings_check_update">檢查更新</string>
+    <string name="settings_storage">儲存空間</string>
+    <string name="settings_clear_cache_desc">清除網頁回應、封面圖與暫存的清單資料，並重新檢查各站可用網址。站方改版或換網址後若出現內容不更新、一直載入失敗，先清一次快取。收藏與觀看紀錄不受影響。</string>
+    <string name="settings_clearing">清除中…</string>
+    <string name="settings_clear_cache">清除快取</string>
+    <string name="settings_sources">來源管理</string>
+    <string name="settings_sources_desc">停用的來源不會出現在搜尋、首頁更多來源、詳情頁的跨來源切換。標示「失效」代表該站可連線但已解析不到內容。</string>
+    <string name="settings_adult">成人內容</string>
+    <string name="settings_adult_desc">啟用後可在「分類瀏覽」存取 18+ 區。建議搭配 PIN 鎖避免家人誤觸。</string>
+    <string name="settings_adult_show">顯示成人內容</string>
+    <string name="settings_pin_enable">啟用 PIN 鎖</string>
+    <string name="settings_pin_change">變更 PIN</string>
+    <string name="settings_adult_plus">進階成人來源（jable / xnxx / 5278）</string>
+    <string name="settings_adult_plus_warn">⚠ 內容為第三方聚合站，未經授權；使用須自行承擔法律責任。</string>
+    <string name="settings_adult_reset">重置成人內容設定</string>
+    <string name="settings_pin_set">設定 PIN</string>
+    <string name="settings_pin_confirm">確認 PIN</string>
+    <string name="settings_pin_enter_4">請輸入 4 位數字</string>
+    <string name="settings_pin_repeat_4">再次輸入相同的 4 位數字</string>
+    <string name="settings_pin_mismatch">兩次輸入不一致，請從頭再來</string>
+    <string name="settings_adult_reset_title">重置成人內容設定？</string>
+    <string name="settings_adult_reset_desc">會清空 PIN 與所有成人內容偏好，恢復為預設關閉狀態。</string>
+    <string name="settings_adult_reset_confirm">確認重置</string>
+    <string name="settings_primary_source">主來源</string>
+    <string name="settings_item_count">%1$d 筆</string>
+    <string name="settings_current_version">目前版本 v%1$s</string>
+    <string name="settings_update_checking">正在檢查更新…</string>
+    <string name="settings_update_latest">已是最新版本</string>
+    <string name="settings_update_found">發現新版本 v%1$s</string>
+    <string name="settings_downloading">下載中 %1$s%%</string>
+    <string name="settings_download_done">下載完成，等待安裝…</string>
+    <string name="settings_error">錯誤：%1$s</string>
+    <string name="settings_cache_cleared">已清除快取，站點網址也重新檢查過了。</string>
+    <string name="settings_cache_cleared_bg">已清除快取。站點網址仍在背景檢查，稍後再操作即可生效。</string>
+    <!-- App 更新 -->
+    <string name="update_required">需要更新</string>
+    <string name="update_found">發現新版本</string>
+    <string name="update_install_hint">若安裝畫面顯示「應用程式未安裝」或「套件衝突」，請先解除安裝舊版再重試。</string>
+    <string name="update_now">立即更新</string>
+    <string name="update_downloading">下載中</string>
+    <string name="update_downloaded">已下載完成</string>
+    <string name="update_downloaded_desc">v%1$s 已經下載好了。若剛才的安裝畫面被取消，可以直接再裝一次，不用重新下載。</string>
+    <string name="update_install_now">立即安裝</string>
+    <string name="update_need_permission">需要授予安裝權限</string>
+    <string name="update_permission_desc">請於系統設定中允許 Doply Hub 安裝應用程式，授予後返回此畫面再次點擊「重試安裝」。</string>
+    <string name="update_permission_no_page">這台裝置找不到對應的設定頁，請手動到「設定 → 安全性 / 應用程式 → 安裝未知應用程式」開啟。</string>
+    <string name="update_permission_denied">尚未取得安裝權限，請先點「前往設定」授予後再回來重試。</string>
+    <string name="update_goto_settings">前往設定</string>
+    <string name="update_retry_install">重試安裝</string>
+    <string name="update_failed">更新失敗</string>
+    <!-- 首頁 -->
+    <string name="home_rail_history">歷史</string>
+    <string name="home_view_detail">▶  觀看詳情</string>
+    <string name="home_view_detail_focused">◀  觀看詳情  ▶</string>
+    <string name="home_continue_watching">繼續觀看</string>
+    <string name="home_watched_to_ep">看到第%1$d集</string>
+    <string name="home_loading">正在載入…</string>
+    <string name="home_more_sources">更多來源</string>
+    <string name="home_more_sources_hint">｜內容池差異化推薦</string>
+    <string name="home_row_load_failed">這個來源載入失敗</string>
+    <!-- 影片詳情 -->
+    <string name="detail_select_source">選擇來源</string>
+    <string name="detail_all_count">全部 %1$d</string>
+    <string name="detail_play_lines">播放線路</string>
+    <string name="detail_ep_count_warn"> %1$d集⚠</string>
+    <string name="detail_related_series">相關系列</string>
+    <string name="detail_related_recommend">相關推薦</string>
+    <string name="detail_director">導演</string>
+    <string name="detail_cast">主演</string>
+    <string name="detail_favorited">已收藏</string>
+    <string name="detail_resume_ep">▶ 續播第%1$d集</string>
+    <string name="detail_more_loading">更多線路與集數載入中…</string>
+    <string name="detail_select_episode">選擇集數</string>
+    <string name="detail_vod_gone">這部片在來源站上已經找不到了。可到收藏或觀看紀錄頁按「清除失效」一次清掉。</string>
+    <string name="detail_load_failed_reason">載入失敗: %1$s</string>
+    <!-- 播放器 -->
+    <string name="player_loading">載入中</string>
+    <string name="player_line_label">線路：%1$s</string>
+    <string name="player_switch_source_retry">切換線路重試</string>
+    <string name="player_tls_failed">連線安全驗證失敗</string>
+    <string name="player_dns_failed">找不到影片伺服器</string>
+    <string name="player_timeout">連線逾時</string>
+    <string name="player_line">線路</string>
+    <string name="player_episodes">集數</string>
+    <string name="player_quick_menu_hint">▲▼ 切換　◀▶ 移動　OK 選定　BACK 關閉</string>
+    <string name="player_gesture_hint">↕ 滑動調整</string>
+    <string name="player_loading_playback">正在載入播放資訊…</string>
+    <string name="player_loading_vod">正在載入影片資訊…</string>
+    <string name="player_searching_other_sources">主來源暫無線路，搜尋其他來源中…</string>
+    <string name="player_resume_searching">從上次的線路繼續，搜尋來源中…</string>
+    <string name="player_no_sources">此影片暫無可用播放線路</string>
+    <string name="player_all_failed">所有線路均無法播放\n（最後錯誤: %1$s）</string>
+    <string name="player_all_failed_ep">所有線路均無法播放第%1$d集\n（最後錯誤: %2$s）</string>
+    <string name="player_all_failed_reason">所有線路都無法播放\n（%1$s）</string>
+    <string name="player_play_failed">播放失敗: %1$s</string>
+    <string name="player_source_no_ep">「%1$s」無第%2$d集</string>
+    <string name="player_connecting">正在連接「%1$s」線路…</string>
+    <string name="player_fallback">「%1$s」無法播放，改用「%2$s」…</string>
+    <string name="player_timeout_source">%1$s: 連線逾時（&gt;%2$d 秒）</string>
+    <string name="player_loading_ep">正在載入第%1$d集…</string>
+    <string name="player_switching">正在切換至「%1$s」…</string>
+    <!-- 成人區（18+） -->
+    <string name="adult_no_source">尚無可用 18+ 內容來源</string>
+    <string name="adult_no_source_hint">請至「設定 → 來源管理」啟用至少一個含成人分區的來源</string>
+    <string name="adult_more_chip">⋯ 更多</string>
+    <string name="adult_loading_tab">正在載入 %1$s %2$s 內容…</string>
+    <string name="adult_source_empty">這個來源沒有內容</string>
+    <string name="adult_all_shown_limited">已顯示全部 %1$d 部（此分類站方資料有限）</string>
+
+    <!-- 成人進階區 -->
+    <string name="adultplus_title">進階</string>
+    <string name="adultplus_all_categories">全部分類</string>
+    <string name="adultplus_menu_all_categories">📂 全部分類</string>
+    <string name="adultplus_menu_history">📜 我的觀看歷史</string>
+    <string name="adultplus_menu_favorites">⭐ 我的收藏</string>
+    <string name="adultplus_load_failed_reason">載入失敗：%1$s</string>
+    <string name="adultplus_load_timeout">載入超時</string>
+    <string name="adultplus_row_jable_hot">🔥 Jable 熱門</string>
+    <string name="adultplus_row_jable_latest">🆕 Jable 最新</string>
+    <string name="adultplus_row_jable_uncensored">🈲 Jable 無碼解放</string>
+    <string name="adultplus_row_jable_subtitle">🈳 Jable 中文字幕</string>
+    <string name="adultplus_row_jable_roleplay">🎭 Jable 角色劇情</string>
+    <string name="adultplus_row_jable_uniform">🎓 Jable 制服誘惑</string>
+    <string name="adultplus_row_jable_private_cam">👀 Jable 盜攝偷拍</string>
+    <string name="adultplus_row_xnxx_week">📈 XNXX 本週最佳</string>
+    <string name="adultplus_row_xnxx_month">🌏 XNXX 本月最佳</string>
+    <string name="adultplus_row_xnxx_today">📅 XNXX 今日最佳</string>
+    <string name="adultplus_row_xnxx_asian">🌸 XNXX 亞洲</string>
+    <string name="adultplus_row_xnxx_japanese">🎌 XNXX 日本</string>
+    <string name="adultplus_row_xnxx_chinese">👩 XNXX 中文</string>
+    <string name="adultplus_row_5278_adult">💬 5278 成人線上</string>
+    <string name="adultplus_row_5278_sexy">💬 5278 線上性感影片</string>
 </resources>

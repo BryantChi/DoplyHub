@@ -36,6 +36,8 @@ import com.gimy.tv.ui.favorites.PageHeader
 import com.gimy.tv.ui.theme.*
 import com.gimy.tv.ui.update.UpdateViewModel
 import kotlinx.coroutines.delay
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun SettingsScreen(
@@ -65,7 +67,7 @@ fun SettingsScreen(
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
     ) {
-        PageHeader("設定", onBack)
+        PageHeader(stringResource(R.string.settings_title), onBack)
 
         LazyColumn(
             Modifier.fillMaxSize().padding(horizontal = dims.screenHorizontalPadding),
@@ -73,14 +75,14 @@ fun SettingsScreen(
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             item {
-                SettingSection(title = "關於") {
-                    InfoRow("應用名稱", "Doply Hub")
-                    InfoRow("版本", "v$versionName")
+                SettingSection(title = stringResource(R.string.settings_about)) {
+                    InfoRow(stringResource(R.string.settings_app_name_label), stringResource(R.string.app_name))
+                    InfoRow(stringResource(R.string.settings_version), stringResource(R.string.settings_version_value, versionName))
                 }
             }
 
             item {
-                SettingSection(title = "更新") {
+                SettingSection(title = stringResource(R.string.settings_update)) {
                     Text(
                         statusLine(state, versionName),
                         color = CinemaTextMuted,
@@ -99,7 +101,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(6.dp),
                         ) {
                             Text(
-                                if (checking) "檢查中…" else "檢查更新",
+                                stringResource(if (checking) R.string.settings_checking else R.string.settings_check_update),
                                 color = Color.White,
                                 fontSize = 13.sp,
                             )
@@ -109,11 +111,9 @@ fun SettingsScreen(
             }
 
             item {
-                SettingSection(title = "儲存空間") {
+                SettingSection(title = stringResource(R.string.settings_storage)) {
                     Text(
-                        "清除網頁回應、封面圖與暫存的清單資料，並重新檢查各站可用網址。" +
-                            "站方改版或換網址後若出現內容不更新、一直載入失敗，先清一次快取。" +
-                            "收藏與觀看紀錄不受影響。",
+                        stringResource(R.string.settings_clear_cache_desc),
                         color = CinemaTextMuted, fontSize = 12.sp, lineHeight = 18.sp,
                     )
                     Spacer(Modifier.height(12.dp))
@@ -124,7 +124,7 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(6.dp),
                     ) {
                         Text(
-                            if (cacheClearing) "清除中…" else "清除快取",
+                            stringResource(if (cacheClearing) R.string.settings_clearing else R.string.settings_clear_cache),
                             color = Color.White, fontSize = 13.sp,
                         )
                     }
@@ -136,9 +136,9 @@ fun SettingsScreen(
             }
 
             item {
-                SettingSection(title = "來源管理") {
+                SettingSection(title = stringResource(R.string.settings_sources)) {
                     Text(
-                        "停用的來源不會出現在搜尋、首頁更多來源、詳情頁的跨來源切換。標示「失效」代表該站可連線但已解析不到內容。",
+                        stringResource(R.string.settings_sources_desc),
                         color = CinemaTextMuted, fontSize = 12.sp,
                     )
                     Spacer(Modifier.height(8.dp))
@@ -160,21 +160,21 @@ fun SettingsScreen(
             }
 
             item {
-                SettingSection(title = "成人內容") {
+                SettingSection(title = stringResource(R.string.settings_adult)) {
                     Text(
-                        "啟用後可在「分類瀏覽」存取 18+ 區。建議搭配 PIN 鎖避免家人誤觸。",
+                        stringResource(R.string.settings_adult_desc),
                         color = CinemaTextMuted, fontSize = 12.sp,
                     )
                     Spacer(Modifier.height(8.dp))
                     SourceToggleRow(
-                        label = "顯示成人內容",
+                        label = stringResource(R.string.settings_adult_show),
                         enabled = adultEnabled,
                         isPrimary = false,
                         onToggle = { adultVm.setEnabled(it) },
                     )
                     if (adultEnabled) {
                         SourceToggleRow(
-                            label = "啟用 PIN 鎖",
+                            label = stringResource(R.string.settings_pin_enable),
                             enabled = pinRequired && pinHash != null,
                             isPrimary = false,
                             onToggle = { newValue ->
@@ -206,13 +206,13 @@ fun SettingsScreen(
                                     },
                                     containerColor = CinemaSurface,
                                     shape = RoundedCornerShape(6.dp),
-                                ) { Text("變更 PIN", color = CinemaTextPrimary, fontSize = 12.sp) }
+                                ) { Text(stringResource(R.string.settings_pin_change), color = CinemaTextPrimary, fontSize = 12.sp) }
                             }
                         }
                         // Phase 6 — Advanced adult sources gate. Locked behind PIN being set
                         // (we don't want a fresh-install-then-toggle path with no friction).
                         SourceToggleRow(
-                            label = "進階成人來源（jable / xnxx / 5278）",
+                            label = stringResource(R.string.settings_adult_plus),
                             enabled = adultPlusEnabled,
                             isPrimary = false,
                             onToggle = { newValue ->
@@ -229,7 +229,7 @@ fun SettingsScreen(
                         )
                         if (adultPlusEnabled) {
                             Text(
-                                "⚠ 內容為第三方聚合站，未經授權；使用須自行承擔法律責任。",
+                                stringResource(R.string.settings_adult_plus_warn),
                                 color = CinemaRed.copy(0.8f), fontSize = 11.sp,
                                 modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 4.dp),
                             )
@@ -239,7 +239,7 @@ fun SettingsScreen(
                             onClick = { showResetConfirm = true },
                             containerColor = CinemaSurface,
                             shape = RoundedCornerShape(6.dp),
-                        ) { Text("重置成人內容設定", color = CinemaRed, fontSize = 12.sp) }
+                        ) { Text(stringResource(R.string.settings_adult_reset), color = CinemaRed, fontSize = 12.sp) }
                     }
                 }
             }
@@ -247,9 +247,11 @@ fun SettingsScreen(
     }
 
     if (showSetPinDialog) {
+        // onPinComplete 不是 Composable，先在組合階段把文案讀出來
+        val pinMismatchText = stringResource(R.string.settings_pin_mismatch)
         PinInputDialog(
-            title = if (pinSetupStep == 0) "設定 PIN" else "確認 PIN",
-            subtitle = if (pinSetupStep == 0) "請輸入 4 位數字" else "再次輸入相同的 4 位數字",
+            title = stringResource(if (pinSetupStep == 0) R.string.settings_pin_set else R.string.settings_pin_confirm),
+            subtitle = stringResource(if (pinSetupStep == 0) R.string.settings_pin_enter_4 else R.string.settings_pin_repeat_4),
             failureMessage = pinErrorMsg,
             onPinComplete = { input ->
                 if (pinSetupStep == 0) {
@@ -265,7 +267,7 @@ fun SettingsScreen(
                         pinSetupStep = 0
                         pinErrorMsg = null
                     } else {
-                        pinErrorMsg = "兩次輸入不一致，請從頭再來"
+                        pinErrorMsg = pinMismatchText
                         firstPin = ""
                         pinSetupStep = 0
                     }
@@ -288,10 +290,10 @@ fun SettingsScreen(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("重置成人內容設定？", color = CinemaTextPrimary, fontSize = 15.sp,
+                Text(stringResource(R.string.settings_adult_reset_title), color = CinemaTextPrimary, fontSize = 15.sp,
                     fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
-                Text("會清空 PIN 與所有成人內容偏好，恢復為預設關閉狀態。",
+                Text(stringResource(R.string.settings_adult_reset_desc),
                     color = CinemaTextMuted, fontSize = 12.sp)
                 Spacer(Modifier.height(20.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -299,7 +301,7 @@ fun SettingsScreen(
                         onClick = { showResetConfirm = false },
                         containerColor = CinemaSurface,
                         shape = RoundedCornerShape(6.dp),
-                    ) { Text("取消", color = CinemaTextPrimary, fontSize = 13.sp) }
+                    ) { Text(stringResource(R.string.common_cancel), color = CinemaTextPrimary, fontSize = 13.sp) }
                     DoplyButton(
                         onClick = {
                             adultVm.resetAll()
@@ -307,7 +309,7 @@ fun SettingsScreen(
                         },
                         containerColor = CinemaRed,
                         shape = RoundedCornerShape(6.dp),
-                    ) { Text("確認重置", color = Color.White, fontSize = 13.sp) }
+                    ) { Text(stringResource(R.string.settings_adult_reset_confirm), color = Color.White, fontSize = 13.sp) }
                 }
             }
         }
@@ -350,7 +352,7 @@ private fun SourceToggleRow(
                     fontWeight = FontWeight.Medium)
                 if (isPrimary) {
                     Spacer(Modifier.width(8.dp))
-                    Text("主來源", color = CinemaRed, fontSize = 10.sp,
+                    Text(stringResource(R.string.settings_primary_source), color = CinemaRed, fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
                             .background(CinemaRed.copy(0.15f), RoundedCornerShape(3.dp))
@@ -372,7 +374,7 @@ private fun SourceToggleRow(
                                     .padding(horizontal = 5.dp, vertical = 1.dp))
                         }
                         h.status == com.gimy.tv.domain.model.EndpointHealthStatus.HEALTHY ->
-                            Text("${h.itemCount} 筆", color = CinemaTextMuted.copy(0.7f), fontSize = 10.sp)
+                            Text(stringResource(R.string.settings_item_count, h.itemCount), color = CinemaTextMuted.copy(0.7f), fontSize = 10.sp)
                         else -> Unit
                     }
                 }
@@ -417,17 +419,18 @@ private fun InfoRow(label: String, value: String) {
     }
 }
 
+@Composable
 private fun statusLine(state: UpdateState, current: String): String = when (state) {
-    UpdateState.Idle -> "目前版本 v$current"
-    UpdateState.Checking -> "正在檢查更新…"
-    UpdateState.UpToDate -> "已是最新版本"
-    is UpdateState.Available -> "發現新版本 v${state.info.latestVersion}"
+    UpdateState.Idle -> stringResource(R.string.settings_current_version, current)
+    UpdateState.Checking -> stringResource(R.string.settings_update_checking)
+    UpdateState.UpToDate -> stringResource(R.string.settings_update_latest)
+    is UpdateState.Available -> stringResource(R.string.settings_update_found, state.info.latestVersion)
     is UpdateState.Downloading -> {
         val pct = if (state.total > 0) (state.downloaded * 100f / state.total).coerceIn(0f, 100f) else 0f
-        "下載中 ${"%.0f".format(pct)}%"
+        stringResource(R.string.settings_downloading, "%.0f".format(pct))
     }
-    is UpdateState.ReadyToInstall -> "下載完成，等待安裝…"
-    is UpdateState.Error -> "錯誤：${state.message}"
+    is UpdateState.ReadyToInstall -> stringResource(R.string.settings_download_done)
+    is UpdateState.Error -> stringResource(R.string.settings_error, state.message)
 }
 
 private fun currentVersionName(ctx: Context): String = runCatching {

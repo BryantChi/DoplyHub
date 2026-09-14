@@ -27,6 +27,8 @@ import com.gimy.tv.ui.favorites.PageHeader
 import com.gimy.tv.ui.components.RefreshIconButton
 import com.gimy.tv.ui.components.RefreshLoadingBar
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun AdultPlusBrowseScreen(
@@ -70,7 +72,7 @@ fun AdultPlusBrowseScreen(
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))
     ) {
-        PageHeader(state.title.ifBlank { "更多" }, onBack) {
+        PageHeader(state.title.ifBlank { stringResource(R.string.common_more) }, onBack) {
             RefreshIconButton(isRefreshing = state.isRefreshing, onClick = { vm.refresh() })
         }
         RefreshLoadingBar(state.isRefreshing)
@@ -89,7 +91,7 @@ fun AdultPlusBrowseScreen(
                 state.error != null && state.items.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("載入失敗", color = CinemaTextPrimary,
+                            Text(stringResource(R.string.common_load_failed), color = CinemaTextPrimary,
                                 fontSize = 15.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(6.dp))
                             Text(state.error ?: "", color = CinemaTextMuted, fontSize = 12.sp)
@@ -98,7 +100,7 @@ fun AdultPlusBrowseScreen(
                                 onClick = { vm.refresh() },
                                 containerColor = CinemaRed,
                                 shape = RoundedCornerShape(6.dp),
-                            ) { Text("重試", color = Color.White, fontSize = 13.sp) }
+                            ) { Text(stringResource(R.string.common_retry), color = Color.White, fontSize = 13.sp) }
                         }
                     }
                 }
@@ -107,10 +109,10 @@ fun AdultPlusBrowseScreen(
                 state.items.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("此分類暫無內容", color = CinemaTextPrimary,
+                            Text(stringResource(R.string.common_category_empty), color = CinemaTextPrimary,
                                 fontSize = 15.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(4.dp))
-                            Text("可連上該站，但解析不到影片，來源可能已改版。",
+                            Text(stringResource(R.string.common_source_parse_failed),
                                 color = CinemaTextMuted, fontSize = 12.sp)
                         }
                     }
@@ -149,7 +151,7 @@ fun AdultPlusBrowseScreen(
                             Modifier.fillMaxWidth().padding(vertical = 14.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("已顯示全部 ${state.items.size} 部",
+                            Text(stringResource(R.string.common_all_shown_count, state.items.size),
                                 color = CinemaTextMuted.copy(0.6f), fontSize = 12.sp)
                         }
                     }

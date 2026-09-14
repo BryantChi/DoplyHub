@@ -1,5 +1,9 @@
 package com.gimy.tv.ui.adult
 
+import android.content.Context
+import com.gimy.tv.R
+import dagger.hilt.android.qualifiers.ApplicationContext
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gimy.tv.domain.repository.AdultContentPreferences
@@ -43,6 +47,7 @@ class AdultContentScreenViewModel @Inject constructor(
     private val vodRepository: VodRepository,
     sourcePreferencesRepository: SourcePreferences,
     adultContentPreferencesRepository: AdultContentPreferences,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     val enabledSources: StateFlow<Set<SourceType>> = sourcePreferencesRepository.enabledSources
@@ -152,13 +157,13 @@ class AdultContentScreenViewModel @Inject constructor(
                 flow.value = flow.value.copy(
                     loading = false, loadingMore = false,
                     // On append-timeout keep existing items; for first-page failure surface error
-                    error = if (append) null else "載入超時，請重試",
+                    error = if (append) null else context.getString(R.string.common_load_timeout_retry),
                     hasMore = if (append) false else flow.value.hasMore,
                 )
             } catch (e: Exception) {
                 flow.value = flow.value.copy(
                     loading = false, loadingMore = false,
-                    error = if (append) null else (e.message?.takeIf { it.isNotBlank() } ?: "載入失敗"),
+                    error = if (append) null else (e.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.common_load_failed)),
                     hasMore = if (append) false else flow.value.hasMore,
                 )
             }

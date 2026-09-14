@@ -44,6 +44,8 @@ import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
@@ -84,7 +86,7 @@ fun SearchScreen(
         // TV keeps the explicit「返回」chip because remote nav benefits from a focusable target.
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (isTV) {
-                FocusableChip("返回") {
+                FocusableChip(stringResource(R.string.common_back)) {
                     if (uiState.hasSearched) viewModel.clearResults() else onBack()
                 }
                 Spacer(Modifier.width(12.dp))
@@ -95,7 +97,7 @@ fun SearchScreen(
                 onValueChange = { viewModel.onQueryChange(it) },
                 placeholder = {
                     androidx.compose.material3.Text(
-                        "輸入關鍵字搜尋…",
+                        stringResource(R.string.search_hint),
                         color = CinemaTextMuted,
                         fontSize = 14.sp,
                     )
@@ -140,7 +142,7 @@ fun SearchScreen(
 
             Spacer(Modifier.width(8.dp))
 
-            FocusableChip("搜尋", primary = true) {
+            FocusableChip(stringResource(R.string.nav_search), primary = true) {
                 viewModel.search()
                 keyboardController?.hide()
                 focusManager.clearFocus()
@@ -150,7 +152,7 @@ fun SearchScreen(
             // no way to do this without system back; TV's「返回」chip handled it.
             if (uiState.hasSearched) {
                 Spacer(Modifier.width(4.dp))
-                FocusableChip("清除") {
+                FocusableChip(stringResource(R.string.common_clear)) {
                     viewModel.clearResults()
                     viewModel.onQueryChange("")
                     inputFocusRequester.requestFocus()
@@ -175,8 +177,8 @@ fun SearchScreen(
                         DoplyLoadingIndicator(dims.loadingIndicatorSize)
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            if (uiState.isVerifying) "首次搜尋需通過站台驗證，請稍候…"
-                            else "搜尋「${uiState.query}」中…",
+                            if (uiState.isVerifying) stringResource(R.string.search_first_time_verify)
+                            else stringResource(R.string.search_searching, uiState.query),
                             color = CinemaTextMuted, fontSize = 14.sp,
                         )
                     }
@@ -185,11 +187,11 @@ fun SearchScreen(
             uiState.error != null -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("搜尋失敗", color = CinemaTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.search_failed), color = CinemaTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(4.dp))
                         Text(uiState.error ?: "", color = CinemaTextMuted, fontSize = 13.sp)
                         Spacer(Modifier.height(16.dp))
-                        FocusableChip("重試") { viewModel.search() }
+                        FocusableChip(stringResource(R.string.common_retry)) { viewModel.search() }
                     }
                 }
             }
@@ -239,7 +241,7 @@ fun SearchScreen(
                     enabled = searchIsAtTop,
                 ) {
                     Column(Modifier.fillMaxSize()) {
-                        Text("找到 ${filteredResults.size} 個結果（總 ${uiState.results.size}）",
+                        Text(stringResource(R.string.search_result_count, filteredResults.size, uiState.results.size),
                             color = CinemaTextMuted, fontSize = 12.sp,
                             modifier = Modifier.padding(bottom = 8.dp))
 
@@ -250,7 +252,7 @@ fun SearchScreen(
                         ) {
                             item(key = "chip_all") {
                                 SourceFilterChip(
-                                    label = "全部 ${uiState.results.size}",
+                                    label = stringResource(R.string.search_filter_all, uiState.results.size),
                                     selected = selectedSource == null,
                                     onClick = { selectedSource = null },
                                 )
@@ -287,7 +289,7 @@ fun SearchScreen(
                                 Modifier.fillMaxWidth().padding(vertical = 16.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("已顯示全部結果", color = CinemaTextMuted.copy(0.6f), fontSize = 13.sp)
+                                Text(stringResource(R.string.search_all_shown), color = CinemaTextMuted.copy(0.6f), fontSize = 13.sp)
                             }
                         }
                     }
@@ -307,24 +309,24 @@ fun SearchScreen(
             uiState.hasSearched && uiState.allSourcesFailed -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("所有來源都連不上", color = CinemaTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.search_all_sources_down), color = CinemaTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
-                        Text("這次搜尋沒有任何站台回應，不是查無此片。", color = CinemaTextMuted, fontSize = 14.sp)
-                        Text("請檢查網路後再搜尋一次。", color = CinemaTextMuted.copy(0.6f), fontSize = 13.sp)
+                        Text(stringResource(R.string.search_all_sources_down_desc), color = CinemaTextMuted, fontSize = 14.sp)
+                        Text(stringResource(R.string.search_all_sources_down_hint), color = CinemaTextMuted.copy(0.6f), fontSize = 13.sp)
                     }
                 }
             }
             uiState.hasSearched -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("找不到「${uiState.query}」", color = CinemaTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.search_not_found, uiState.query), color = CinemaTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
-                        Text("建議：用 2~3 個字的短關鍵字搜尋", color = CinemaTextMuted, fontSize = 14.sp)
-                        Text("例如「斗羅」而非「斗羅大陸」", color = CinemaTextMuted.copy(0.6f), fontSize = 13.sp)
+                        Text(stringResource(R.string.search_tip_short_keyword), color = CinemaTextMuted, fontSize = 14.sp)
+                        Text(stringResource(R.string.search_tip_example), color = CinemaTextMuted.copy(0.6f), fontSize = 13.sp)
                         if (uiState.query.length > 2) {
                             Spacer(Modifier.height(16.dp))
                             val shorter = uiState.query.substring(0, 2)
-                            FocusableChip("試試搜尋「$shorter」") {
+                            FocusableChip(stringResource(R.string.search_try_shorter, shorter)) {
                                 viewModel.onQueryChange(shorter)
                                 viewModel.search(shorter)
                             }
@@ -340,13 +342,13 @@ fun SearchScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("最近搜尋", color = CinemaTextMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(stringResource(R.string.search_recent), color = CinemaTextMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                         // Clear-all action. The previous build had no way to remove
                         // recent searches on phone (TV remote could long-press a chip
                         // via Compose-TV defaults but that doesn't reach mobile users).
                         // Surfacing a clear chip here covers both — touch users tap it,
                         // remote users focus → click.
-                        FocusableChip("清除") { viewModel.clearRecentSearches() }
+                        FocusableChip(stringResource(R.string.common_clear)) { viewModel.clearRecentSearches() }
                     }
                     Spacer(Modifier.height(10.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -359,7 +361,7 @@ fun SearchScreen(
                     }
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("輸入關鍵字開始搜尋", color = CinemaTextMuted.copy(0.5f), fontSize = 15.sp)
+                        Text(stringResource(R.string.search_empty), color = CinemaTextMuted.copy(0.5f), fontSize = 15.sp)
                     }
                 }
             }

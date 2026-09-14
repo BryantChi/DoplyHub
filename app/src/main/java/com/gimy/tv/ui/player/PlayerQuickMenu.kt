@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gimy.tv.ui.theme.CinemaRed
 import com.gimy.tv.ui.theme.CinemaTextMuted
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 /** 選單目前停在哪一列。 */
 enum class MenuRow { SOURCE, EPISODE }
@@ -170,17 +172,17 @@ fun PlayerQuickMenu(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             QuickMenuRow(
-                label = "線路",
+                label = stringResource(R.string.player_line),
                 items = sources,
                 focusedIndex = if (state.row == MenuRow.SOURCE) state.index else -1,
             )
             QuickMenuRow(
-                label = "集數",
+                label = stringResource(R.string.player_episodes),
                 items = episodes,
                 focusedIndex = if (state.row == MenuRow.EPISODE) state.index else -1,
             )
             Text(
-                "▲▼ 切換　◀▶ 移動　OK 選定　BACK 關閉",
+                stringResource(R.string.player_quick_menu_hint),
                 color = CinemaTextMuted,
                 fontSize = 11.sp,
             )

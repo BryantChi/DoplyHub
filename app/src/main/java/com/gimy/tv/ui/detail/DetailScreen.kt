@@ -41,6 +41,8 @@ import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.VodCard
 import com.gimy.tv.ui.components.VodCover
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -74,10 +76,10 @@ fun DetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            ActionButton("返回", false, onBack)
-                            ActionButton("重試", false) { viewModel.retry() }
+                            ActionButton(stringResource(R.string.common_back), false, onBack)
+                            ActionButton(stringResource(R.string.common_retry), false) { viewModel.retry() }
                             if (uiState.lastEpisode != null) {
-                                ActionButton("刪除記錄", false) { viewModel.deleteHistory() }
+                                ActionButton(stringResource(R.string.common_delete_history), false) { viewModel.deleteHistory() }
                             }
                         }
                     }
@@ -247,7 +249,7 @@ fun DetailScreen(
                     if (groupSourceTypes.size > 1) {
                         item {
                             Column(Modifier.padding(horizontal = dims.screenHorizontalPadding)) {
-                                Text("選擇來源", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text(stringResource(R.string.detail_select_source), color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.height(8.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     items(groupSourceTypes.size, key = { "src_chip_${groupSourceTypes[it].name}" }) { i ->
@@ -267,7 +269,7 @@ fun DetailScreen(
                                     }
                                     item(key = "src_chip_all") {
                                         DetailSourceChip(
-                                            label = "全部 ${d.episodes.size}",
+                                            label = stringResource(R.string.detail_all_count, d.episodes.size),
                                             selected = selectedSourceType == null,
                                             onClick = { selectedSourceType = null },
                                         )
@@ -292,7 +294,7 @@ fun DetailScreen(
                             // 18+ sources) skip the marker — clustering doesn't apply.
                             val globalMax = d.episodes.maxOfOrNull { it.episodes.size } ?: 0
                             Column(Modifier.padding(horizontal = dims.screenHorizontalPadding)) {
-                                Text("播放線路", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text(stringResource(R.string.detail_play_lines), color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.height(8.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     items(filteredEpisodes.size) { i ->
@@ -305,9 +307,11 @@ fun DetailScreen(
                                         val displayLineName = if (selectedSourceType != null) {
                                             g.sourceName.replace(Regex("^\\[[^\\]]+\\]\\s*"), "")
                                         } else g.sourceName
+                                        // buildString 的 lambda 取不到 Composable context，先讀出來
+                                        val warnSuffix = stringResource(R.string.detail_ep_count_warn, g.episodes.size)
                                         val label = buildString {
                                             if (i == 0) append("$displayLineName ★") else append(displayLineName)
-                                            if (isLowConfidence) append(" ${g.episodes.size}集⚠")
+                                            if (isLowConfidence) append(warnSuffix)
                                         }
                                         var f by remember { mutableStateOf(false) }
                                         DoplyButton(
@@ -343,7 +347,7 @@ fun DetailScreen(
                     if (d.seriesVods.isNotEmpty()) {
                         item {
                             Spacer(Modifier.height(24.dp))
-                            RelatedRow("相關系列", d.seriesVods, dims.screenHorizontalPadding, onVodClick)
+                            RelatedRow(stringResource(R.string.detail_related_series), d.seriesVods, dims.screenHorizontalPadding, onVodClick)
                         }
                     }
 
@@ -351,7 +355,7 @@ fun DetailScreen(
                     if (d.relatedVods.isNotEmpty()) {
                         item {
                             Spacer(Modifier.height(24.dp))
-                            RelatedRow("相關推薦", d.relatedVods, dims.screenHorizontalPadding, onVodClick)
+                            RelatedRow(stringResource(R.string.detail_related_recommend), d.relatedVods, dims.screenHorizontalPadding, onVodClick)
                         }
                     }
                 }
@@ -429,8 +433,8 @@ private fun DetailInfo(
     }
 
     Spacer(Modifier.height(12.dp))
-    if (d.director.isNotBlank()) MetaLine("導演", d.director, isTV)
-    if (d.actors.isNotEmpty()) MetaLine("主演", d.actors.take(5).joinToString(" / "), isTV)
+    if (d.director.isNotBlank()) MetaLine(stringResource(R.string.detail_director), d.director, isTV)
+    if (d.actors.isNotEmpty()) MetaLine(stringResource(R.string.detail_cast), d.actors.take(5).joinToString(" / "), isTV)
 
     Spacer(Modifier.height(16.dp))
     FlowRow(
@@ -438,9 +442,9 @@ private fun DetailInfo(
         horizontalArrangement = actionArrange,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ActionButton("返回", false, onBack)
+        ActionButton(stringResource(R.string.common_back), false, onBack)
         ActionButton(
-            if (uiState.isFavorite) "已收藏" else "收藏",
+            stringResource(if (uiState.isFavorite) R.string.detail_favorited else R.string.nav_favorites),
             uiState.isFavorite
         ) { onToggleFavorite() }
         RefreshIconButton(isRefreshing = uiState.isRefreshing, onClick = onRefresh)
@@ -461,8 +465,8 @@ private fun DetailInfo(
                 focusedContentColor = CinemaBlack,
                 focusBorder = false,
                 contentPadding = PaddingValues(horizontal = 22.dp, vertical = 9.dp),
-            ) { Text("▶ 續播第${ep}集", fontWeight = FontWeight.Bold, fontSize = 14.sp) }
-            ActionButton("刪除記錄", false) { onDeleteHistory() }
+            ) { Text(stringResource(R.string.detail_resume_ep, ep), fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+            ActionButton(stringResource(R.string.common_delete_history), false) { onDeleteHistory() }
         }
     }
 
@@ -480,7 +484,7 @@ private fun DetailInfo(
         ) {
             DoplyLoadingIndicator(14.dp)
             Spacer(Modifier.width(8.dp))
-            Text("更多線路與集數載入中…", color = CinemaTextMuted, fontSize = 11.sp)
+            Text(stringResource(R.string.detail_more_loading), color = CinemaTextMuted, fontSize = 11.sp)
         }
     }
 
@@ -559,7 +563,7 @@ private fun LazyListScope.episodeGrid(
 ) {
     item(key = "ep_header_${group.sourceId}") {
         Column(Modifier.fillMaxWidth().padding(horizontal = horizontalPadding)) {
-            Text("選擇集數", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(stringResource(R.string.detail_select_episode), color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(10.dp))
         }
     }

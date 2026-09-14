@@ -1,10 +1,13 @@
 package com.gimy.tv.ui.home
 
+import android.content.Context
+import com.gimy.tv.R
+import dagger.hilt.android.qualifiers.ApplicationContext
+
 import kotlinx.coroutines.Job
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gimy.tv.domain.repository.CacheManager
-import com.gimy.tv.ui.UiText
 import com.gimy.tv.domain.model.categoryMap
 import com.gimy.tv.domain.model.StandardCategory
 import com.gimy.tv.domain.model.*
@@ -38,6 +41,7 @@ class HomeViewModel @Inject constructor(
     private val watchHistoryRepository: WatchHistoryRepository,
     private val cacheManager: CacheManager,
     sourcePreferencesRepository: com.gimy.tv.domain.repository.SourcePreferences,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     val enabledSources: kotlinx.coroutines.flow.StateFlow<Set<SourceType>> =
@@ -238,7 +242,7 @@ class HomeViewModel @Inject constructor(
                         if (isRefresh && previousRows.isNotEmpty()) {
                             state.copy(isLoading = false, isRefreshing = false, rows = previousRows)
                         } else {
-                            state.copy(isLoading = false, isRefreshing = false, error = UiText.NETWORK_ERROR)
+                            state.copy(isLoading = false, isRefreshing = false, error = context.getString(R.string.common_network_error))
                         }
                     } else {
                         state.copy(isLoading = false, isRefreshing = false)
@@ -255,7 +259,7 @@ class HomeViewModel @Inject constructor(
                         isRefresh && state.rows.isEmpty() && previousRows.isNotEmpty() ->
                             state.copy(isLoading = false, isRefreshing = false, rows = previousRows)
                         state.rows.isEmpty() && state.isLoading ->
-                            state.copy(isLoading = false, isRefreshing = false, error = UiText.NETWORK_ERROR)
+                            state.copy(isLoading = false, isRefreshing = false, error = context.getString(R.string.common_network_error))
                         else ->
                             state.copy(isLoading = false, isRefreshing = false)
                     }

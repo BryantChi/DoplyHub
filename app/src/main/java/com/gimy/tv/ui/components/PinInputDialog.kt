@@ -20,6 +20,8 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 /**
  * 4-digit PIN entry dialog. Designed for TV remotes:
@@ -81,7 +83,7 @@ fun PinInputDialog(
             Spacer(Modifier.height(14.dp))
             when {
                 lockedRemainingSec > 0L -> Text(
-                    "輸入錯誤過多，已鎖定 ${formatSec(lockedRemainingSec)}",
+                    stringResource(R.string.pin_locked, formatSec(lockedRemainingSec)),
                     color = CinemaRed, fontSize = 12.sp,
                 )
                 failureMessage != null -> Text(failureMessage, color = CinemaRed, fontSize = 12.sp)
@@ -135,7 +137,7 @@ fun PinInputDialog(
                 containerColor = CinemaSurface,
                 shape = RoundedCornerShape(6.dp),
             ) {
-                Text("取消", color = CinemaTextPrimary, fontSize = 13.sp)
+                Text(stringResource(R.string.common_cancel), color = CinemaTextPrimary, fontSize = 13.sp)
             }
         }
     }

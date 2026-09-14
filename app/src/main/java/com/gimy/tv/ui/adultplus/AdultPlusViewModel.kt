@@ -1,5 +1,10 @@
 package com.gimy.tv.ui.adultplus
 
+import android.content.Context
+import androidx.annotation.StringRes
+import com.gimy.tv.R
+import dagger.hilt.android.qualifiers.ApplicationContext
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gimy.tv.domain.repository.AdultPlusCatalog
@@ -22,7 +27,8 @@ import javax.inject.Inject
 
 /** One row in the AdultPlusScreen — combines a source with a path/typeId selector. */
 data class AdultPlusRow(
-    val title: String,
+    /** 標題放 res id：這份清單是 ViewModel 的 val，標題與 path 要留在同一行才好維護。 */
+    @StringRes val titleRes: Int,
     val sourceType: SourceType,
     /** "forum:N" for 5278, otherwise an opaque path key passed to fetchVodListByPath */
     val key: String,
@@ -45,6 +51,7 @@ class AdultPlusViewModel @Inject constructor(
     private val adultPlusCatalog: AdultPlusCatalog,
     watchHistoryRepository: WatchHistoryRepository,
     favoriteRepository: FavoriteRepository,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     /** Adult-only watch history surfaced inside AdultPlusScreen. Mapped to Vod
@@ -55,7 +62,7 @@ class AdultPlusViewModel @Inject constructor(
                 Vod(
                     id = e.vodId, sourceType = e.sourceType, title = e.title,
                     coverUrl = e.coverUrl, category = "", year = 0,
-                    status = "第${e.episodeNum}集",
+                    status = context.getString(R.string.common_episode_n, e.episodeNum),
                 )
             }
         }
@@ -71,23 +78,23 @@ class AdultPlusViewModel @Inject constructor(
      *  but fetch() catches the empty result and reports "站方維護中，稍後重試". */
     val rows: List<AdultPlusRow> = listOf(
         // Jable — paths verified against jable.tv/categories/ index
-        AdultPlusRow("🔥 Jable 熱門", SourceType.JABLE_TV, "hot"),
-        AdultPlusRow("🆕 Jable 最新", SourceType.JABLE_TV, "latest-updates"),
-        AdultPlusRow("🈲 Jable 無碼解放", SourceType.JABLE_TV, "categories/uncensored"),
-        AdultPlusRow("🈳 Jable 中文字幕", SourceType.JABLE_TV, "categories/chinese-subtitle"),
-        AdultPlusRow("🎭 Jable 角色劇情", SourceType.JABLE_TV, "categories/roleplay"),
-        AdultPlusRow("🎓 Jable 制服誘惑", SourceType.JABLE_TV, "categories/uniform"),
-        AdultPlusRow("👀 Jable 盜攝偷拍", SourceType.JABLE_TV, "categories/private-cam"),
+        AdultPlusRow(R.string.adultplus_row_jable_hot, SourceType.JABLE_TV, "hot"),
+        AdultPlusRow(R.string.adultplus_row_jable_latest, SourceType.JABLE_TV, "latest-updates"),
+        AdultPlusRow(R.string.adultplus_row_jable_uncensored, SourceType.JABLE_TV, "categories/uncensored"),
+        AdultPlusRow(R.string.adultplus_row_jable_subtitle, SourceType.JABLE_TV, "categories/chinese-subtitle"),
+        AdultPlusRow(R.string.adultplus_row_jable_roleplay, SourceType.JABLE_TV, "categories/roleplay"),
+        AdultPlusRow(R.string.adultplus_row_jable_uniform, SourceType.JABLE_TV, "categories/uniform"),
+        AdultPlusRow(R.string.adultplus_row_jable_private_cam, SourceType.JABLE_TV, "categories/private-cam"),
         // XNXX — /best/{period}, /tags/{slug}
-        AdultPlusRow("📈 XNXX 本週最佳", SourceType.XNXX, "best/this_week"),
-        AdultPlusRow("🌏 XNXX 本月最佳", SourceType.XNXX, "best/this_month"),
-        AdultPlusRow("📅 XNXX 今日最佳", SourceType.XNXX, "best/today"),
-        AdultPlusRow("🌸 XNXX 亞洲", SourceType.XNXX, "tags/asian"),
-        AdultPlusRow("🎌 XNXX 日本", SourceType.XNXX, "tags/japanese"),
-        AdultPlusRow("👩 XNXX 中文", SourceType.XNXX, "tags/chinese"),
+        AdultPlusRow(R.string.adultplus_row_xnxx_week, SourceType.XNXX, "best/this_week"),
+        AdultPlusRow(R.string.adultplus_row_xnxx_month, SourceType.XNXX, "best/this_month"),
+        AdultPlusRow(R.string.adultplus_row_xnxx_today, SourceType.XNXX, "best/today"),
+        AdultPlusRow(R.string.adultplus_row_xnxx_asian, SourceType.XNXX, "tags/asian"),
+        AdultPlusRow(R.string.adultplus_row_xnxx_japanese, SourceType.XNXX, "tags/japanese"),
+        AdultPlusRow(R.string.adultplus_row_xnxx_chinese, SourceType.XNXX, "tags/chinese"),
         // 5278 — Discuz forums
-        AdultPlusRow("💬 5278 成人線上", SourceType.FORUM5278, "forum:23"),
-        AdultPlusRow("💬 5278 線上性感影片", SourceType.FORUM5278, "forum:42"),
+        AdultPlusRow(R.string.adultplus_row_5278_adult, SourceType.FORUM5278, "forum:23"),
+        AdultPlusRow(R.string.adultplus_row_5278_sexy, SourceType.FORUM5278, "forum:42"),
     )
 
     /** Pull-to-refresh visual state. Without this, RefreshableContainer always sees
@@ -166,7 +173,7 @@ class AdultPlusViewModel @Inject constructor(
 
                     if (unique.isEmpty() && row.sourceType == SourceType.FORUM5278) {
                         flow.value = AdultPlusRowState(items = emptyList(), loading = false,
-                            loadingMore = false, error = "站方維護中，稍後再試",
+                            loadingMore = false, error = context.getString(R.string.common_site_maintenance),
                             currentPage = 1, hasMore = false)
                     } else {
                         flow.value = AdultPlusRowState(
@@ -178,11 +185,11 @@ class AdultPlusViewModel @Inject constructor(
                 }
             } catch (_: TimeoutCancellationException) {
                 flow.value = flow.value.copy(loading = false, loadingMore = false,
-                    error = if (append) null else "載入超時",
+                    error = if (append) null else context.getString(R.string.adultplus_load_timeout),
                     hasMore = if (append) false else flow.value.hasMore)
             } catch (e: Exception) {
-                val msg = if (row.sourceType == SourceType.FORUM5278) "站方維護中，稍後再試"
-                else e.message?.takeIf { it.isNotBlank() } ?: "載入失敗"
+                val msg = if (row.sourceType == SourceType.FORUM5278) context.getString(R.string.common_site_maintenance)
+                else e.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.common_load_failed)
                 flow.value = flow.value.copy(loading = false, loadingMore = false,
                     error = if (append) null else msg,
                     hasMore = if (append) false else flow.value.hasMore)

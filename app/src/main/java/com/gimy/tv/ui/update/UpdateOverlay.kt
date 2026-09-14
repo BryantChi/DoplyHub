@@ -21,6 +21,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gimy.tv.domain.model.UpdateState
 import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 /**
  * Floating dialog overlay that observes [UpdateViewModel.state] and presents the appropriate
@@ -118,7 +120,7 @@ private fun AvailableDialog(
         title = {
             Column {
                 Text(
-                    if (state.info.isMandatory) "需要更新" else "發現新版本",
+                    stringResource(if (state.info.isMandatory) R.string.update_required else R.string.update_found),
                     color = Color.White,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
@@ -142,7 +144,7 @@ private fun AvailableDialog(
                     Spacer(Modifier.height(10.dp))
                 }
                 Text(
-                    "若安裝畫面顯示「應用程式未安裝」或「套件衝突」，請先解除安裝舊版再重試。",
+                    stringResource(R.string.update_install_hint),
                     color = CinemaTextMuted,
                     fontSize = 11.sp,
                 )
@@ -160,7 +162,7 @@ private fun AvailableDialog(
                 onClick = onConfirm,
                 containerColor = CinemaRed,
                 shape = RoundedCornerShape(6.dp),
-            ) { Text("立即更新", color = Color.White, fontSize = 13.sp) }
+            ) { Text(stringResource(R.string.update_now), color = Color.White, fontSize = 13.sp) }
         },
         dismissButton = onDismiss?.let {
             {
@@ -168,7 +170,7 @@ private fun AvailableDialog(
                     onClick = it,
                     containerColor = CinemaSurface,
                     shape = RoundedCornerShape(6.dp),
-                ) { Text("稍後", color = Color.White, fontSize = 13.sp) }
+                ) { Text(stringResource(R.string.common_later), color = Color.White, fontSize = 13.sp) }
             }
         },
     )
@@ -184,7 +186,7 @@ private fun DownloadingDialog(
         onDismissRequest = { /* not dismissible by tapping outside */ },
         containerColor = CinemaSurface,
         shape = RoundedCornerShape(12.dp),
-        title = { Text("下載中", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.update_downloading), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 LinearProgressIndicator(
@@ -208,7 +210,7 @@ private fun DownloadingDialog(
                     onClick = onCancel,
                     containerColor = CinemaSurface,
                     shape = RoundedCornerShape(6.dp),
-                ) { Text("取消", color = Color.White, fontSize = 13.sp) }
+                ) { Text(stringResource(R.string.common_cancel), color = Color.White, fontSize = 13.sp) }
             }
         },
     )
@@ -224,10 +226,10 @@ private fun ReadyDialog(
         onDismissRequest = { onLater?.invoke() },
         containerColor = CinemaSurface,
         shape = RoundedCornerShape(12.dp),
-        title = { Text("已下載完成", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.update_downloaded), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
         text = {
             Text(
-                "v$version 已經下載好了。若剛才的安裝畫面被取消，可以直接再裝一次，不用重新下載。",
+                stringResource(R.string.update_downloaded_desc, version),
                 color = CinemaTextPrimary.copy(0.85f),
                 fontSize = 13.sp,
                 lineHeight = 20.sp,
@@ -238,7 +240,7 @@ private fun ReadyDialog(
                 onClick = onInstall,
                 containerColor = CinemaRed,
                 shape = RoundedCornerShape(6.dp),
-            ) { Text("立即安裝", color = Color.White, fontSize = 13.sp) }
+            ) { Text(stringResource(R.string.update_install_now), color = Color.White, fontSize = 13.sp) }
         },
         dismissButton = onLater?.let {
             {
@@ -246,7 +248,7 @@ private fun ReadyDialog(
                     onClick = it,
                     containerColor = CinemaSurface,
                     shape = RoundedCornerShape(6.dp),
-                ) { Text("稍後", color = Color.White, fontSize = 13.sp) }
+                ) { Text(stringResource(R.string.common_later), color = Color.White, fontSize = 13.sp) }
             }
         },
     )
@@ -264,11 +266,11 @@ private fun PermissionDialog(
         onDismissRequest = { onLater?.invoke() },
         containerColor = CinemaSurface,
         shape = RoundedCornerShape(12.dp),
-        title = { Text("需要授予安裝權限", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.update_need_permission), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 Text(
-                    "請於系統設定中允許 Doply Hub 安裝應用程式，授予後返回此畫面再次點擊「重試安裝」。",
+                    stringResource(R.string.update_permission_desc),
                     color = CinemaTextPrimary.copy(0.85f),
                     fontSize = 13.sp,
                     lineHeight = 20.sp,
@@ -276,7 +278,7 @@ private fun PermissionDialog(
                 if (settingsUnavailable) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "這台裝置找不到對應的設定頁，請手動到「設定 → 安全性 / 應用程式 → 安裝未知應用程式」開啟。",
+                        stringResource(R.string.update_permission_no_page),
                         color = CinemaRed,
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
@@ -284,7 +286,7 @@ private fun PermissionDialog(
                 } else if (retryFailed) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "尚未取得安裝權限，請先點「前往設定」授予後再回來重試。",
+                        stringResource(R.string.update_permission_denied),
                         color = CinemaRed,
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
@@ -298,12 +300,12 @@ private fun PermissionDialog(
                     onClick = onGrant,
                     containerColor = CinemaRed,
                     shape = RoundedCornerShape(6.dp),
-                ) { Text("前往設定", color = Color.White, fontSize = 13.sp) }
+                ) { Text(stringResource(R.string.update_goto_settings), color = Color.White, fontSize = 13.sp) }
                 DoplyButton(
                     onClick = onRetry,
                     containerColor = CinemaSurface,
                     shape = RoundedCornerShape(6.dp),
-                ) { Text("重試安裝", color = Color.White, fontSize = 13.sp) }
+                ) { Text(stringResource(R.string.update_retry_install), color = Color.White, fontSize = 13.sp) }
             }
         },
         dismissButton = onLater?.let {
@@ -312,7 +314,7 @@ private fun PermissionDialog(
                     onClick = it,
                     containerColor = CinemaSurface,
                     shape = RoundedCornerShape(6.dp),
-                ) { Text("稍後", color = Color.White, fontSize = 13.sp) }
+                ) { Text(stringResource(R.string.common_later), color = Color.White, fontSize = 13.sp) }
             }
         },
     )
@@ -324,14 +326,14 @@ private fun ErrorDialog(message: String, onClose: () -> Unit) {
         onDismissRequest = onClose,
         containerColor = CinemaSurface,
         shape = RoundedCornerShape(12.dp),
-        title = { Text("更新失敗", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.update_failed), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
         text = { Text(message, color = CinemaTextPrimary.copy(0.85f), fontSize = 13.sp) },
         confirmButton = {
             DoplyButton(
                 onClick = onClose,
                 containerColor = CinemaSurface,
                 shape = RoundedCornerShape(6.dp),
-            ) { Text("關閉", color = Color.White, fontSize = 13.sp) }
+            ) { Text(stringResource(R.string.common_close), color = Color.White, fontSize = 13.sp) }
         },
     )
 }

@@ -33,6 +33,8 @@ import com.gimy.tv.ui.settings.AdultContentViewModel
 import com.gimy.tv.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 data class CategoryItem(
     val sourceType: String,
@@ -105,7 +107,7 @@ fun CategoryScreen(
             .padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding)
     ) {
         Text(
-            "分類瀏覽",
+            stringResource(R.string.category_title),
             color = CinemaTextPrimary,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
@@ -181,9 +183,11 @@ fun CategoryScreen(
     }
 
     if (showPinDialog) {
+        // 在 coroutine 裡取不到 Composable 的 context，先在組合階段讀出來
+        val pinErrorText = stringResource(R.string.category_pin_error)
         PinInputDialog(
-            title = "請輸入 PIN",
-            subtitle = "進入 18+ 區",
+            title = stringResource(R.string.category_pin_prompt),
+            subtitle = stringResource(R.string.category_pin_subtitle),
             failureMessage = pinErrorMsg,
             lockedRemainingSec = lockedRemaining,
             onPinComplete = { input ->
@@ -193,7 +197,7 @@ fun CategoryScreen(
                         pinErrorMsg = null
                         onAdultZoneClick()
                     } else {
-                        pinErrorMsg = if (adultVm.isLocked()) null else "PIN 錯誤"
+                        pinErrorMsg = if (adultVm.isLocked()) null else pinErrorText
                     }
                 }
             },

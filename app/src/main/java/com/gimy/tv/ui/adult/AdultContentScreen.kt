@@ -31,6 +31,8 @@ import com.gimy.tv.ui.favorites.PageHeader
 import com.gimy.tv.ui.components.RefreshIconButton
 import com.gimy.tv.ui.components.RefreshLoadingBar
 import com.gimy.tv.ui.theme.*
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -70,10 +72,10 @@ fun AdultContentScreen(
         if (tabs.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("尚無可用 18+ 內容來源", color = CinemaTextPrimary,
+                    Text(stringResource(R.string.adult_no_source), color = CinemaTextPrimary,
                         fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
-                    Text("請至「設定 → 來源管理」啟用至少一個含成人分區的來源",
+                    Text(stringResource(R.string.adult_no_source_hint),
                         color = CinemaTextMuted, fontSize = 12.sp)
                 }
             }
@@ -98,7 +100,7 @@ fun AdultContentScreen(
             if (adultPlusEnabled) {
                 item(key = "more_chip") {
                     AdultSourceTab(
-                        label = "⋯ 更多",
+                        label = stringResource(R.string.adult_more_chip),
                         selected = false,
                         onClick = onMoreClick,
                     )
@@ -143,7 +145,7 @@ fun AdultContentScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 DoplyLoadingIndicator(dims.loadingIndicatorSize)
                                 Spacer(Modifier.height(12.dp))
-                                Text("正在載入 ${current.sourceType.displayName} ${current.label} 內容…",
+                                Text(stringResource(R.string.adult_loading_tab, current.sourceType.displayName, current.label),
                                     color = CinemaTextMuted, fontSize = 12.sp)
                             }
                         }
@@ -151,7 +153,7 @@ fun AdultContentScreen(
                     rowState.items.isEmpty() && rowState.error != null -> {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("載入失敗", color = CinemaTextPrimary,
+                                Text(stringResource(R.string.common_load_failed), color = CinemaTextPrimary,
                                     fontSize = 15.sp, fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.height(6.dp))
                                 Text(rowState.error ?: "", color = CinemaTextMuted, fontSize = 12.sp)
@@ -160,7 +162,7 @@ fun AdultContentScreen(
                                     onClick = { vm.refreshTab(current) },
                                     containerColor = CinemaRed,
                                     shape = RoundedCornerShape(6.dp),
-                                ) { Text("重試", color = Color.White, fontSize = 13.sp) }
+                                ) { Text(stringResource(R.string.common_retry), color = Color.White, fontSize = 13.sp) }
                             }
                         }
                     }
@@ -170,10 +172,10 @@ fun AdultContentScreen(
                     rowState.items.isEmpty() -> {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("這個來源沒有內容", color = CinemaTextPrimary,
+                                Text(stringResource(R.string.adult_source_empty), color = CinemaTextPrimary,
                                     fontSize = 15.sp, fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.height(4.dp))
-                                Text("可連上該站，但解析不到影片，來源可能已改版。",
+                                Text(stringResource(R.string.common_source_parse_failed),
                                     color = CinemaTextMuted, fontSize = 12.sp)
                             }
                         }
@@ -210,9 +212,9 @@ fun AdultContentScreen(
                                     // same first page for every paginated URL pattern. We tell the
                                     // user the site itself is the bottleneck, not the App.
                                     val text = if (current.sourceType == SourceType.GIMY_TW && current.typeId == 39) {
-                                        "已顯示全部 ${rowState.items.size} 部（此分類站方資料有限）"
+                                        stringResource(R.string.adult_all_shown_limited, rowState.items.size)
                                     } else {
-                                        "已顯示全部 ${rowState.items.size} 部"
+                                        stringResource(R.string.common_all_shown_count, rowState.items.size)
                                     }
                                     Text(text, color = CinemaTextMuted.copy(0.6f), fontSize = 12.sp)
                                 }

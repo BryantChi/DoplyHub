@@ -31,6 +31,8 @@ import com.gimy.tv.ui.components.DoplyButton
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 @HiltViewModel
 class FavoritesViewModel @Inject constructor(
@@ -53,14 +55,14 @@ fun FavoritesScreen(onVodClick: (SourceType, Long) -> Unit, onBack: () -> Unit, 
     val favs by vm.favorites.collectAsStateWithLifecycle()
     val staleCount by vm.staleCount.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))) {
-        PageHeader("我的收藏", onBack) {
+        PageHeader(stringResource(R.string.favorites_title), onBack) {
             if (staleCount > 0) {
                 DoplyButton(onClick = { vm.clearStale() }, containerColor = CinemaSurface) {
-                    Text("清除失效 $staleCount 筆", color = CinemaTextPrimary, fontSize = 12.sp)
+                    Text(stringResource(R.string.common_clear_stale, staleCount), color = CinemaTextPrimary, fontSize = 12.sp)
                 }
             }
         }
-        if (favs.isEmpty()) EmptyState("還沒有收藏的內容")
+        if (favs.isEmpty()) EmptyState(stringResource(R.string.favorites_empty))
         else LazyVerticalGrid(GridCells.Adaptive(dims.cardWidth), contentPadding = PaddingValues(horizontal = dims.screenHorizontalPadding, vertical = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(dims.cardSpacing), verticalArrangement = Arrangement.spacedBy(dims.cardSpacing), modifier = Modifier.fillMaxSize()
         ) { items(favs, key = { "${it.sourceType}_${it.id}" }) { vod -> VodCard(vod, onClick = { onVodClick(vod.sourceType, vod.id) }) } }
@@ -89,7 +91,7 @@ fun PageHeader(
             contentColor = Color.White,
             focusBorder = false,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp),
-        ) { Text("返回", color = Color.White, fontSize = 13.sp) }
+        ) { Text(stringResource(R.string.common_back), color = Color.White, fontSize = 13.sp) }
         Spacer(Modifier.width(16.dp))
         Box(Modifier.width(3.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(CinemaRed))
         Spacer(Modifier.width(10.dp))

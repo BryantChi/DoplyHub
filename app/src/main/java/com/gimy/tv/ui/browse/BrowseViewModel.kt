@@ -1,5 +1,6 @@
 package com.gimy.tv.ui.browse
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,7 +9,9 @@ import com.gimy.tv.domain.model.categoryMap
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.domain.repository.VodRepository
+import com.gimy.tv.R
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -31,14 +34,18 @@ data class BrowseUiState(
  * 扁平表在多來源下必然會錯：gimy 的 14 是台劇、gimy.tw 的 14 卻是港劇，
  * 而 kubo 的韓劇是 24（扁平表裡根本沒有，標題會 fallback 成「瀏覽」）。
  * 2026-09-13 的「點日劇顯示港劇」就是同一個病。
+ *
+ * 回傳 null 而不是自己填 fallback：fallback 是要給使用者看的文案，取它需要 Context，
+ * 而這個函式要能在純 JVM 測試裡直接呼叫。
  */
-internal fun browseTitleFor(sourceType: SourceType, typeId: Int): String =
-    sourceType.categoryMap.categoryFor(typeId)?.displayName ?: "瀏覽"
+internal fun browseTitleFor(sourceType: SourceType, typeId: Int): String? =
+    sourceType.categoryMap.categoryFor(typeId)?.displayName
 
 @HiltViewModel
 class BrowseViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val vodRepository: VodRepository
+    private val vodRepository: VodRepository,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYTV"
@@ -46,7 +53,7 @@ class BrowseViewModel @Inject constructor(
     private val typeId: Int = savedStateHandle.get<String>("typeId")?.toIntOrNull() ?: 2
 
     private val _uiState = MutableStateFlow(BrowseUiState(
-        title = browseTitleFor(sourceType, typeId)
+        title = browseTitleFor(sourceType, typeId) ?: context.getString(R.string.browse_title_fallback)
     ))
     val uiState: StateFlow<BrowseUiState> = _uiState.asStateFlow()
 

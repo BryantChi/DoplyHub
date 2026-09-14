@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 private const val DOUBLE_BACK_INTERVAL_MS = 2000L
 
@@ -33,7 +35,7 @@ fun ExitConfirmHandler(isPhone: Boolean) {
                 activity.finish()
             } else {
                 lastBackPressTime = now
-                Toast.makeText(context, "再按一次返回鍵退出", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.exit_confirm_toast), Toast.LENGTH_SHORT).show()
             }
         }
     } else {
@@ -46,13 +48,13 @@ fun ExitConfirmHandler(isPhone: Boolean) {
 
             AlertDialog(
                 onDismissRequest = { showDialog = false },
-                text = { Text("確定要退出 Doply Hub？") },
+                text = { Text(stringResource(R.string.exit_confirm_title)) },
                 confirmButton = {
                     TextButton(onClick = {
                         showDialog = false
                         activity.finish()
                     }) {
-                        Text("確定退出")
+                        Text(stringResource(R.string.exit_confirm_ok))
                     }
                 },
                 dismissButton = {
@@ -60,7 +62,7 @@ fun ExitConfirmHandler(isPhone: Boolean) {
                         onClick = { showDialog = false },
                         modifier = Modifier.focusRequester(cancelFocus)
                     ) {
-                        Text("取消")
+                        Text(stringResource(R.string.common_cancel))
                     }
                 }
             )

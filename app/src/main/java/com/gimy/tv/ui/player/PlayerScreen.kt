@@ -38,6 +38,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
+import com.gimy.tv.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 /** 方向鍵一次快轉／倒轉的毫秒數。 */
@@ -185,7 +187,7 @@ fun PlayerScreen(
     }
     val menuEpisodes = menuEpisodeList.map {
         QuickMenuItem(
-            label = it.title.ifBlank { "第${it.number}集" },
+            label = it.title.ifBlank { context.getString(R.string.common_episode_n, it.number) },
             isCurrent = it.number == uiState.episodeNum,
         )
     }
@@ -286,7 +288,7 @@ fun PlayerScreen(
                     "playback failed (retries=$errorRetryCount): ${error.errorCodeName} http=$httpStatus url=$failedUri",
                     error,
                 )
-                viewModel.onPlaybackFailed(describePlaybackError(error))
+                viewModel.onPlaybackFailed(describePlaybackError(context, error))
             }
         }
         exoPlayer.addListener(listener)
@@ -505,12 +507,12 @@ fun PlayerScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     DoplyLoadingIndicator(48.dp)
                     Spacer(Modifier.height(20.dp))
-                    Text(uiState.vodTitle.ifBlank { "載入中" }, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(uiState.vodTitle.ifBlank { stringResource(R.string.player_loading) }, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-                    Text(uiState.loadingMessage, color = CinemaTextMuted, fontSize = 14.sp)
+                    Text(uiState.loadingMessage.ifBlank { stringResource(R.string.player_loading_playback) }, color = CinemaTextMuted, fontSize = 14.sp)
                     if (uiState.sourceName.isNotBlank()) {
                         Spacer(Modifier.height(4.dp))
-                        Text("線路：${uiState.sourceName}", color = CinemaRed, fontSize = 13.sp)
+                        Text(stringResource(R.string.player_line_label, uiState.sourceName), color = CinemaRed, fontSize = 13.sp)
                     }
                 }
             }
@@ -523,11 +525,11 @@ fun PlayerScreen(
                     Text(uiState.error ?: "", color = CinemaRed, fontSize = 15.sp)
                     Spacer(Modifier.height(20.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        DoplyButton(onClick = onBack, containerColor = CinemaSurface) { Text("返回", color = Color.White) }
+                        DoplyButton(onClick = onBack, containerColor = CinemaSurface) { Text(stringResource(R.string.common_back), color = Color.White) }
                         if (uiState.allSources.size > 1) {
                             DoplyButton(onClick = { viewModel.retryWithNextSource() },
                                 containerColor = CinemaRed
-                            ) { Text("切換線路重試", color = Color.White) }
+                            ) { Text(stringResource(R.string.player_switch_source_retry), color = Color.White) }
                         }
                     }
                 }
@@ -544,12 +546,15 @@ fun PlayerScreen(
  * 對使用者毫無意義。認不出來的就保留 errorCodeName——那是 Media3 定義的字串常數，
  * 混淆後仍然可讀，使用者回報時我們照樣查得到。
  */
-private fun describePlaybackError(error: androidx.media3.common.PlaybackException): String {
+private fun describePlaybackError(
+    context: android.content.Context,
+    error: androidx.media3.common.PlaybackException,
+): String {
     val causes = generateSequence(error.cause) { it.cause }
     return when {
-        causes.any { it is javax.net.ssl.SSLHandshakeException } -> "連線安全驗證失敗"
-        causes.any { it is java.net.UnknownHostException } -> "找不到影片伺服器"
-        causes.any { it is java.net.SocketTimeoutException } -> "連線逾時"
+        causes.any { it is javax.net.ssl.SSLHandshakeException } -> context.getString(R.string.player_tls_failed)
+        causes.any { it is java.net.UnknownHostException } -> context.getString(R.string.player_dns_failed)
+        causes.any { it is java.net.SocketTimeoutException } -> context.getString(R.string.player_timeout)
         else -> error.errorCodeName
     }
 }
