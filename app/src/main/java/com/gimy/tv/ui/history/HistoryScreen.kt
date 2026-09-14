@@ -59,20 +59,20 @@ fun HistoryScreen(onVodClick: (SourceType, Long) -> Unit, onBack: () -> Unit, vm
     var pendingDelete by remember { mutableStateOf<WatchHistoryEntry?>(null) }
 
     Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaBase, CinemaBlack)))) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding, vertical = dims.screenVerticalPadding), verticalAlignment = Alignment.CenterVertically) {
-            PageHeader("觀看歷史", onBack)
-            Spacer(Modifier.weight(1f))
+        // 按鈕要放進 PageHeader 的 actions 槽。PageHeader 自己就是一個 fillMaxWidth 的 Row，
+        // 外面再包一層 Row 的話它會把寬度吃光，後面的按鈕量到 0 寬、等於看不見。
+        PageHeader("觀看歷史", onBack) {
             // Sits before the blanket "clear": removing only the entries that no longer open
             // is far less destructive than wiping the whole history.
             if (staleCount > 0) {
-                com.gimy.tv.ui.components.DoplyButton(
+                DoplyButton(
                     onClick = { vm.clearStale() },
                     containerColor = CinemaSurface,
+                    focusBorder = false,
                 ) { Text("清除失效 $staleCount 筆", color = Color.White, fontSize = 12.sp) }
                 Spacer(Modifier.width(8.dp))
             }
             if (history.isNotEmpty()) {
-                var f by remember { mutableStateOf(false) }
                 DoplyButton(
                     onClick = { vm.clear() },
                     shape = RoundedCornerShape(6.dp),
