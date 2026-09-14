@@ -586,14 +586,7 @@ private fun LazyListScope.episodeGrid(
                     val watched = lastEp != null && ep.number < lastEp
                     var f by remember { mutableStateOf(false) }
                     val epColor = when { cur -> CinemaRed; watched -> CinemaRedDim.copy(0.5f); else -> CinemaSurface }
-                    // Compact label: long titles like "特別篇 - 大結局" get truncated to
-                    // ep.number to keep button heights uniform and avoid awkward 中文 character
-                    // breaks. Threshold of 5 chars matches "第01集" / "第123集" / 番外篇.
-                    val rawLabel = ep.title.ifBlank { ep.number.toString() }
-                    // Long episode titles (e.g. "聖光篇 第1集") used to degrade to a
-                    // bare ep.number which loses the named-arc context. Truncate
-                    // instead so anime users still see "聖光篇…" rather than "1".
-                    val label = if (rawLabel.length > 5) "${rawLabel.take(5)}…" else rawLabel
+                    val label = episodeButtonLabel(ep.title, ep.number)
                     // 集數按鈕排得很密，focusBorder 關掉；焦點時要加粗字重，
                     // 那個沒辦法用顏色表達，所以仍然自己接 onFocusChanged。
                     DoplyButton(
@@ -622,6 +615,25 @@ private fun LazyListScope.episodeGrid(
             repeat(episodeColumns - row.size) { Spacer(Modifier.weight(1f)) }
         }
     }
+}
+
+/** 純集數標題：「第1141集」「1141」「第01集」都算，具名標題如「聖光篇 第1集」不算。 */
+private val PLAIN_EPISODE = Regex("^第?\\d+集?$")
+
+/**
+ * 集數按鈕上顯示的字。
+ *
+ * 具名標題（「特別篇 - 大結局」「聖光篇 第1集」）截到 5 個字加刪節號，
+ * 一來讓每顆按鈕等高，二來避免中文在按鈕邊界斷得很難看。
+ *
+ * 純集數標題一律不截，不管幾位數——「第1141集」有 6 個字，原本會被截成
+ * 「第1141…」，比原文還長，而且使用者根本看不出這是第幾集。航海王那種
+ * 上千集的番，整個集數區會變成一整片看不懂的刪節號。
+ */
+internal fun episodeButtonLabel(title: String, number: Int): String {
+    val raw = title.ifBlank { number.toString() }
+    if (PLAIN_EPISODE.matches(raw)) return raw
+    return if (raw.length > 5) "${raw.take(5)}…" else raw
 }
 
 // ═══════════════════════════════════════
