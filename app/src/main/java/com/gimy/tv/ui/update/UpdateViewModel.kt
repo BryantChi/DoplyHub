@@ -1,17 +1,17 @@
 package com.gimy.tv.ui.update
 
 import androidx.lifecycle.ViewModel
-import com.gimy.tv.data.update.UpdateController
+import com.gimy.tv.domain.repository.AppUpdater
 import com.gimy.tv.domain.model.UpdateState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
-/** Thin facade over the singleton [UpdateController]. Multiple screens may instantiate this VM,
+/** Thin facade over the singleton [AppUpdater]. Multiple screens may instantiate this VM,
  *  but they all share the same underlying state. */
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
-    private val controller: UpdateController,
+    private val controller: AppUpdater,
 ) : ViewModel() {
     val state: StateFlow<UpdateState> = controller.state
 

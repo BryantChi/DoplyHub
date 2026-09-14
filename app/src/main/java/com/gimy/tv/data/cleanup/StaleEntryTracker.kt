@@ -1,6 +1,7 @@
 package com.gimy.tv.data.cleanup
 
-import com.gimy.tv.data.endpoint.EndpointHealthStatus
+import com.gimy.tv.domain.repository.StaleEntryReporter
+import com.gimy.tv.domain.model.EndpointHealthStatus
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.data.local.dao.FavoriteDao
 import com.gimy.tv.data.local.dao.WatchHistoryDao
@@ -20,12 +21,12 @@ class StaleEntryTracker @Inject constructor(
     private val favoriteDao: FavoriteDao,
     private val watchHistoryDao: WatchHistoryDao,
     private val endpointResolver: EndpointResolver,
-) {
+) : StaleEntryReporter {
     /**
      * Records the outcome of opening [vodId]. A success clears the counter; repeated failures
      * mark the entry stale and eventually retire it.
      */
-    suspend fun recordOpenResult(sourceType: SourceType, vodId: Long, opened: Boolean) {
+    override suspend fun recordOpenResult(sourceType: SourceType, vodId: Long, opened: Boolean) {
         val source = sourceType.name
         val status = endpointResolver.health.value[sourceType]?.status ?: EndpointHealthStatus.UNKNOWN
 

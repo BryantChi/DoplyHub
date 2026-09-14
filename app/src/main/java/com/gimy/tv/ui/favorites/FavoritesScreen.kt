@@ -34,17 +34,16 @@ import javax.inject.Inject
 
 @HiltViewModel
 class FavoritesViewModel @Inject constructor(
-    fav: FavoriteRepository,
-    private val favoriteDao: com.gimy.tv.data.local.dao.FavoriteDao,
+    private val fav: FavoriteRepository,
 ) : ViewModel() {
     val favorites: StateFlow<List<Vod>> = fav.getFavorites().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** Entries that failed to open. Surfaced so the user can clear them deliberately,
      *  rather than relying only on the conservative automatic retirement. */
-    val staleCount: StateFlow<Int> = favoriteDao.staleCount()
+    val staleCount: StateFlow<Int> = fav.staleCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    fun clearStale() { viewModelScope.launch { runCatching { favoriteDao.deleteStale() } } }
+    fun clearStale() { viewModelScope.launch { runCatching { fav.clearStale() } } }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)

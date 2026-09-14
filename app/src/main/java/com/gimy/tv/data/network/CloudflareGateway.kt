@@ -1,5 +1,6 @@
 package com.gimy.tv.data.network
 
+import com.gimy.tv.domain.repository.ChallengeSolverStatus
 import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.CookieManager
@@ -43,7 +44,7 @@ class CloudflareGateway @Inject constructor(
     @ApplicationContext private val context: Context,
     private val cookieStore: CfCookieStore,
     private val userAgentProvider: WebViewUserAgentProvider,
-) {
+) : ChallengeSolverStatus {
     /** One solve at a time per host: a cold home screen fires ten category requests at once,
      *  and without this each would spawn its own WebView for the same challenge. */
     private val hostLocks = ConcurrentHashMap<String, Mutex>()
@@ -55,7 +56,7 @@ class CloudflareGateway @Inject constructor(
     /** Hosts currently being solved. The search screen reads this to say "verifying" instead
      *  of silently returning fewer sources. */
     private val _solvingHosts = MutableStateFlow<Set<String>>(emptySet())
-    val solvingHosts: StateFlow<Set<String>> = _solvingHosts
+    override val solvingHosts: StateFlow<Set<String>> = _solvingHosts
 
     /** Solves any endpoint that has no clearance yet, so the first real search does not have
      *  to wait. Fire-and-forget: failures leave behaviour exactly as it was. */

@@ -35,7 +35,7 @@ class DoplyApp : Application(), ImageLoaderFactory {
     @Inject lateinit var jableTitleRepair: com.gimy.tv.data.repair.JableTitleRepair
 
     @Inject lateinit var adultContentPreferences:
-        com.gimy.tv.data.preferences.AdultContentPreferencesRepository
+        com.gimy.tv.domain.repository.AdultContentPreferences
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

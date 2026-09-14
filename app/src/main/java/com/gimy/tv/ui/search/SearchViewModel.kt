@@ -2,6 +2,7 @@ package com.gimy.tv.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gimy.tv.domain.repository.ChallengeSolverStatus
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.domain.repository.SearchHistoryRepository
 import com.gimy.tv.domain.repository.VodRepository
@@ -34,7 +35,7 @@ data class SearchUiState(
 class SearchViewModel @Inject constructor(
     private val vodRepository: VodRepository,
     private val searchHistoryRepository: SearchHistoryRepository,
-    cloudflareGateway: com.gimy.tv.data.network.CloudflareGateway,
+    challengeStatus: ChallengeSolverStatus,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
@@ -44,7 +45,7 @@ class SearchViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            cloudflareGateway.solvingHosts.collect { hosts ->
+            challengeStatus.solvingHosts.collect { hosts ->
                 _uiState.update { it.copy(isVerifying = hosts.isNotEmpty()) }
             }
         }

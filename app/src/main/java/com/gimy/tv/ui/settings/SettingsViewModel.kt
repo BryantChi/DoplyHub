@@ -1,8 +1,11 @@
 package com.gimy.tv.ui.settings
 
+import com.gimy.tv.domain.repository.SourceHealthMonitor
+import com.gimy.tv.domain.repository.CacheManager
+import com.gimy.tv.domain.model.EndpointHealth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gimy.tv.data.preferences.SourcePreferencesRepository
+import com.gimy.tv.domain.repository.SourcePreferences
 import com.gimy.tv.domain.model.SourceType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
@@ -11,9 +14,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val sourcePreferencesRepository: SourcePreferencesRepository,
-    private val cacheCleaner: com.gimy.tv.data.cache.CacheCleaner,
-    endpointResolver: com.gimy.tv.data.endpoint.EndpointResolver,
+    private val sourcePreferencesRepository: SourcePreferences,
+    private val cacheManager: CacheManager,
+    sourceHealth: SourceHealthMonitor,
 ) : ViewModel() {
 
     val enabledSources: StateFlow<Set<SourceType>> = sourcePreferencesRepository.enabledSources
@@ -34,7 +37,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _cacheClearing.value = true
             _cacheClearResult.value = null
-            val refreshed = runCatching { cacheCleaner.clearAll() }.getOrDefault(false)
+            val refreshed = runCatching { cacheManager.clearAll() }.getOrDefault(false)
             _cacheClearing.value = false
             _cacheClearResult.value =
                 if (refreshed) "已清除快取，站點網址也重新檢查過了。"
@@ -43,8 +46,8 @@ class SettingsViewModel @Inject constructor(
     }
 
     /** Last probe result per source, so Settings can surface a silently broken endpoint. */
-    val endpointHealth: StateFlow<Map<SourceType, com.gimy.tv.data.endpoint.EndpointHealth>> =
-        endpointResolver.health
+    val endpointHealth: StateFlow<Map<SourceType, com.gimy.tv.domain.model.EndpointHealth>> =
+        sourceHealth.health
 
     fun toggleSource(sourceType: SourceType, enabled: Boolean) {
         viewModelScope.launch {

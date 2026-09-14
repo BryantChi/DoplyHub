@@ -1,5 +1,6 @@
 package com.gimy.tv.data.preferences
 
+import com.gimy.tv.domain.repository.AdultContentPreferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -37,7 +38,7 @@ private val Context.adultContentDataStore: DataStore<Preferences> by preferences
 @Singleton
 class AdultContentPreferencesRepository @Inject constructor(
     @ApplicationContext context: Context,
-) {
+) : AdultContentPreferences {
     companion object {
         const val MAX_FAIL_BEFORE_LOCK = 3
         const val LOCK_DURATION_MS = 5L * 60L * 1000L
@@ -53,29 +54,29 @@ class AdultContentPreferencesRepository @Inject constructor(
     private val dataStore = context.adultContentDataStore
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    val enabled: StateFlow<Boolean> = dataStore.data
+    override val enabled: StateFlow<Boolean> = dataStore.data
         .map { it[KEY_ENABLED] ?: false }
         .stateIn(scope, SharingStarted.Eagerly, false)
 
-    val pinRequired: StateFlow<Boolean> = dataStore.data
+    override val pinRequired: StateFlow<Boolean> = dataStore.data
         .map { it[KEY_PIN_REQUIRED] ?: false }
         .stateIn(scope, SharingStarted.Eagerly, false)
 
-    val pinHash: StateFlow<String?> = dataStore.data
+    override val pinHash: StateFlow<String?> = dataStore.data
         .map { it[KEY_PIN_HASH] }
         .stateIn(scope, SharingStarted.Eagerly, null)
 
-    val failCount: StateFlow<Int> = dataStore.data
+    override val failCount: StateFlow<Int> = dataStore.data
         .map { it[KEY_FAIL_COUNT] ?: 0 }
         .stateIn(scope, SharingStarted.Eagerly, 0)
 
-    val lockedUntilMs: StateFlow<Long> = dataStore.data
+    override val lockedUntilMs: StateFlow<Long> = dataStore.data
         .map { it[KEY_LOCKED_UNTIL] ?: 0L }
         .stateIn(scope, SharingStarted.Eagerly, 0L)
 
     /** Phase 6 toggle for advanced adult sources (jable.tv / xnxx.com / 5278.cc).
      *  Off by default; user must explicitly opt in via Settings. */
-    val adultPlusEnabled: StateFlow<Boolean> = dataStore.data
+    override val adultPlusEnabled: StateFlow<Boolean> = dataStore.data
         .map { it[KEY_ADULT_PLUS_ENABLED] ?: false }
         .stateIn(scope, SharingStarted.Eagerly, false)
 
@@ -85,20 +86,20 @@ class AdultContentPreferencesRepository @Inject constructor(
      * 不能用 [adultPlusEnabled].value：那是 stateIn 的 StateFlow，DataStore 還沒讀完之前
      * 拿到的是初始佔位值 false，在 Application.onCreate 這種時間點幾乎必定讀錯。
      */
-    suspend fun isAdultPlusEnabledNow(): Boolean =
+    override suspend fun isAdultPlusEnabledNow(): Boolean =
         runCatching { dataStore.data.first()[KEY_ADULT_PLUS_ENABLED] }.getOrNull() ?: false
 
     /** In-memory only — resets to false on cold start. Set when user passes PIN this session. */
     private val _unlocked = MutableStateFlow(false)
-    val unlocked: StateFlow<Boolean> = _unlocked.asStateFlow()
+    override val unlocked: StateFlow<Boolean> = _unlocked.asStateFlow()
 
-    fun isLocked(nowMs: Long = System.currentTimeMillis()): Boolean =
+    override fun isLocked(nowMs: Long): Boolean =
         lockedUntilMs.value > nowMs
 
-    fun remainingLockSeconds(nowMs: Long = System.currentTimeMillis()): Long =
+    override fun remainingLockSeconds(nowMs: Long): Long =
         ((lockedUntilMs.value - nowMs) / 1000).coerceAtLeast(0)
 
-    suspend fun setEnabled(value: Boolean) {
+    override suspend fun setEnabled(value: Boolean) {
         dataStore.edit { it[KEY_ENABLED] = value }
         if (!value) {
             _unlocked.value = false  // disabling resets session unlock
@@ -107,16 +108,16 @@ class AdultContentPreferencesRepository @Inject constructor(
         }
     }
 
-    suspend fun setAdultPlusEnabled(value: Boolean) {
+    override suspend fun setAdultPlusEnabled(value: Boolean) {
         dataStore.edit { it[KEY_ADULT_PLUS_ENABLED] = value }
     }
 
-    suspend fun setPinRequired(value: Boolean) {
+    override suspend fun setPinRequired(value: Boolean) {
         dataStore.edit { it[KEY_PIN_REQUIRED] = value }
     }
 
     /** Stores SHA-256 hash; never persists the plaintext. */
-    suspend fun setPin(pin: String) {
+    override suspend fun setPin(pin: String) {
         require(pin.length == 4 && pin.all { it.isDigit() }) { "PIN must be 4 digits" }
         dataStore.edit {
             it[KEY_PIN_HASH] = sha256(pin)
@@ -125,7 +126,7 @@ class AdultContentPreferencesRepository @Inject constructor(
         }
     }
 
-    suspend fun clearPin() {
+    override suspend fun clearPin() {
         dataStore.edit {
             it.remove(KEY_PIN_HASH)
             it[KEY_PIN_REQUIRED] = false
@@ -135,7 +136,7 @@ class AdultContentPreferencesRepository @Inject constructor(
     }
 
     /** Returns true if input matches stored PIN. Updates fail count / lock timer accordingly. */
-    suspend fun verifyPin(input: String): Boolean {
+    override suspend fun verifyPin(input: String): Boolean {
         val storedHash = dataStore.data.first()[KEY_PIN_HASH]
         if (storedHash == null) return true  // no PIN set means no gate
         if (sha256(input) == storedHash) {
@@ -159,11 +160,10 @@ class AdultContentPreferencesRepository @Inject constructor(
         return false
     }
 
-    fun markUnlocked() { _unlocked.value = true }
-    fun clearSessionUnlock() { _unlocked.value = false }
+    override fun markUnlocked() { _unlocked.value = true }
 
     /** Wipes everything: opt-out of adult zone entirely. */
-    suspend fun resetAll() {
+    override suspend fun resetAll() {
         dataStore.edit { it.clear() }
         _unlocked.value = false
     }

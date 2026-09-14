@@ -1,5 +1,6 @@
 package com.gimy.tv.data.update
 
+import com.gimy.tv.domain.repository.AppUpdater
 import com.gimy.tv.domain.model.UpdateState
 import android.content.Context
 import android.content.Intent
@@ -44,7 +45,7 @@ class UpdateController @Inject constructor(
     @ApplicationContext private val context: Context,
     private val updateService: AppUpdateService,
     private val okHttpClient: OkHttpClient,
-) {
+) : AppUpdater {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** APK 下載專用的 client。
@@ -75,7 +76,7 @@ class UpdateController @Inject constructor(
     }
 
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
-    val state: StateFlow<UpdateState> = _state.asStateFlow()
+    override val state: StateFlow<UpdateState> = _state.asStateFlow()
 
     private var downloadJob: Job? = null
 
@@ -94,7 +95,7 @@ class UpdateController @Inject constructor(
      *               so first launch doesn't surface a "更新失敗" dialog when the user's just offline).
      *               Manual checks from the settings page should pass false to surface the error.
      */
-    fun checkForUpdate(silent: Boolean = false) {
+    override fun checkForUpdate(silent: Boolean) {
         // ReadyToInstall 也要擋：APK 已經下載好了，這時候去查更新會把狀態洗成 Checking，
         // 那份檔案的參照就此遺失，使用者得整包重下。
         if (_state.value is UpdateState.Checking ||
@@ -118,14 +119,14 @@ class UpdateController @Inject constructor(
         }
     }
 
-    fun dismiss() {
+    override fun dismiss() {
         val current = _state.value
         // Mandatory updates can't be dismissed — caller should not even surface a dismiss button.
         if (current is UpdateState.Available && current.info.isMandatory) return
         _state.value = UpdateState.Idle
     }
 
-    fun startDownload() {
+    override fun startDownload() {
         val available = (_state.value as? UpdateState.Available) ?: return
         downloadJob?.cancel()
         val token = ++downloadToken
@@ -156,7 +157,7 @@ class UpdateController @Inject constructor(
         }
     }
 
-    fun cancelDownload() {
+    override fun cancelDownload() {
         // 先讓仍在路上的回呼失效，再取消 job：阻塞中的 read 停不下來，
         // 這行是「畫面不會被復活成下載中」的唯一保證。
         downloadToken++
@@ -172,7 +173,7 @@ class UpdateController @Inject constructor(
      *
      *  沒有 APK 可裝時也回 false：以前回 true（宣稱成功），於是「重試安裝」會把權限
      *  對話框收掉卻什麼都沒裝，看起來就是按了沒反應。 */
-    fun launchInstaller(): Boolean {
+    override fun launchInstaller(): Boolean {
         val ready = (_state.value as? UpdateState.ReadyToInstall) ?: return false
         if (!context.packageManager.canRequestPackageInstalls()) return false
 
@@ -198,7 +199,7 @@ class UpdateController @Inject constructor(
      *  在不少 Android TV（Leanback 設定）上根本沒有對應的 Activity，原本無條件
      *  startActivity 會直接丟 ActivityNotFoundException 讓 App 掛掉，所以逐個 fallback
      *  並讓呼叫端能把「請自己去設定裡開」講給使用者聽。 */
-    fun requestInstallPermission(): Boolean {
+    override fun requestInstallPermission(): Boolean {
         val candidates = listOf(
             Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
                 .setData(Uri.parse("package:${context.packageName}")),

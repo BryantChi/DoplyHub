@@ -1,5 +1,7 @@
 package com.gimy.tv.data.repair
 
+import com.gimy.tv.domain.model.RecoveryTarget
+import com.gimy.tv.domain.model.RecoveryPlan
 import com.gimy.tv.domain.model.SourceType
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test

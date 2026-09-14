@@ -2,8 +2,8 @@ package com.gimy.tv.ui.adult
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gimy.tv.data.preferences.AdultContentPreferencesRepository
-import com.gimy.tv.data.preferences.SourcePreferencesRepository
+import com.gimy.tv.domain.repository.AdultContentPreferences
+import com.gimy.tv.domain.repository.SourcePreferences
 import com.gimy.tv.domain.model.SourceType
 import com.gimy.tv.domain.model.Vod
 import com.gimy.tv.domain.model.categoryMap
@@ -41,8 +41,8 @@ data class AdultRowState(
 @HiltViewModel
 class AdultContentScreenViewModel @Inject constructor(
     private val vodRepository: VodRepository,
-    sourcePreferencesRepository: SourcePreferencesRepository,
-    adultContentPreferencesRepository: AdultContentPreferencesRepository,
+    sourcePreferencesRepository: SourcePreferences,
+    adultContentPreferencesRepository: AdultContentPreferences,
 ) : ViewModel() {
 
     val enabledSources: StateFlow<Set<SourceType>> = sourcePreferencesRepository.enabledSources

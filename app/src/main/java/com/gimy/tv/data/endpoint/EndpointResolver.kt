@@ -1,5 +1,7 @@
 package com.gimy.tv.data.endpoint
 
+import com.gimy.tv.domain.repository.SourceHealthMonitor
+import com.gimy.tv.domain.model.EndpointHealth
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -53,7 +55,7 @@ class EndpointResolver @Inject constructor(
     @ApplicationContext context: Context,
     private val okHttpClient: OkHttpClient,
     private val sourcesProvider: javax.inject.Provider<Map<SourceType, @JvmSuppressWildcards com.gimy.tv.data.scraper.SiteSource>>,
-) {
+) : SourceHealthMonitor {
     companion object {
         private const val REMOTE_URL =
             "https://raw.githubusercontent.com/BryantChi/DoplyHub/dev/endpoints.json"
@@ -111,7 +113,7 @@ class EndpointResolver @Inject constructor(
     /** Last probe result per source. Settings reads this so a silently broken endpoint is
      *  visible instead of just looking like an empty catalogue. */
     private val _health = kotlinx.coroutines.flow.MutableStateFlow<Map<SourceType, EndpointHealth>>(emptyMap())
-    val health: kotlinx.coroutines.flow.StateFlow<Map<SourceType, EndpointHealth>> = _health
+    override val health: kotlinx.coroutines.flow.StateFlow<Map<SourceType, EndpointHealth>> = _health
 
     fun getBaseUrl(sourceType: SourceType): String =
         (resolved[sourceType] ?: DEFAULTS[sourceType]!!.first()).url

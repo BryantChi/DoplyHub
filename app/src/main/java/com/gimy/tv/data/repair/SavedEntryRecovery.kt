@@ -1,5 +1,8 @@
 package com.gimy.tv.data.repair
 
+import com.gimy.tv.domain.repository.SavedEntryRecoverer
+import com.gimy.tv.domain.model.RecoveryTarget
+import com.gimy.tv.domain.model.RecoveryPlan
 import com.gimy.tv.data.cleanup.StaleEntryTracker
 import com.gimy.tv.data.local.dao.FavoriteDao
 import com.gimy.tv.data.local.dao.WatchHistoryDao
@@ -27,13 +30,13 @@ class SavedEntryRecovery @Inject constructor(
     private val favoriteDao: FavoriteDao,
     private val watchHistoryDao: WatchHistoryDao,
     private val staleEntryTracker: StaleEntryTracker,
-) {
+) : SavedEntryRecoverer {
     /**
      * 嘗試復原 [sourceType] / [vodId] 這一筆。
      *
      * 只處理「使用者存過」的項目：隨手點進來的片沒有記錄可修，也沒有東西該被標記。
      */
-    suspend fun recover(sourceType: SourceType, vodId: Long): RecoveryPlan {
+    override suspend fun recover(sourceType: SourceType, vodId: Long): RecoveryPlan {
         val title = savedTitleOf(sourceType, vodId) ?: return RecoveryPlan.Inconclusive
 
         val lookup = runCatching { vodRepository.findByTitle(title, sourceType) }

@@ -1,5 +1,7 @@
 package com.gimy.tv.domain.repository
 
+import kotlinx.coroutines.flow.StateFlow
+import com.gimy.tv.domain.model.UpdateState
 import com.gimy.tv.domain.model.*
 import kotlinx.coroutines.flow.Flow
 
@@ -61,6 +63,10 @@ interface FavoriteRepository {
     fun isFavorite(vodId: Long, sourceType: SourceType): Flow<Boolean>
     suspend fun addFavorite(vod: Vod)
     suspend fun removeFavorite(vodId: Long, sourceType: SourceType)
+
+    /** 開不起來的筆數。讓使用者自己決定要不要清，而不是靠保守的自動退役。 */
+    fun staleCount(): Flow<Int>
+    suspend fun clearStale()
 }
 
 interface WatchHistoryRepository {
@@ -75,6 +81,10 @@ interface WatchHistoryRepository {
     suspend fun deleteEntry(vodId: Long, sourceType: SourceType)
     suspend fun clearHistory()
     suspend fun clearAdultHistory()
+
+    /** 開不起來的筆數，語意同 [FavoriteRepository.staleCount]。 */
+    fun staleCount(): Flow<Int>
+    suspend fun clearStale()
 }
 
 /** [VodRepository.findByTitle] 的結果。[sourceAnswered] 為 false 代表原來源這次沒回應，
@@ -124,4 +134,120 @@ interface AdultPlusCatalog {
     suspend fun fetchByPath(
         sourceType: SourceType, pathKey: String, page: Int,
     ): PaginatedResult<Vod>
+}
+
+/**
+ * 使用者啟用了哪些來源。
+ *
+ * 介面放在 domain、實作放在 data，是為了讓畫面只認得這份契約——
+ * 不然 ViewModel 會直接綁上 DataStore 的實作類別。
+ */
+interface SourcePreferences {
+    val enabledSources: StateFlow<Set<SourceType>>
+
+    suspend fun setEnabled(sourceType: SourceType, enabled: Boolean)
+
+    /**
+     * 等 DataStore 真的讀完才回傳。
+     *
+     * 冷啟動時直接讀 [enabledSources].value 拿到的是 stateIn 的初始佔位值（全部來源），
+     * 會把錯的來源集合寫進搜尋快取。
+     */
+    suspend fun snapshot(): Set<SourceType>
+}
+
+/**
+ * 成人區的開關、PIN 與鎖定狀態。
+ *
+ * [unlocked] 只存在記憶體，冷啟動一定回到鎖定——即使這次開機前已經解過鎖。
+ */
+interface AdultContentPreferences {
+    val enabled: StateFlow<Boolean>
+    val pinRequired: StateFlow<Boolean>
+    val pinHash: StateFlow<String?>
+    val failCount: StateFlow<Int>
+    val lockedUntilMs: StateFlow<Long>
+    val adultPlusEnabled: StateFlow<Boolean>
+    val unlocked: StateFlow<Boolean>
+
+    /**
+     * 一次性讀取，給 Application.onCreate 這種 StateFlow 還沒就緒的時間點用。
+     * 直接讀 [adultPlusEnabled].value 在那個時機幾乎必定讀到初始佔位值 false。
+     */
+    suspend fun isAdultPlusEnabledNow(): Boolean
+
+    fun isLocked(nowMs: Long = System.currentTimeMillis()): Boolean
+    fun remainingLockSeconds(nowMs: Long = System.currentTimeMillis()): Long
+
+    suspend fun setEnabled(value: Boolean)
+    suspend fun setAdultPlusEnabled(value: Boolean)
+    suspend fun setPinRequired(value: Boolean)
+    suspend fun setPin(pin: String)
+    suspend fun clearPin()
+
+    /** 對一次即解鎖本次工作階段；連續錯到上限會觸發鎖定計時。 */
+    suspend fun verifyPin(input: String): Boolean
+
+    fun markUnlocked()
+    suspend fun resetAll()
+}
+
+/**
+ * App 自我更新。
+ *
+ * [launchInstaller] 與 [requestInstallPermission] 都會開系統畫面，成功與否由回傳值表示，
+ * 呼叫端據此決定要不要顯示提示——這兩件事在不同 Android 版本與機型上都可能直接失敗。
+ */
+interface AppUpdater {
+    val state: StateFlow<UpdateState>
+
+    fun checkForUpdate(silent: Boolean = false)
+    fun dismiss()
+    fun startDownload()
+    fun cancelDownload()
+
+    /** @return false 代表沒有可安裝的檔案，狀態維持不變。 */
+    fun launchInstaller(): Boolean
+
+    /** @return false 代表這台裝置沒有「安裝未知應用程式」的設定頁可開。 */
+    fun requestInstallPermission(): Boolean
+}
+
+/**
+ * 清快取。
+ *
+ * 三個畫面都會用到，但各自要清的範圍不同：設定頁是整套、首頁與詳情頁只清網路回應，
+ * 不動已經抓下來的封面圖（重抓幾十張圖在電視盒上很痛）。
+ */
+interface CacheManager {
+    /** @return 是否在時間內等到端點重新探測的結果；false 代表還在背景跑。 */
+    suspend fun clearAll(
+        reresolveEndpoints: Boolean = true,
+        clearImages: Boolean = true,
+    ): Boolean
+}
+
+/** 各來源目前選中的網址健不健康，設定頁的「來源管理」直接顯示它。 */
+interface SourceHealthMonitor {
+    val health: StateFlow<Map<SourceType, EndpointHealth>>
+}
+
+/**
+ * 正在解 Cloudflare 挑戰的主機。
+ *
+ * 搜尋畫面靠它說出「正在驗證中」，而不是安靜地少回幾個來源——那會讓使用者
+ * 以為這些站沒有這部片。
+ */
+interface ChallengeSolverStatus {
+    val solvingHosts: StateFlow<Set<String>>
+}
+
+/** 記錄一筆收藏／紀錄這次開得起來還是開不起來，累積到一定次數才會被視為失效。 */
+interface StaleEntryReporter {
+    suspend fun recordOpenResult(sourceType: SourceType, vodId: Long, opened: Boolean)
+}
+
+/** 舊記錄開不起來時，試著找回同一部片。 */
+interface SavedEntryRecoverer {
+    suspend fun recover(sourceType: SourceType, vodId: Long): RecoveryPlan
 }

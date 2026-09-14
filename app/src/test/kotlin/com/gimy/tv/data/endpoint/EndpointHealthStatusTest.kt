@@ -1,5 +1,6 @@
 package com.gimy.tv.data.endpoint
 
+import com.gimy.tv.domain.model.EndpointHealthStatus
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 

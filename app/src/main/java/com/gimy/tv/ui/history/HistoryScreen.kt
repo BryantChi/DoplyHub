@@ -37,13 +37,12 @@ import javax.inject.Inject
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
     private val repo: WatchHistoryRepository,
-    private val watchHistoryDao: com.gimy.tv.data.local.dao.WatchHistoryDao,
 ) : ViewModel() {
     /** Entries that failed to open; cleared on demand. */
-    val staleCount: StateFlow<Int> = watchHistoryDao.staleCount()
+    val staleCount: StateFlow<Int> = repo.staleCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    fun clearStale() { viewModelScope.launch { runCatching { watchHistoryDao.deleteStale() } } }
+    fun clearStale() { viewModelScope.launch { runCatching { repo.clearStale() } } }
 
     val history: StateFlow<List<WatchHistoryEntry>> = repo.getRecentHistory(50).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     fun clear() { viewModelScope.launch { repo.clearHistory() } }

@@ -2,7 +2,7 @@ package com.gimy.tv.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gimy.tv.data.preferences.AdultContentPreferencesRepository
+import com.gimy.tv.domain.repository.AdultContentPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -10,7 +10,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AdultContentViewModel @Inject constructor(
-    private val repo: AdultContentPreferencesRepository,
+    private val repo: AdultContentPreferences,
 ) : ViewModel() {
     val enabled: StateFlow<Boolean> = repo.enabled
     val pinRequired: StateFlow<Boolean> = repo.pinRequired

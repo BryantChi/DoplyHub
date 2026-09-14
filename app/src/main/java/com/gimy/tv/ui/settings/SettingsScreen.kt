@@ -1,5 +1,7 @@
 package com.gimy.tv.ui.settings
 
+import com.gimy.tv.domain.model.EndpointHealth
+import com.gimy.tv.domain.model.EndpointHealthStatus
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.foundation.background
@@ -319,7 +321,7 @@ private fun SourceToggleRow(
     isPrimary: Boolean,
     /** Only the source-management rows have a probe result; the adult toggles reuse this
      *  row and pass nothing. */
-    health: com.gimy.tv.data.endpoint.EndpointHealth? = null,
+    health: com.gimy.tv.domain.model.EndpointHealth? = null,
     onToggle: (Boolean) -> Unit,
 ) {
     // 用 Modifier.toggleable 整合 click + focus + accessibility（Compose 為 row-level
@@ -361,7 +363,7 @@ private fun SourceToggleRow(
                     Spacer(Modifier.width(8.dp))
                     when {
                         h.status.needsAttention -> {
-                            val tint = if (h.status == com.gimy.tv.data.endpoint.EndpointHealthStatus.BROKEN)
+                            val tint = if (h.status == com.gimy.tv.domain.model.EndpointHealthStatus.BROKEN)
                                 CinemaRed else Color(0xFFF59E0B)
                             Text(h.status.label, color = tint, fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -369,7 +371,7 @@ private fun SourceToggleRow(
                                     .background(tint.copy(0.15f), RoundedCornerShape(3.dp))
                                     .padding(horizontal = 5.dp, vertical = 1.dp))
                         }
-                        h.status == com.gimy.tv.data.endpoint.EndpointHealthStatus.HEALTHY ->
+                        h.status == com.gimy.tv.domain.model.EndpointHealthStatus.HEALTHY ->
                             Text("${h.itemCount} 筆", color = CinemaTextMuted.copy(0.7f), fontSize = 10.sp)
                         else -> Unit
                     }

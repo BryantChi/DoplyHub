@@ -1,5 +1,6 @@
 package com.gimy.tv.data.cache
 
+import com.gimy.tv.domain.repository.CacheManager
 import android.content.Context
 import coil.imageLoader
 import com.gimy.tv.data.endpoint.EndpointResolver
@@ -29,7 +30,7 @@ class CacheCleaner @Inject constructor(
     private val okHttpClient: OkHttpClient,
     private val vodRepository: VodRepository,
     private val endpointResolver: EndpointResolver,
-) {
+) : CacheManager {
     /**
      * @param reresolveEndpoints 是否順便重新探測鏡像。設定頁的「清除快取」與首頁重試都要，
      *        單純想丟掉圖片快取的場合可以關掉，省下探測的等待。
@@ -38,9 +39,9 @@ class CacheCleaner @Inject constructor(
      *        MovieFFM 的分類頁本來就大（約 170KB × 9 頁），一被排擠就整組逾時消失。
      * @return 是否在時間內等到探測結果；false 代表探測還在背景跑，下一次取用才會換網址。
      */
-    suspend fun clearAll(
-        reresolveEndpoints: Boolean = true,
-        clearImages: Boolean = true,
+    override suspend fun clearAll(
+        reresolveEndpoints: Boolean,
+        clearImages: Boolean,
     ): Boolean = withContext(Dispatchers.IO) {
         // evictAll 會走磁碟，要在 IO 上跑；任何一層失敗都不該擋住其他層。
         runCatching { okHttpClient.cache?.evictAll() }

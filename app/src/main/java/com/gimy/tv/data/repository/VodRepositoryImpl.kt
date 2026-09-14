@@ -3,7 +3,7 @@ package com.gimy.tv.data.repository
 import com.gimy.tv.data.cache.TtlLruCache
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.data.local.dao.VodCacheDao
-import com.gimy.tv.data.preferences.SourcePreferencesRepository
+import com.gimy.tv.domain.repository.SourcePreferences
 import com.gimy.tv.data.scraper.EynyTvSource
 import com.gimy.tv.data.scraper.Forum5278Source
 import com.gimy.tv.data.scraper.GimyMaxSource
@@ -102,7 +102,7 @@ class VodRepositoryImpl @Inject constructor(
     private val vodCacheDao: VodCacheDao,
     private val okHttpClient: OkHttpClient,
     private val endpointResolver: EndpointResolver,
-    private val sourcePreferencesRepository: SourcePreferencesRepository,
+    private val sourcePreferencesRepository: SourcePreferences,
 ) : VodRepository {
 
     // In-memory home row cache (survives Activity recreation since VodRepositoryImpl is @Singleton)

@@ -1,6 +1,6 @@
 package com.gimy.tv.data.cleanup
 
-import com.gimy.tv.data.endpoint.EndpointHealthStatus
+import com.gimy.tv.domain.model.EndpointHealthStatus
 
 /** Consecutive failed opens before an entry is eligible for automatic removal. */
 const val STALE_REMOVAL_THRESHOLD = 3

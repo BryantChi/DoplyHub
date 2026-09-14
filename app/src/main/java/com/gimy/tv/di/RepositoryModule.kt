@@ -1,5 +1,13 @@
 package com.gimy.tv.di
 
+import com.gimy.tv.data.repair.SavedEntryRecovery
+import com.gimy.tv.data.network.CloudflareGateway
+import com.gimy.tv.data.endpoint.EndpointResolver
+import com.gimy.tv.data.cleanup.StaleEntryTracker
+import com.gimy.tv.data.cache.CacheCleaner
+import com.gimy.tv.data.update.UpdateController
+import com.gimy.tv.data.preferences.SourcePreferencesRepository
+import com.gimy.tv.data.preferences.AdultContentPreferencesRepository
 import com.gimy.tv.data.repository.*
 import com.gimy.tv.data.scraper.*
 import com.gimy.tv.domain.model.SourceType
@@ -28,6 +36,32 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindAdultPlusCatalog(impl: AdultPlusCatalogImpl): AdultPlusCatalog
+
+    @Binds
+    abstract fun bindSourcePreferences(impl: SourcePreferencesRepository): SourcePreferences
+
+    @Binds
+    abstract fun bindAdultContentPreferences(
+        impl: AdultContentPreferencesRepository,
+    ): AdultContentPreferences
+
+    @Binds
+    abstract fun bindAppUpdater(impl: UpdateController): AppUpdater
+
+    @Binds
+    abstract fun bindCacheManager(impl: CacheCleaner): CacheManager
+
+    @Binds
+    abstract fun bindSourceHealthMonitor(impl: EndpointResolver): SourceHealthMonitor
+
+    @Binds
+    abstract fun bindChallengeSolverStatus(impl: CloudflareGateway): ChallengeSolverStatus
+
+    @Binds
+    abstract fun bindStaleEntryReporter(impl: StaleEntryTracker): StaleEntryReporter
+
+    @Binds
+    abstract fun bindSavedEntryRecoverer(impl: SavedEntryRecovery): SavedEntryRecoverer
 
     @Binds @IntoMap @SourceTypeKey(SourceType.GIMYMAX)
     abstract fun bindGimyMaxIntoMap(s: GimyMaxSource): SiteSource

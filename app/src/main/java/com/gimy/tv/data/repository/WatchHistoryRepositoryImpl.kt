@@ -67,6 +67,10 @@ class WatchHistoryRepositoryImpl @Inject constructor(
         dao.deleteByVod(vodId, sourceType.name)
     }
 
+    override fun staleCount(): Flow<Int> = dao.staleCount()
+
+    override suspend fun clearStale() { dao.deleteStale() }
+
     override suspend fun clearHistory() {
         dao.deleteAll()
     }

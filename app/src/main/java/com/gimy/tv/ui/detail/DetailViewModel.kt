@@ -3,6 +3,9 @@ package com.gimy.tv.ui.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gimy.tv.domain.repository.SavedEntryRecoverer
+import com.gimy.tv.domain.repository.StaleEntryReporter
+import com.gimy.tv.domain.repository.CacheManager
 import com.gimy.tv.ui.UiText
 import com.gimy.tv.domain.model.*
 import com.gimy.tv.domain.repository.FavoriteRepository
@@ -36,9 +39,9 @@ class DetailViewModel @Inject constructor(
     private val vodRepository: VodRepository,
     private val favoriteRepository: FavoriteRepository,
     private val watchHistoryRepository: WatchHistoryRepository,
-    private val staleEntryTracker: com.gimy.tv.data.cleanup.StaleEntryTracker,
-    private val cacheCleaner: com.gimy.tv.data.cache.CacheCleaner,
-    private val savedEntryRecovery: com.gimy.tv.data.repair.SavedEntryRecovery,
+    private val staleEntryReporter: StaleEntryReporter,
+    private val cacheManager: CacheManager,
+    private val savedEntryRecoverer: SavedEntryRecoverer,
 ) : ViewModel() {
 
     private val sourceTypeName: String = savedStateHandle["sourceType"] ?: "GIMYTV"
@@ -89,7 +92,7 @@ class DetailViewModel @Inject constructor(
         if (vodId == null) return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            runCatching { cacheCleaner.clearAll(reresolveEndpoints = false, clearImages = false) }
+            runCatching { cacheManager.clearAll(reresolveEndpoints = false, clearImages = false) }
             loadDetail(isRefresh = false)
         }
     }
@@ -113,7 +116,7 @@ class DetailViewModel @Inject constructor(
                 // Cleanup happens at repository layer via EpisodeNormalizer.
                 val detail = vodRepository.getVodDetail(sourceType, id)
                 // A successful open clears any stale marking on this entry.
-                staleEntryTracker.recordOpenResult(sourceType, id, opened = true)
+                staleEntryReporter.recordOpenResult(sourceType, id, opened = true)
                 if (!isActive) return@launch  // refresh() cancelled us mid-fetch
                 _uiState.update {
                     it.copy(isLoading = false, isRefreshing = false, isEnriching = true, detail = detail)
@@ -181,18 +184,18 @@ class DetailViewModel @Inject constructor(
                 // 失效計數改由 SavedEntryRecovery 負責，這裡不再自己記一次——它會分辨
                 // 「來源有回應但查無此片」與「來源根本沒回應」，後者不該算在使用者頭上。
                 val plan = if (!isRefresh) {
-                    runCatching { savedEntryRecovery.recover(sourceType, id) }
-                        .getOrDefault(com.gimy.tv.data.repair.RecoveryPlan.Inconclusive)
+                    runCatching { savedEntryRecoverer.recover(sourceType, id) }
+                        .getOrDefault(com.gimy.tv.domain.model.RecoveryPlan.Inconclusive)
                 } else {
-                    com.gimy.tv.data.repair.RecoveryPlan.Inconclusive
+                    com.gimy.tv.domain.model.RecoveryPlan.Inconclusive
                 }
-                if (plan is com.gimy.tv.data.repair.RecoveryPlan.Relink && isActive) {
+                if (plan is com.gimy.tv.domain.model.RecoveryPlan.Relink && isActive) {
                     retargetTo(plan.target)
                     loadDetail(isRefresh = false)
                     return@launch
                 }
                 val message =
-                    if (plan is com.gimy.tv.data.repair.RecoveryPlan.MarkStale) {
+                    if (plan is com.gimy.tv.domain.model.RecoveryPlan.MarkStale) {
                         "這部片在來源站上已經找不到了。可到收藏或觀看紀錄頁按「清除失效」一次清掉。"
                     } else {
                         "載入失敗: ${e.message}"
@@ -206,7 +209,7 @@ class DetailViewModel @Inject constructor(
     }
 
     /** 記錄已改指到新的一筆：更新目標並重訂與 id 綁定的狀態。 */
-    private fun retargetTo(target: com.gimy.tv.data.repair.RecoveryTarget) {
+    private fun retargetTo(target: com.gimy.tv.domain.model.RecoveryTarget) {
         sourceType = target.sourceType
         vodId = target.vodId
         observeFavorite()

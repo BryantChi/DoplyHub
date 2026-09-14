@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import com.gimy.tv.domain.repository.SourcePreferences
 import com.gimy.tv.domain.model.SourceType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -29,12 +30,12 @@ private val Context.sourcePreferencesDataStore: DataStore<Preferences> by prefer
 @Singleton
 class SourcePreferencesRepository @Inject constructor(
     @ApplicationContext context: Context,
-) {
+) : SourcePreferences {
     private val dataStore = context.sourcePreferencesDataStore
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** Set of currently-enabled sources. Eagerly hot — VodRepositoryImpl reads `.value` synchronously. */
-    val enabledSources: StateFlow<Set<SourceType>> = dataStore.data
+    override val enabledSources: StateFlow<Set<SourceType>> = dataStore.data
         .map { prefs ->
             SourceType.values().filter { type ->
                 prefs[keyFor(type)] ?: true
@@ -42,7 +43,7 @@ class SourcePreferencesRepository @Inject constructor(
         }
         .stateIn(scope, SharingStarted.Eagerly, SourceType.values().toSet())
 
-    suspend fun setEnabled(sourceType: SourceType, enabled: Boolean) {
+    override suspend fun setEnabled(sourceType: SourceType, enabled: Boolean) {
         dataStore.edit { it[keyFor(sourceType)] = enabled }
     }
 
@@ -55,7 +56,7 @@ class SourcePreferencesRepository @Inject constructor(
      * polluting the 60s cache for that long. Reading `dataStore.data.first()` directly
      * suspends until the real value is available, regardless of stateIn timing.
      */
-    suspend fun snapshot(): Set<SourceType> {
+    override suspend fun snapshot(): Set<SourceType> {
         val prefs = dataStore.data.first()
         return SourceType.values().filter { prefs[keyFor(it)] ?: true }.toSet()
     }

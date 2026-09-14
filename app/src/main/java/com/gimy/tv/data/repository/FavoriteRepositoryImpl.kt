@@ -47,6 +47,10 @@ class FavoriteRepositoryImpl @Inject constructor(
         )
     }
 
+    override fun staleCount(): Flow<Int> = dao.staleCount()
+
+    override suspend fun clearStale() { dao.deleteStale() }
+
     override suspend fun removeFavorite(vodId: Long, sourceType: SourceType) {
         dao.delete(vodId, sourceType.name)
     }
