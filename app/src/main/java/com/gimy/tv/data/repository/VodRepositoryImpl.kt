@@ -612,6 +612,9 @@ class VodRepositoryImpl @Inject constructor(
             // status string (e.g. parser missed it on that page) but a matched secondary
             // has one, surface the secondary's so the badge can still display authoritative
             // text instead of falling through to our own count compute.
+            // 讀 deprecated 的 status 是刻意的：這裡要的正是站方原始字串，
+            // siteStatus 是解析後的結果，解析不出來時反而沒有可顯示的文字。
+            @Suppress("DEPRECATION")
             val statusFallback = primaryDetail.vod.status.takeIf { it.isNotBlank() }
                 ?: matchedDetails.firstNotNullOfOrNull {
                     it.vod.status.takeIf { s -> s.isNotBlank() }

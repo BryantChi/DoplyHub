@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -83,10 +84,11 @@ fun VolumeOverlay(gestureMode: GestureMode) {
         exit = fadeOut(),
     ) {
         val fraction = (gestureMode as? GestureMode.Volume)?.fraction ?: 0f
+        // AutoMirrored 版本會依語系方向自動鏡像；非 AutoMirrored 的那三個已標 deprecated。
         val icon = when {
-            fraction <= 0f -> Icons.Default.VolumeOff
-            fraction < 0.5f -> Icons.Default.VolumeDown
-            else -> Icons.Default.VolumeUp
+            fraction <= 0f -> Icons.AutoMirrored.Filled.VolumeOff
+            fraction < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+            else -> Icons.AutoMirrored.Filled.VolumeUp
         }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
             VerticalIndicator(

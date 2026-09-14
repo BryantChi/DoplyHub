@@ -32,6 +32,9 @@ class FavoriteRepositoryImpl @Inject constructor(
         return dao.isFavorite(vodId, sourceType.name)
     }
 
+    // 這裡是儲存層，讀 deprecated 的 status 正是 deprecation 訊息允許的用法
+    // （「UI MUST NOT read this directly」——UI 一律走 siteStatus）。
+    @Suppress("DEPRECATION")
     override suspend fun addFavorite(vod: Vod) {
         dao.insert(
             FavoriteEntity(
