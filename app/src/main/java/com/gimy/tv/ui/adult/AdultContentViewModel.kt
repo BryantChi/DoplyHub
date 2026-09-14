@@ -62,13 +62,21 @@ class AdultContentScreenViewModel @Inject constructor(
 
     private val rowCache = mutableMapOf<String, MutableStateFlow<AdultRowState>>()
 
-    fun rowFor(tab: AdultTab): StateFlow<AdultRowState> {
-        val existing = rowCache[tab.key]
-        if (existing != null) return existing.asStateFlow()
-        val flow = MutableStateFlow(AdultRowState(loading = true))
-        rowCache[tab.key] = flow
+    /** 純讀取，不發請求。抓取由畫面的 LaunchedEffect 觸發（見 [ensureRow]）。 */
+    fun rowFor(tab: AdultTab): StateFlow<AdultRowState> =
+        rowCache.getOrPut(tab.key) { MutableStateFlow(AdultRowState(loading = true)) }.asStateFlow()
+
+    /**
+     * 這個分頁第一次進入畫面時抓資料。
+     *
+     * 抓取不放在 [rowFor] 裡，是因為那個函式在組合階段被呼叫——組合可能被丟棄或重跑，
+     * 把網路請求綁在重組上不是安全的做法。重複呼叫是安全的：已經有結果就不再打網路。
+     */
+    fun ensureRow(tab: AdultTab) {
+        val flow = rowCache[tab.key] ?: MutableStateFlow(AdultRowState(loading = true))
+            .also { rowCache[tab.key] = it }
+        if (flow.value.items.isNotEmpty() || flow.value.error != null) return
         fetchPage(tab, flow, page = 1, append = false)
-        return flow.asStateFlow()
     }
 
     /** Drives the header spinner and the loading bar during a full refresh. */

@@ -127,6 +127,7 @@ private fun AdultPlusRowSection(
 ) {
     val dims = LocalDimensions.current
     val state by vm.rowState(row).collectAsStateWithLifecycle()
+    LaunchedEffect(row) { vm.ensureRow(row) }
 
     Column(Modifier.padding(top = 20.dp)) {
         // Section header (matches HomeScreen style)

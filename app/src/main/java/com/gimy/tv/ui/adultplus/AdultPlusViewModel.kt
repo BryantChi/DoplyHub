@@ -97,14 +97,19 @@ class AdultPlusViewModel @Inject constructor(
 
     private val rowCache = mutableMapOf<String, MutableStateFlow<AdultPlusRowState>>()
 
-    fun rowState(row: AdultPlusRow): StateFlow<AdultPlusRowState> {
+    /** 純讀取，不發請求。抓取由畫面的 LaunchedEffect 觸發（見 [ensureRow]）。 */
+    fun rowState(row: AdultPlusRow): StateFlow<AdultPlusRowState> =
+        rowCache.getOrPut(cacheKey(row)) {
+            MutableStateFlow(AdultPlusRowState(loading = true))
+        }.asStateFlow()
+
+    /** 這一列第一次進入畫面時抓資料。理由同 [AdultContentViewModel.ensureRow]。 */
+    fun ensureRow(row: AdultPlusRow) {
         val key = cacheKey(row)
-        val existing = rowCache[key]
-        if (existing != null) return existing.asStateFlow()
-        val flow = MutableStateFlow(AdultPlusRowState(loading = true))
-        rowCache[key] = flow
+        val flow = rowCache[key] ?: MutableStateFlow(AdultPlusRowState(loading = true))
+            .also { rowCache[key] = it }
+        if (flow.value.items.isNotEmpty() || flow.value.error != null) return
         fetch(row, flow)
-        return flow.asStateFlow()
     }
 
     fun refreshRow(row: AdultPlusRow) {

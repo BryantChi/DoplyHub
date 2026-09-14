@@ -115,6 +115,7 @@ fun AdultContentScreen(
                 }
             }
             val rowState by vm.rowFor(current).collectAsStateWithLifecycle()
+            LaunchedEffect(current.key) { vm.ensureRow(current) }
 
             // Infinite scroll: when within 4 items of the bottom and we know there's more, fetch next page.
             // Re-keyed on `current.key` so switching tabs doesn't cross-trigger the previous tab's loadMore.
