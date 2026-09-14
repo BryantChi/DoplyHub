@@ -100,12 +100,11 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.foundation)
     implementation(libs.compose.ui)
-    implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material.icons)
     debugImplementation(libs.compose.ui.tooling)
 
     // Compose for TV
-    implementation(libs.tv.foundation)
+    // tv-foundation 零引用（Google 也已停更），只留 tv-material3
     implementation(libs.tv.material)
 
     // Media3 ExoPlayer
@@ -113,7 +112,6 @@ dependencies {
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.ui)
     implementation(libs.media3.ui.compose)
-    implementation(libs.media3.session)
     implementation(libs.media3.datasource.okhttp)
 
     // Hilt
