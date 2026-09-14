@@ -45,12 +45,18 @@ fun BrowseScreen(
         }
     }
 
-    // Auto load more: trigger when the last visible item is within 4 items of the end
-    LaunchedEffect(gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index) {
-        val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
-        val total = gridState.layoutInfo.totalItemsCount
-        if (total > 0 && lastVisible >= total - 4) {
-            vm.loadMore()
+    // 捲到離底部 4 格以內就自動載下一頁。
+    //
+    // 用 snapshotFlow 而不是把 layoutInfo 當 LaunchedEffect 的 key：後者等於在組合階段
+    // 讀取捲動狀態，每一個捲動影格都會讓整個畫面重組。SearchScreen 就是這個寫法。
+    LaunchedEffect(gridState) {
+        snapshotFlow {
+            val info = gridState.layoutInfo
+            (info.visibleItemsInfo.lastOrNull()?.index ?: -1) to info.totalItemsCount
+        }.collect { (lastVisible, total) ->
+            if (total > 0 && lastVisible >= total - 4) {
+                vm.loadMore()
+            }
         }
     }
 
