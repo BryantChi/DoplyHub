@@ -598,9 +598,10 @@ private fun MoreSourceRow(
     onMoreClick: () -> Unit,
     viewModel: HomeViewModel,
 ) {
-    // collectAsState binds to ViewModel-cached StateFlow; first access kicks off fetch,
-    // subsequent recompositions reuse cached items. refresh() clears the cache.
+    // 組合階段只讀狀態；發請求交給 LaunchedEffect。組合可能被丟棄或重跑，
+    // 在裡面直接打網路等於把副作用綁在畫面重組上。
     val state by viewModel.moreSourceRow(sourceType, typeId).collectAsStateWithLifecycle()
+    LaunchedEffect(sourceType, typeId) { viewModel.ensureMoreSourceRow(sourceType, typeId) }
     when (val s = state) {
         MoreSourceRowState.Loading -> RowSkeleton(title, sourceType)
         MoreSourceRowState.Failed -> RowLoadFailed(title, sourceType) {

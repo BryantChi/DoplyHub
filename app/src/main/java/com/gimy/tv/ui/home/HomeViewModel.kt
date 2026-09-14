@@ -1,5 +1,6 @@
 package com.gimy.tv.ui.home
 
+import kotlinx.coroutines.Job
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gimy.tv.domain.repository.CacheManager
@@ -51,31 +52,56 @@ class HomeViewModel @Inject constructor(
      * Phase 3.1 lets the home page surface the 5 new MacCMS sources without blocking
      * the primary load — the rows materialize as the user scrolls down.
      */
+    // 只在主執行緒被碰：讀取來自組合階段，clear 來自 refresh／retry，兩者都在 Main。
+    // 所以這裡不需要 concurrent 容器，但在途的抓取需要能取消——見 clearMoreSourceRows。
     private val moreSourceCache = mutableMapOf<String, MutableStateFlow<MoreSourceRowState>>()
+    private val moreSourceJobs = mutableMapOf<String, Job>()
 
-    fun moreSourceRow(sourceType: SourceType, typeId: Int): StateFlow<MoreSourceRowState> {
-        val key = "${sourceType.name}_$typeId"
-        return moreSourceCache.getOrPut(key) {
-            MutableStateFlow<MoreSourceRowState>(MoreSourceRowState.Loading).also { flow ->
-                fetchMoreSourceRow(sourceType, typeId, flow)
-            }
+    /** 純讀取，不發請求。抓取由畫面的 LaunchedEffect 觸發（見 [ensureMoreSourceRow]）。 */
+    fun moreSourceRow(sourceType: SourceType, typeId: Int): StateFlow<MoreSourceRowState> =
+        moreSourceCache.getOrPut("${sourceType.name}_$typeId") {
+            MutableStateFlow(MoreSourceRowState.Loading)
         }
+
+    /** 這一列第一次進入畫面時抓資料。重複呼叫是安全的：已經有結果就不再打網路。 */
+    fun ensureMoreSourceRow(sourceType: SourceType, typeId: Int) {
+        val key = "${sourceType.name}_$typeId"
+        moreSourceRow(sourceType, typeId)  // 確保 flow 存在
+        val flow = moreSourceCache[key] ?: return
+        if (flow.value !is MoreSourceRowState.Loading) return
+        if (moreSourceJobs[key]?.isActive == true) return
+        fetchMoreSourceRow(key, sourceType, typeId, flow)
     }
 
     /** 讓失敗的那一列自己重來，不必整個首頁重新整理（其他列是好的，不該一起丟掉）。 */
     fun retryMoreSourceRow(sourceType: SourceType, typeId: Int) {
-        val flow = moreSourceCache["${sourceType.name}_$typeId"] ?: return
+        val key = "${sourceType.name}_$typeId"
+        val flow = moreSourceCache[key] ?: return
         if (flow.value == MoreSourceRowState.Loading) return
         flow.value = MoreSourceRowState.Loading
-        fetchMoreSourceRow(sourceType, typeId, flow)
+        fetchMoreSourceRow(key, sourceType, typeId, flow)
+    }
+
+    /**
+     * 清掉所有「更多來源」的列，並取消在途的抓取。
+     *
+     * 只 clear map 不取消 job 的話，那幾個請求會繼續跑完再寫進沒人看的 flow，
+     * 而且正好與重試時的首頁重載搶同一組連線額度——這個專案吃過好幾次這種虧。
+     */
+    private fun clearMoreSourceRows() {
+        moreSourceJobs.values.forEach { it.cancel() }
+        moreSourceJobs.clear()
+        moreSourceCache.clear()
     }
 
     private fun fetchMoreSourceRow(
+        key: String,
         sourceType: SourceType,
         typeId: Int,
         flow: MutableStateFlow<MoreSourceRowState>,
     ) {
-        viewModelScope.launch {
+        moreSourceJobs[key]?.cancel()
+        moreSourceJobs[key] = viewModelScope.launch {
             flow.value = try {
                 MoreSourceRowState.Loaded(
                     vodRepository.getVodList(sourceType, typeId, 1).items.take(15)
@@ -121,7 +147,7 @@ class HomeViewModel @Inject constructor(
 
     fun refresh() {
         if (_uiState.value.isRefreshing) return
-        moreSourceCache.clear()  // force "More Sources" rows to re-fetch on next collect
+        clearMoreSourceRows()  // force "More Sources" rows to re-fetch on next collect
         fetchHome(isRefresh = true, force = true)
     }
 
@@ -139,7 +165,7 @@ class HomeViewModel @Inject constructor(
      * 假設畫面上已有內容可以留著，在空畫面重試時會把錯誤訊息吃掉變成一片空白。
      */
     fun retry() {
-        moreSourceCache.clear()
+        clearMoreSourceRows()
         viewModelScope.launch {
             // 先進載入中，清快取這段也要有畫面回饋，否則按下去像是沒反應。
             _uiState.update { it.copy(isLoading = true, error = null) }
