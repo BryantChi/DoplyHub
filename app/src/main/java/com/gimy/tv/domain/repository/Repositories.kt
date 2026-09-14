@@ -13,7 +13,6 @@ data class HomeRowData(
 )
 
 interface VodRepository {
-    suspend fun getCategories(sourceType: SourceType): List<Category>
     suspend fun getVodList(sourceType: SourceType, typeId: Int, page: Int): PaginatedResult<Vod>
     suspend fun getVodDetail(sourceType: SourceType, vodId: Long): VodDetail
     /**

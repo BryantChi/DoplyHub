@@ -146,10 +146,6 @@ class VodRepositoryImpl @Inject constructor(
     // ID is meaningless and causes "Unknown movieffm ID" errors. Only keyword-based
     // operations (search) can safely fall back across sources.
 
-    override suspend fun getCategories(sourceType: SourceType): List<Category> {
-        return getSource(sourceType).fetchCategories()
-    }
-
     override suspend fun getVodList(
         sourceType: SourceType, typeId: Int, page: Int
     ): PaginatedResult<Vod> {

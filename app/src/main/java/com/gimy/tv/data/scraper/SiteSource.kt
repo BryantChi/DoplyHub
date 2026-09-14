@@ -6,7 +6,6 @@ interface SiteSource {
     val sourceType: SourceType
     val baseUrl: String
 
-    suspend fun fetchCategories(): List<Category>
     suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod>
     suspend fun fetchVodDetail(vodId: Long): VodDetail
     /**

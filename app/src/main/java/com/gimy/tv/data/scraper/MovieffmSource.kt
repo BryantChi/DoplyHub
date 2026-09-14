@@ -82,20 +82,6 @@ class MovieffmSource @Inject constructor(
         208 to ("drama" to "tvtype=hkdrama"),
     )
 
-    override suspend fun fetchCategories(): List<Category> = listOf(
-        Category(100, "電影", sourceType),
-        Category(101, "熱門電影", sourceType),
-        Category(200, "電視劇", sourceType),
-        Category(201, "韓劇", sourceType),
-        Category(202, "陸劇", sourceType),
-        Category(203, "美劇", sourceType),
-        Category(204, "日劇", sourceType),
-        Category(205, "動漫", sourceType),
-        Category(206, "綜藝", sourceType),
-        Category(207, "台劇", sourceType),
-        Category(208, "港劇", sourceType),
-    )
-
     override suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod> =
         withContext(Dispatchers.IO) {
             val (basePath, query) = categoryRoutes[typeId] ?: ("movies" to "")

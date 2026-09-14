@@ -48,12 +48,6 @@ class Forum5278Source @Inject constructor(
      */
     private val coverCache = com.gimy.tv.data.cache.TtlLruCache<Long, String>(capacity = 1000)
 
-    /** Forums we surface. typeId = Discuz forum number. */
-    override suspend fun fetchCategories(): List<Category> = listOf(
-        Category(23, "成人線上", sourceType),
-        Category(42, "線上性感影片", sourceType),
-    )
-
     override suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod> =
         withContext(Dispatchers.IO) {
             val url = "$baseUrl/forum-$typeId-$page.html"

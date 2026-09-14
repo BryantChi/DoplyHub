@@ -116,7 +116,6 @@ abstract class EmbeddedHlsSource(
     // These sites have no traditional categories; AdultPlusScreen drives list URLs directly
     // via fetchVodListByPath() below. The legacy fetchVodList(typeId, page) is unused.
 
-    override suspend fun fetchCategories(): List<Category> = emptyList()
 
     override suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod> =
         PaginatedResult(emptyList(), page, 0, false)

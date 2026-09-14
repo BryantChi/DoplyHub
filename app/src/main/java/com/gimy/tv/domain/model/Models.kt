@@ -28,12 +28,6 @@ val SourceType.displayName: String get() = when (this) {
 val SourceType.isAdultOnly: Boolean
     get() = this == SourceType.JABLE_TV || this == SourceType.XNXX || this == SourceType.FORUM5278
 
-data class Category(
-    val id: Int,
-    val name: String,
-    val sourceType: SourceType
-)
-
 data class Vod(
     val id: Long,
     val sourceType: SourceType,

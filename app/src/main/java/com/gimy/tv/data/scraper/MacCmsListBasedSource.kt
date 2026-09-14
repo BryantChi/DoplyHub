@@ -83,25 +83,6 @@ abstract class MacCmsListBasedSource(
 
     // ─── SiteSource impl ───
 
-    override suspend fun fetchCategories(): List<Category> {
-        val m = categoryMap
-        return listOf(
-            m.movie to "電影",
-            m.series to "劇集",
-            m.anime to "動漫",
-            m.variety to "綜藝",
-            m.korean to "韓劇",
-            m.chinese to "陸劇",
-            m.hk to "港劇",
-            m.taiwan to "台劇",
-            m.japanese to "日劇",
-            m.american to "美劇",
-            m.documentary to "紀錄片",
-        )
-            .filter { it.first > 0 }
-            .map { (id, name) -> Category(id, name, sourceType) }
-    }
-
     override open suspend fun fetchVodList(typeId: Int, page: Int): PaginatedResult<Vod> =
         withContext(Dispatchers.IO) {
             parseVodList(fetchDocument(buildListUrl(typeId, page)), page)
