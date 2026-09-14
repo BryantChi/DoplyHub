@@ -44,6 +44,8 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            // 沒開這個的話 R8 只縮程式碼、資源照單全收。兩者本來就該成對。
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
