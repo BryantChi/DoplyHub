@@ -25,6 +25,7 @@ import com.gimy.tv.domain.repository.VodRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeout
+import kotlin.coroutines.cancellation.CancellationException
 import okhttp3.OkHttpClient
 import java.io.IOException
 import javax.inject.Inject
@@ -261,14 +262,12 @@ class VodRepositoryImpl @Inject constructor(
                 async {
                     // null 代表這個來源整個失敗（逾時／連不上／解析不到），跟「有回應但沒有
                     // 符合的片」要分開，否則無法判斷這次搜尋值不值得放進快取。
-                    try {
-                        withTimeout(5_000) { src.search(keyword, page) }
-                    } catch (e: Exception) {
+                    withSourceTimeout(5_000, onFailure = { e ->
                         // 搜尋同時打八個來源，少了一個在結果裡看不出來——「這個站明明有這部片
                         // 卻沒出現」的回報，過去只能靠猜。記下來才查得動。
                         android.util.Log.w("SearchFallback", "${src.sourceType} 搜尋失敗", e)
                         null
-                    }
+                    }) { src.search(keyword, page) }
                 }
             }
             val results = deferreds.map { it.await() }
@@ -497,9 +496,9 @@ class VodRepositoryImpl @Inject constructor(
         return coroutineScope {
             val deferreds = searchOrder().map { src ->
                 async {
-                    try {
-                        withTimeout(4_000) { src.search(baseTitle, 1).items }
-                    } catch (_: Exception) { emptyList<Vod>() }
+                    withSourceTimeout(4_000, onFailure = { emptyList<Vod>() }) {
+                        src.search(baseTitle, 1).items
+                    }
                 }
             }
             // Merge results in priority order, drop adult content
@@ -551,23 +550,21 @@ class VodRepositoryImpl @Inject constructor(
             val otherSources = searchOrder().filter { it.sourceType != sourceType }
             val matchedDetails = otherSources.map { src ->
                 async {
-                    try {
-                        withTimeout(5_000) {
-                            val results = src.search(primaryTitle, 1).items
-                            // Two-pass: prefer exact (key equality) before falling back
-                            // to scoreMatch ≥ threshold. Year filter unchanged.
-                            val candidates = results.filter {
-                                !looksAdult(it) &&
-                                    (primaryYear == 0 || it.year == 0 || it.year == primaryYear)
-                            }
-                            val match = candidates.firstOrNull { parseTitleKey(it.title) == primaryKey }
-                                ?: candidates.firstOrNull {
-                                    scoreMatch(parseTitleKey(it.title), primaryKey) >= similarityThreshold
-                                }
-                                ?: return@withTimeout null
-                            src.fetchVodDetail(match.id)
+                    withSourceTimeout(5_000, onFailure = { null }) {
+                        val results = src.search(primaryTitle, 1).items
+                        // Two-pass: prefer exact (key equality) before falling back
+                        // to scoreMatch ≥ threshold. Year filter unchanged.
+                        val candidates = results.filter {
+                            !looksAdult(it) &&
+                                (primaryYear == 0 || it.year == 0 || it.year == primaryYear)
                         }
-                    } catch (_: Exception) { null }
+                        val match = candidates.firstOrNull { parseTitleKey(it.title) == primaryKey }
+                            ?: candidates.firstOrNull {
+                                scoreMatch(parseTitleKey(it.title), primaryKey) >= similarityThreshold
+                            }
+                            ?: return@withSourceTimeout null
+                        src.fetchVodDetail(match.id)
+                    }
                 }
             }.mapNotNull { it.await() }
 
@@ -733,16 +730,26 @@ class VodRepositoryImpl @Inject constructor(
     override suspend fun findByTitle(title: String, preferredSource: SourceType): TitleLookup {
         val key = parseTitleKey(title)
         // 先問原來源。網域換了但站還是同一個時，片子多半還在、只是 id 不同，這一步就會中。
-        val primary = runCatching {
-            withTimeout(6_000) { getSource(preferredSource).search(title, 1) }
+        //
+        // 這裡原本兩段都用 runCatching，而 runCatching 連 CancellationException 也吞。
+        // 下面那段包的是 searchAllSources，吞掉的話它內部剛放行的取消又會被擋在這裡，
+        // 等於白做。
+        var primaryAnswered = true
+        val primary = withSourceTimeout(6_000, onFailure = { primaryAnswered = false; null }) {
+            getSource(preferredSource).search(title, 1)
         }
-        primary.getOrNull()?.items?.firstOrNull { parseTitleKey(it.title) == key }
+        primary?.items?.firstOrNull { parseTitleKey(it.title) == key }
             ?.let { return TitleLookup(it, sourceAnswered = true) }
 
         // 原來源查無此片才跨來源找。換站至少讓這筆記錄還開得起來，比留著一個死連結好。
-        val cross = runCatching { searchAllSources(title, 1).items }.getOrDefault(emptyList())
-            .firstOrNull { parseTitleKey(it.title) == key }
-        return TitleLookup(cross, sourceAnswered = primary.isSuccess)
+        val cross = try {
+            searchAllSources(title, 1).items
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            emptyList()
+        }.firstOrNull { parseTitleKey(it.title) == key }
+        return TitleLookup(cross, sourceAnswered = primaryAnswered)
     }
 
     override fun clearMemoryCaches() {
@@ -780,16 +787,14 @@ class VodRepositoryImpl @Inject constructor(
             )
             categories.map { (typeId, name) ->
                 async {
-                    try {
-                        withTimeout(8000) {
-                            val result = gimyTvSource.fetchVodList(typeId, 1)
-                            HomeRowData(name, SourceType.GIMYTV, typeId, result.items.take(15))
-                        }
-                    } catch (e: Exception) {
+                    withSourceTimeout(8000, onFailure = { e ->
                         // 與 movieffm 那組對稱。gimy 是首頁主力（十列），某個分類失敗時
                         // 原本只是安靜地少一列，看不出是逾時、解析掛掉還是站方改版。
                         android.util.Log.w("HomeLoad", "gimy $name($typeId) failed", e)
                         null
+                    }) {
+                        val result = gimyTvSource.fetchVodList(typeId, 1)
+                        HomeRowData(name, SourceType.GIMYTV, typeId, result.items.take(15))
                     }
                 }
             }.mapNotNull { it.await() }.filter { it.items.isNotEmpty() }
@@ -826,16 +831,11 @@ class VodRepositoryImpl @Inject constructor(
             // All parallel — OkHttp's per-host limit handles throttling
             categories.map { (typeId, name) ->
                 async {
-                    try {
-                        // 給的時間比 gimy 那組還長：movieffm 的分類頁約 170KB（gimy 約 60KB），
-                        // 九頁同時抓再用 Jsoup 解，在電視盒的 CPU 上遠比模擬器吃力。原本 6 秒
-                        // 在開發機綽綽有餘，到電視上卻整組逾時，首頁就安靜地少掉所有 FFM 列。
-                        // 這一段是 Phase 2、不擋首頁顯示，拉長只會讓 FFM 列晚一點補上。
-                        withTimeout(12_000) {
-                            val result = movieffmSource.fetchVodList(typeId, 1)
-                            HomeRowData(name, SourceType.MOVIEFFM, typeId, result.items.take(15))
-                        }
-                    } catch (e: Exception) {
+                    // 給的時間比 gimy 那組還長：movieffm 的分類頁約 170KB（gimy 約 60KB），
+                    // 九頁同時抓再用 Jsoup 解，在電視盒的 CPU 上遠比模擬器吃力。原本 6 秒
+                    // 在開發機綽綽有餘，到電視上卻整組逾時，首頁就安靜地少掉所有 FFM 列。
+                    // 這一段是 Phase 2、不擋首頁顯示，拉長只會讓 FFM 列晚一點補上。
+                    withSourceTimeout(12_000, onFailure = { e ->
                         // 原本這裡靜默吞掉，九個分類全失敗時首頁就只是安靜地少掉所有 FFM 列，
                         // 完全查不出是逾時、網址錯還是解析掛掉。
                         android.util.Log.w(
@@ -844,6 +844,9 @@ class VodRepositoryImpl @Inject constructor(
                             e,
                         )
                         null
+                    }) {
+                        val result = movieffmSource.fetchVodList(typeId, 1)
+                        HomeRowData(name, SourceType.MOVIEFFM, typeId, result.items.take(15))
                     }
                 }
             }.mapNotNull { it.await() }.filter { it.items.isNotEmpty() }
