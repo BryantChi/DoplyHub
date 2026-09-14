@@ -1,5 +1,8 @@
 package com.gimy.tv.ui.detail
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -326,10 +329,13 @@ fun DetailScreen(
                     // ── Episodes ──
                     if (filteredEpisodes.isNotEmpty()) {
                         val grp = filteredEpisodes[safeSrcIdx]
-                        item {
-                            EpisodeGrid(grp, uiState.lastEpisode, dims.episodeColumns) { sId, ep ->
-                                onPlayClick(d.vod.sourceType.name, d.vod.id, sId, ep)
-                            }
+                        episodeGrid(
+                            group = grp,
+                            lastEp = uiState.lastEpisode,
+                            episodeColumns = dims.episodeColumns,
+                            horizontalPadding = dims.screenHorizontalPadding,
+                        ) { sId, ep ->
+                            onPlayClick(d.vod.sourceType.name, d.vod.id, sId, ep)
                         }
                     }
 
@@ -536,26 +542,42 @@ private fun RelatedRow(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun EpisodeGrid(
+/**
+ * 集數格線。寫成 LazyListScope 擴充而不是單一 Composable，是因為它原本整個包在外層
+ * LazyColumn 的一個 item 裡——一部 265 集的番在畫面上只看得到兩三列，卻要一次組合
+ * 265 個按鈕。改成每一列各自是一個 item 之後，只有看得到的列會被組合。
+ *
+ * 刻意不做分段顯示（第 1-50 集／51-100 集…）：那會讓所有人多一層操作，
+ * 用確定的體驗倒退去換不確定的效能風險。
+ */
+private fun LazyListScope.episodeGrid(
     group: EpisodeGroup,
     lastEp: Int?,
     episodeColumns: Int,
-    onEpClick: (Int, Int) -> Unit
+    horizontalPadding: Dp,
+    onEpClick: (Int, Int) -> Unit,
 ) {
-    val isTV = LocalIsTelevision.current
-    val dims = LocalDimensions.current
-    Column(Modifier.fillMaxWidth().padding(horizontal = dims.screenHorizontalPadding)) {
-        Text("選擇集數", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-        Spacer(Modifier.height(10.dp))
-        for (row in group.episodes.chunked(episodeColumns)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                for (ep in row) {
-                    key(ep.number) {
+    item(key = "ep_header_${group.sourceId}") {
+        Column(Modifier.fillMaxWidth().padding(horizontal = horizontalPadding)) {
+            Text("選擇集數", color = CinemaTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(10.dp))
+        }
+    }
+    val rows = group.episodes.chunked(episodeColumns)
+    itemsIndexed(
+        rows,
+        // key 要穩定，否則捲動時焦點會跳。同一列的第一集集號在一個來源裡是唯一的。
+        key = { index, row -> "ep_row_${group.sourceId}_${row.firstOrNull()?.number ?: index}" },
+    ) { _, row ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = horizontalPadding)
+                .padding(bottom = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            for (ep in row) {
+                key(ep.number) {
                     val cur = lastEp != null && ep.number == lastEp
                     val watched = lastEp != null && ep.number < lastEp
                     var f by remember { mutableStateOf(false) }
@@ -590,15 +612,10 @@ private fun EpisodeGrid(
                             textAlign = TextAlign.Center,
                         )
                     }
-                    } // key
-                }
-                // Fill remaining space when last row has fewer items
-                val remaining = episodeColumns - row.size
-                if (remaining > 0) {
-                    repeat(remaining) { Spacer(Modifier.weight(1f)) }
                 }
             }
-            Spacer(Modifier.height(5.dp))
+            // 最後一列不滿時用空白撐住，按鈕寬度才會與其他列一致
+            repeat(episodeColumns - row.size) { Spacer(Modifier.weight(1f)) }
         }
     }
 }
