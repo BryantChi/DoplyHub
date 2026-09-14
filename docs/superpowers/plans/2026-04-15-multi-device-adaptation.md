@@ -195,7 +195,7 @@ val CinemaCard = Color(0xFF1A1A1A)
 val CinemaSurface = Color(0xFF1E1E1E)
 val CinemaBorder = Color(0xFF2A2A2A)
 
-val CinemaRed = Color(0xFFE11D48)
+val CinemaRed = Color(0xFF9F1832)
 val CinemaRedDim = Color(0xFFBE123C)
 val CinemaIndigo = Color(0xFF6366F1)
 

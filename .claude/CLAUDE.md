@@ -20,4 +20,4 @@ Pure client-side, no backend. Clean Architecture: UI → Domain → Data layers.
 - Code comments and variable names in English
 - Git commits in English
 - User communication in Traditional Chinese (zh-TW)
-- Design theme: Cinematic Dark (OLED black + red accent #E11D48)
+- Design theme: Cinematic Dark (OLED black + wine red accent #9F1832)

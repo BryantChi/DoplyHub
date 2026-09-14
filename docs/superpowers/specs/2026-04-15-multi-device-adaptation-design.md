@@ -161,8 +161,8 @@ TV and standard Material3 components have similar but incompatible APIs — must
 ```
 GimyTheme(darkTheme, isTelevision)
 ├── Colors:
-│   ├── Dark: existing OLED black + #E11D48 (shared across all devices)
-│   └── Light: new light scheme (white background + #E11D48 accent)
+│   ├── Dark: existing OLED black + #9F1832 (shared across all devices)
+│   └── Light: new light scheme (white background + #9F1832 accent)
 ├── Typography:
 │   ├── TV: existing larger type scale (distance reading)
 │   └── Phone/Tablet: standard Material3 Typography
