@@ -68,6 +68,15 @@ android {
     }
 
     lint {
+        // release 建置不跑 lint。
+        //
+        // 不是懶得修：目前的 AGP 8.7.3 + Compose BOM 組合下，lint 自己會掛——
+        // NullSafeMutableLiveData、RememberInComposition、FrequentlyChangingValue
+        // 三個 detector 都拋 IncompatibleClassChangeError（lint 版本與 Compose lint
+        // 產出的 API 對不上）。一條一條 disable 等於把 Compose 的檢查關光，
+        // 開了也檢查不到東西。
+        //
+        // 要解開這條得升 AGP 或 Compose BOM——那是工具鏈升級，不該混在清理裡做。
         checkReleaseBuilds = false
     }
 }
