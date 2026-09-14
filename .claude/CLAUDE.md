@@ -11,13 +11,13 @@ Android TV 影視串流 App，從 gimymax.com / gimytv.ai 抓取影片資料，�
 - Jsoup + OkHttp (web scraping)
 - Room + DataStore (local storage)
 - Hilt (DI), Coil (images), Coroutines + Flow
-- Min SDK 23, Target SDK 35, AGP 8.7.3, Gradle 8.9
+- Min SDK 28, Target SDK 35, AGP 8.7.3, Gradle 8.9
 
 ## Architecture
 Pure client-side, no backend. Clean Architecture: UI → Domain → Data layers.
 
 ## Key Conventions
-- Code comments and variable names in English
-- Git commits in English
+- Code comments in Traditional Chinese; variable / function / type names stay English
+- Git commits in Traditional Chinese, no AI attribution
 - User communication in Traditional Chinese (zh-TW)
 - Design theme: Cinematic Dark (OLED black + wine red accent #9F1832)
