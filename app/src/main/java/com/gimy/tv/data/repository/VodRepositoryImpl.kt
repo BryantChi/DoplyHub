@@ -2,7 +2,6 @@ package com.gimy.tv.data.repository
 
 import com.gimy.tv.data.cache.TtlLruCache
 import com.gimy.tv.data.endpoint.EndpointResolver
-import com.gimy.tv.data.local.dao.VodCacheDao
 import com.gimy.tv.domain.repository.SourcePreferences
 import com.gimy.tv.data.scraper.EynyTvSource
 import com.gimy.tv.data.scraper.Forum5278Source
@@ -99,7 +98,6 @@ class VodRepositoryImpl @Inject constructor(
     private val jableTvSource: JableTvSource,
     private val xnxxSource: XnxxSource,
     private val forum5278Source: Forum5278Source,
-    private val vodCacheDao: VodCacheDao,
     private val okHttpClient: OkHttpClient,
     private val endpointResolver: EndpointResolver,
     private val sourcePreferencesRepository: SourcePreferences,
@@ -509,12 +507,6 @@ class VodRepositoryImpl @Inject constructor(
             for (d in deferreds) all = mergeSearchResults(all, d.await().filterNot { looksAdult(it) })
             all.filter { isSameSeries(baseTitle, it, vod.id) }
         }
-    }
-
-    private fun inferSeriesFromRelated(currentVod: Vod, relatedVods: List<Vod>): List<Vod> {
-        val baseTitle = extractSeriesBase(currentVod.title)
-        if (baseTitle.isBlank() || baseTitle.length < 2) return emptyList()
-        return relatedVods.filter { isSameSeries(baseTitle, it, currentVod.id) }
     }
 
     // ── Enriched detail with cross-source episode groups ──

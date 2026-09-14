@@ -95,6 +95,17 @@ object DatabaseModule {
         }
     }
 
+    /**
+     * vod_cache 從 v1 就在，但整張表從來沒有被讀寫過——快取實際上都在記憶體裡
+     * （VodRepositoryImpl 的 gimyHomeCache／detailCache）。空表不佔空間，但留著會讓人
+     * 以為有一層磁碟快取在運作，查效能問題時找錯方向。
+     */
+    private val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP TABLE IF EXISTS `vod_cache`")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): GimyDatabase {
@@ -102,7 +113,7 @@ object DatabaseModule {
             context,
             GimyDatabase::class.java,
             "gimy_tv.db"
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
          // 只在「降版」時才允許砍表重建。
          //
          // 原本是無條件的 fallbackToDestructiveMigration()：目前 1→6 的 migration 是連續的，
@@ -118,9 +129,6 @@ object DatabaseModule {
 
     @Provides
     fun provideWatchHistoryDao(db: GimyDatabase): WatchHistoryDao = db.watchHistoryDao()
-
-    @Provides
-    fun provideVodCacheDao(db: GimyDatabase): VodCacheDao = db.vodCacheDao()
 
     @Provides
     fun provideSearchHistoryDao(db: GimyDatabase): SearchHistoryDao = db.searchHistoryDao()

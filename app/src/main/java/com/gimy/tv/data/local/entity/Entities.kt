@@ -52,13 +52,6 @@ data class WatchHistoryEntity(
     val missCount: Int = 0,
 )
 
-@Entity(tableName = "vod_cache")
-data class VodCacheEntity(
-    @PrimaryKey val cacheKey: String,
-    val jsonData: String,
-    val cachedAt: Long = System.currentTimeMillis()
-)
-
 @Entity(tableName = "search_history")
 data class SearchHistoryEntity(
     @PrimaryKey val keyword: String,

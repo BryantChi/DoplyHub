@@ -145,18 +145,6 @@ interface WatchHistoryDao {
 }
 
 @Dao
-interface VodCacheDao {
-    @Query("SELECT * FROM vod_cache WHERE cacheKey = :key AND cachedAt > :minTime LIMIT 1")
-    suspend fun get(key: String, minTime: Long): VodCacheEntity?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(cache: VodCacheEntity)
-
-    @Query("DELETE FROM vod_cache WHERE cachedAt < :maxAge")
-    suspend fun deleteExpired(maxAge: Long)
-}
-
-@Dao
 interface SearchHistoryDao {
     @Query("SELECT * FROM search_history ORDER BY searchedAt DESC LIMIT :limit")
     fun getRecent(limit: Int = 20): Flow<List<SearchHistoryEntity>>
