@@ -163,14 +163,9 @@ fun AdultContentScreen(
                             }
                         }
                     }
-                    rowState.items.isEmpty() -> {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("此分類暫無內容",
-                                color = CinemaTextMuted, fontSize = 13.sp)
-                        }
-                    }
-                    // Loaded fine but parsed nothing — same silent-failure shape the
-                    // general browse screen now reports.
+                    // 有回應但解析不到——這個專案最常見也最難察覺的失效形態。
+                    // 原本這裡有兩個一模一樣的 items.isEmpty() 分支，後面那個（也就是
+                    // 訊息比較有診斷價值的這一段）永遠進不去，畫面上只會看到「此分類暫無內容」。
                     rowState.items.isEmpty() -> {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
