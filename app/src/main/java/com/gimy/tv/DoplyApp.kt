@@ -53,8 +53,14 @@ class DoplyApp : Application(), ImageLoaderFactory {
                 cfCookieStore.warmUp()
                 // 目前唯一需要預解挑戰的是 jable，而 jable 只在成人進階區進得去。
                 // 那個開關預設關閉，所以原本的寫法等於每次冷啟動都為了一個使用者根本
-                // 到不了的來源，在主執行緒建一個 WebView（實測會多開一個 chromium
-                // renderer 行程）再花 6-20 秒解挑戰。關著就整段跳過。
+                // 到不了的來源，花 6-20 秒解一道挑戰。關著就整段跳過。
+                //
+                // 注意這裡跳過的只有「解挑戰」。chromium 照樣會被載進來，因為
+                // WebViewUserAgentProvider 要借 WebView 的真實 UA，而
+                // WebSettings.getDefaultUserAgent() 會完整初始化 WebView。
+                // 2026-09-15 實機實測：即使進階區關閉，冷啟動仍有一個
+                // sandboxed_process0（PSS 6.35 MB），chromium 載入約 42 ms。
+                // 想連這個也省掉，得把「借 UA」改成按需——見 WebViewUserAgentProvider。
                 if (adultContentPreferences.isAdultPlusEnabledNow()) {
                     cloudflareGateway.warmUp(
                         siteSources.get().values.mapNotNull { it.cloudflareWarmUpUrl }
