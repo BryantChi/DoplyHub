@@ -40,6 +40,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 
 @OptIn(ExperimentalTvMaterial3Api::class)
+/** 方向鍵一次快轉／倒轉的毫秒數。 */
+private const val SEEK_STEP_MS = 10_000L
+
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun PlayerScreen(
@@ -104,10 +107,27 @@ fun PlayerScreen(
     // PlayerView reference for showing/hiding controller
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
 
+    // 長按方向鍵時累積中的目標位置；-1 代表沒有待處理的 seek。
+    //
+    // Android 長按會持續送 ACTION_DOWN（repeatCount 遞增），每一次都直接 seekTo 的話，
+    // HLS 每次都要重新緩衝，畫面卡住而且位置跳得亂七八糟。單次點按仍然立刻 seek，
+    // 只有重複事件走累積＋去抖動這條路。
+    var pendingSeekMs by remember { mutableLongStateOf(-1L) }
+    var seekNonce by remember { mutableIntStateOf(0) }
+
     // Error retry limiter — prevent infinite prepare() loop
     var errorRetryCount by remember { mutableIntStateOf(0) }
     // 重試的等待要在協程裡做；離開播放器時這個 scope 會連同 composition 一起取消。
     val retryScope = rememberCoroutineScope()
+
+    // 長按停下來 200ms 後才真的 seek。key 每次重複都會變，所以前一個 delay 會被取消。
+    LaunchedEffect(seekNonce) {
+        if (pendingSeekMs >= 0) {
+            delay(200)
+            runCatching { exoPlayer.seekTo(pendingSeekMs) }
+            pendingSeekMs = -1L
+        }
+    }
 
     // Info bar visibility with auto-hide counter
     var infoVisible by remember { mutableStateOf(true) }
@@ -383,19 +403,26 @@ fun PlayerScreen(
                                         true
                                     }
                                     KeyEvent.KEYCODE_DPAD_LEFT,
-                                    KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                                        val target = (exoPlayer.currentPosition - 10_000).coerceAtLeast(0)
-                                        exoPlayer.seekTo(target)
-                                        showController()
-                                        infoTrigger++
-                                        true
-                                    }
+                                    KeyEvent.KEYCODE_MEDIA_REWIND,
                                     KeyEvent.KEYCODE_DPAD_RIGHT,
                                     KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                                        val back = keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+                                            keyCode == KeyEvent.KEYCODE_MEDIA_REWIND
+                                        val step = if (back) -SEEK_STEP_MS else SEEK_STEP_MS
+                                        // 連續事件從上一次的目標接著算，不然長按等於原地打轉
+                                        val base = if (pendingSeekMs >= 0) pendingSeekMs
+                                            else exoPlayer.currentPosition
                                         val dur = exoPlayer.duration
-                                        val raw = exoPlayer.currentPosition + 10_000
+                                        val raw = (base + step).coerceAtLeast(0)
                                         val target = if (dur > 0) raw.coerceAtMost(dur) else raw
-                                        exoPlayer.seekTo(target)
+                                        if (event.repeatCount == 0) {
+                                            // 單次點按：立刻 seek，維持原本的即時回饋
+                                            pendingSeekMs = -1L
+                                            exoPlayer.seekTo(target)
+                                        } else {
+                                            pendingSeekMs = target
+                                            seekNonce++
+                                        }
                                         showController()
                                         infoTrigger++
                                         true
