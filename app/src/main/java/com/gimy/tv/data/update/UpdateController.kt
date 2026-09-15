@@ -219,9 +219,11 @@ class UpdateController @Inject constructor(
         return false
     }
 
-    /** 清掉 cacheDir 裡殘留的 APK。 */
-    private fun clearDownloadedApks() {
-        File(context.cacheDir, "apk").listFiles()?.forEach { it.delete() }
+    /** 清掉 cacheDir 裡殘留的 APK；[keep] 指定的那一份留著（續傳用）。 */
+    private fun clearDownloadedApks(keep: File? = null) {
+        File(context.cacheDir, "apk").listFiles()?.forEach {
+            if (keep == null || it.name != keep.name) it.delete()
+        }
     }
 
     /**
@@ -234,15 +236,27 @@ class UpdateController @Inject constructor(
         info: UpdateInfo.Available,
         onProgress: (downloaded: Long, total: Long) -> Unit,
     ): File {
-        return try {
-            downloadApkFrom(info, info.downloadUrl, onProgress)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            val fallback = info.fallbackDownloadUrl ?: throw e
-            android.util.Log.w("UpdateDownload", "主要來源失敗，改用備援：$fallback", e)
-            downloadApkFrom(info, fallback, onProgress)
+        val sources = listOfNotNull(info.downloadUrl, info.fallbackDownloadUrl)
+        var last: Exception? = null
+        for (url in sources) {
+            // 同一條來源給三次機會，每次都從已落檔的位置續傳。慢網路上最常見的是
+            // 讀到一半斷線，重來一遍只會再斷一次；接著下去才有機會走完。
+            repeat(DOWNLOAD_ATTEMPTS_PER_SOURCE) { attempt ->
+                try {
+                    return downloadApkFrom(info, url, onProgress)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    last = e
+                    android.util.Log.w(
+                        "UpdateDownload",
+                        "下載失敗（來源 ${sources.indexOf(url) + 1}/${sources.size}，第 ${attempt + 1} 次）：$url",
+                        e,
+                    )
+                }
+            }
         }
+        throw last ?: IllegalStateException("沒有可用的下載來源")
     }
 
     private suspend fun downloadApkFrom(
@@ -251,20 +265,33 @@ class UpdateController @Inject constructor(
         onProgress: (downloaded: Long, total: Long) -> Unit,
     ): File = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "apk").apply { mkdirs() }
-        // Clear stale APKs before downloading new one
-        clearDownloadedApks()
-
         val target = File(dir, "DoplyHub-v${info.latestVersion}.apk")
-        val req = Request.Builder().url(url).get().build()
+        // 只清掉「別版」的殘檔。這一版的半截檔要留著才能續傳——以前無條件清光，
+        // 於是每次重試都從 0 開始，慢網路上等於永遠走不完。
+        clearDownloadedApks(keep = target)
+
+        val have = if (target.isFile) target.length() else 0L
+        val resume = have > 0 && info.sizeBytes > 0 && have < info.sizeBytes
+        val req = Request.Builder().url(url).get()
+            .apply { if (resume) header("Range", "bytes=$have-") }
+            .build()
         try {
             downloadClient.newCall(req).execute().use { resp ->
+                // 206 = 伺服器接受續傳；200 = 不支援（或我們沒要求），從頭給整份。
+                val appending = resp.code == 206
                 if (!resp.isSuccessful) error("HTTP ${resp.code}")
+                if (resume && !appending) target.delete()
                 val body = resp.body ?: error("空白回應")
-                val total = if (body.contentLength() > 0) body.contentLength() else info.sizeBytes
-                target.sink().buffer().use { sink ->
+                val already = if (appending) have else 0L
+                val total = when {
+                    info.sizeBytes > 0 -> info.sizeBytes
+                    body.contentLength() > 0 -> already + body.contentLength()
+                    else -> 0L
+                }
+                target.sink(append = appending).buffer().use { sink ->
                     body.source().use { source ->
                         val buf = okio.Buffer()
-                        var totalRead = 0L
+                        var totalRead = already
                         var lastNotify = 0L
                         while (true) {
                             // 阻塞的 read 吃不到 coroutine 取消，每輪主動檢查一次。
@@ -301,4 +328,9 @@ class UpdateController @Inject constructor(
         }
         target
     }
+    private companion object {
+        /** 每個來源重試幾次。慢網路上「讀到一半斷線」很常見，續傳接下去才走得完。 */
+        const val DOWNLOAD_ATTEMPTS_PER_SOURCE = 3
+    }
+
 }
