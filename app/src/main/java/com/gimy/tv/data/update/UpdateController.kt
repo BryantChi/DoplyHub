@@ -219,8 +219,30 @@ class UpdateController @Inject constructor(
         File(context.cacheDir, "apk").listFiles()?.forEach { it.delete() }
     }
 
+    /**
+     * 先試主要來源（CDN），失敗才退回 GitHub。
+     *
+     * 取消不重試——那是使用者自己按的。其餘失敗（連不上、CDN 還沒同步到這個 tag、
+     * 落檔大小對不上）都值得換一條線再試一次，畢竟更新失敗的代價是使用者完全裝不了。
+     */
     private suspend fun downloadApk(
         info: UpdateInfo.Available,
+        onProgress: (downloaded: Long, total: Long) -> Unit,
+    ): File {
+        return try {
+            downloadApkFrom(info, info.downloadUrl, onProgress)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val fallback = info.fallbackDownloadUrl ?: throw e
+            android.util.Log.w("UpdateDownload", "主要來源失敗，改用備援：$fallback", e)
+            downloadApkFrom(info, fallback, onProgress)
+        }
+    }
+
+    private suspend fun downloadApkFrom(
+        info: UpdateInfo.Available,
+        url: String,
         onProgress: (downloaded: Long, total: Long) -> Unit,
     ): File = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "apk").apply { mkdirs() }
@@ -228,7 +250,7 @@ class UpdateController @Inject constructor(
         clearDownloadedApks()
 
         val target = File(dir, "DoplyHub-v${info.latestVersion}.apk")
-        val req = Request.Builder().url(info.downloadUrl).get().build()
+        val req = Request.Builder().url(url).get().build()
         try {
             downloadClient.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) error("HTTP ${resp.code}")

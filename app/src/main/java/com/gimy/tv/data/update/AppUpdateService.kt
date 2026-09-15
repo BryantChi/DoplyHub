@@ -63,8 +63,10 @@ class AppUpdateService @Inject constructor(
             latest > current -> UpdateInfo.Available(
                 currentVersion = current,
                 latestVersion = latest,
-                downloadUrl = release.apkUrl
+                // CDN 優先：GitHub release asset 在台灣只有 ~89 KB/s，5.7MB 要 40 秒以上。
+                downloadUrl = release.cdnUrl ?: release.apkUrl
                     ?: return@withContext UpdateInfo.Error("最新版本未提供 APK 下載連結"),
+                fallbackDownloadUrl = release.apkUrl.takeIf { release.cdnUrl != null },
                 sizeBytes = release.apkSize,
                 changelog = plainChangelog(release.body).ifBlank { "無更新說明" },
                 isMandatory = needsForce,
@@ -76,7 +78,8 @@ class AppUpdateService @Inject constructor(
             needsForce && release.apkUrl != null -> UpdateInfo.Available(
                 currentVersion = current,
                 latestVersion = latest,
-                downloadUrl = release.apkUrl,
+                downloadUrl = release.cdnUrl ?: release.apkUrl,
+                fallbackDownloadUrl = release.apkUrl.takeIf { release.cdnUrl != null },
                 sizeBytes = release.apkSize,
                 changelog = plainChangelog(release.body),
                 isMandatory = true,
@@ -103,11 +106,11 @@ class AppUpdateService @Inject constructor(
             if (resp.code == 404) return@withTimeout null
             if (!resp.isSuccessful) error("GitHub API ${resp.code}")
             val body = resp.body?.string() ?: error("Empty response")
-            parseRelease(body)
+            parseRelease(body, repo)
         }
     }
 
-    private fun parseRelease(json: String): GitHubRelease {
+    private fun parseRelease(json: String, repo: String): GitHubRelease {
         val root = JSONObject(json)
         val tag = root.optString("tag_name", "")
         val body = root.optString("body", "").trim()
@@ -125,7 +128,14 @@ class AppUpdateService @Inject constructor(
                 }
             }
         }
-        return GitHubRelease(tagName = tag, body = body, apkUrl = apkUrl, apkSize = apkSize)
+        val fileName = apkUrl?.substringAfterLast('/').orEmpty()
+        return GitHubRelease(
+            tagName = tag,
+            body = body,
+            apkUrl = apkUrl,
+            apkSize = apkSize,
+            cdnUrl = DownloadMirror.cdnUrlFor(repo, tag, fileName),
+        )
     }
 
     private data class GitHubRelease(
@@ -133,5 +143,6 @@ class AppUpdateService @Inject constructor(
         val body: String,
         val apkUrl: String?,
         val apkSize: Long,
+        val cdnUrl: String? = null,
     )
 }
