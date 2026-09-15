@@ -66,7 +66,7 @@ class AppUpdateService @Inject constructor(
                 downloadUrl = release.apkUrl
                     ?: return@withContext UpdateInfo.Error("最新版本未提供 APK 下載連結"),
                 sizeBytes = release.apkSize,
-                changelog = release.body.ifBlank { "無更新說明" },
+                changelog = plainChangelog(release.body).ifBlank { "無更新說明" },
                 isMandatory = needsForce,
                 mandatoryMessage = updateConfig.forceUpdateMessage,
             )
@@ -78,7 +78,7 @@ class AppUpdateService @Inject constructor(
                 latestVersion = latest,
                 downloadUrl = release.apkUrl,
                 sizeBytes = release.apkSize,
-                changelog = release.body,
+                changelog = plainChangelog(release.body),
                 isMandatory = true,
                 mandatoryMessage = updateConfig.forceUpdateMessage,
             )
