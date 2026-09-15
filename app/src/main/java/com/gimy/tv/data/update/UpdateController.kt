@@ -63,7 +63,12 @@ class UpdateController @Inject constructor(
     private val downloadClient: OkHttpClient by lazy {
         okHttpClient.newBuilder()
             .callTimeout(0, TimeUnit.MILLISECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
+            // connectTimeout 一定要一起放寬——它是繼承主 client 的 8 秒，而備援來源
+            // release-assets.githubusercontent.com 在台灣建連線經常超過那個數字，
+            // 於是「CDN 失敗就退回 GitHub」這條路等於不存在，照樣 timeout。
+            // 下載是背景進行、使用者看得到進度，慢一點沒關係，失敗才是問題。
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
             .cache(null)
             .apply {
                 // 只拿掉這兩個具名的；不可以用 clear()，那會把 NetworkModule 裡
