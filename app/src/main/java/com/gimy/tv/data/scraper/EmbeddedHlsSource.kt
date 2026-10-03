@@ -73,7 +73,7 @@ abstract class EmbeddedHlsSource(
     protected val idToSlug = com.gimy.tv.data.cache.TtlLruCache<Long, String>(slugCacheCapacity)
 
     protected fun stableId(slug: String): Long = slugToId.getOrPut(slug) {
-        val id = stableHashLong(slug)
+        val id = slugStableId(slug)
         idToSlug.put(id, slug)
         id
     }
@@ -106,11 +106,6 @@ abstract class EmbeddedHlsSource(
         if (rows.isNotEmpty()) runCatching { dao.insertAll(rows) }
     }
 
-    private fun stableHashLong(s: String): Long {
-        var h = 1125899906842597L
-        for (c in s) h = 31L * h + c.code.toLong()
-        return h and 0x7FFFFFFFFFFFFFFFL  // strip sign so Vod.id is non-negative
-    }
 
     // ─── SiteSource impl ───
     // These sites have no traditional categories; AdultPlusScreen drives list URLs directly

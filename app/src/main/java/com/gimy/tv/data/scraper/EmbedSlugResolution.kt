@@ -24,3 +24,14 @@ internal suspend fun resolveSlug(
     remember(vodId, stored)
     return stored
 }
+
+/**
+ * slug（或 cuid）→ 穩定的非負 Long id。
+ *
+ * 演算法一個字都不能改：Jable／XNXX／Imaple 的收藏與觀看紀錄只存這個 id，改了就全部對不回 slug。
+ */
+internal fun slugStableId(slug: String): Long {
+    var h = 1125899906842597L
+    for (c in slug) h = 31L * h + c.code.toLong()
+    return h and 0x7FFFFFFFFFFFFFFFL  // 去掉符號位，Vod.id 才不會是負數
+}

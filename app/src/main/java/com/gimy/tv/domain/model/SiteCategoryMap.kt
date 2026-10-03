@@ -135,11 +135,13 @@ val SourceType.categoryMap: SiteCategoryMap get() = when (this) {
         japanese = 16, american = 24, documentary = 20,
         adultCategories = listOf(AdultEntry(27, "倫理")),
     )
+    // 2026-10-03 起是新平台（路徑式分類，見 ImapleTvSource.kt 的 IMAPLE_CATEGORY_PATHS）。
+    // 這些 typeId 只是 App 內部代碼、不對應站上任何數字；categoryFor 靠它們反查，所以不可重複。
+    // 新平台沒有成人分類。
     SourceType.IMAPLE_TV -> SiteCategoryMap(
         movie = 1, series = 2, variety = 3, anime = 4,
-        korean = 15, chinese = 13, hk = 21, taiwan = 20,
-        japanese = 22, american = 16, documentary = 32,
-        adultCategories = listOf(AdultEntry(59, "倫理")),
+        korean = 5, chinese = 6, hk = 7, taiwan = 8,
+        japanese = 9, american = 10, documentary = 11,
     )
     SourceType.MOMOVOD -> SiteCategoryMap(
         movie = 1, series = 2, variety = 3, anime = 4,
