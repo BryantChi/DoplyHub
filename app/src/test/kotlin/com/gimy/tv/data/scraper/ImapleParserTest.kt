@@ -65,6 +65,30 @@ class ImapleParserTest {
         assertThat(cards[1].status).isEqualTo("更新至第18集")
     }
 
+    /**
+     * 2026-10-04 列表頁改成 site-card 版型（h3 沒有 class 也沒有 title 屬性），搜尋頁仍是 stub 版型，
+     * 兩種同時存在。選擇器綁 class 名稱的話，站方一改名就整列解析不到。
+     */
+    @Test fun `site-card list markup parses like the stub markup`() {
+        val html = """
+            <div><span class="filter-label">共 <span class="font-semibold">3,143</span> 部</span></div>
+            <a class="navigation-link site-card site-card--excerpt" href="/title/cmuiku92e010onr2nevyt7pq7"><div class="site-card-image"><div class="skeleton absolute inset-0" aria-hidden="true"></div><img src="/pi/360/pZG9.webp" alt="潛入你心" loading="eager" class="h-full w-full object-cover"/></div><div class="site-card-copy"><h3>潛入你心</h3><p class="site-card-meta">更新至 EP 03</p><p class="site-card-blurb">尹夏娜是備受亞洲矚目的頂級女星。</p></div><span class="site-card-score" aria-label="評分 6.0">6.0</span><span aria-hidden="true" class="navigation-hint"></span></a>
+            <a class="breadcrumb" href="/title/cmuiku92e010onr2nevyt7pq7">潛入你心</a>
+        """.trimIndent()
+        val cards = ImapleParser.parseCards(Jsoup.parse(html, base), base)
+        assertThat(cards).hasSize(1)
+        assertThat(cards[0].cuid).isEqualTo("cmuiku92e010onr2nevyt7pq7")
+        assertThat(cards[0].title).isEqualTo("潛入你心")
+        assertThat(cards[0].coverUrl).isEqualTo("https://imaple.tv/pi/360/pZG9.webp")
+        assertThat(cards[0].status).isEqualTo("更新至 EP 03")
+    }
+
+    /** 只有文字、沒有海報也沒有片名標題的 /title/ 連結（麵包屑、內文連結）不是卡片。 */
+    @Test fun `plain text links to a title are not cards`() {
+        val html = """<p>相關：<a href="/title/cmaaaaaaaaaaaaaaaaaaaaaaa">另一部片</a></p>"""
+        assertThat(ImapleParser.parseCards(Jsoup.parse(html, base), base)).isEmpty()
+    }
+
     @Test fun `list total reads the number with a thousands separator`() {
         assertThat(ImapleParser.parseListTotal(Jsoup.parse(listHtml, base))).isEqualTo(5742)
     }

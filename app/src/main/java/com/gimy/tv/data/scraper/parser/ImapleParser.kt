@@ -38,19 +38,27 @@ internal object ImapleParser {
     private val SEARCH_TOTAL = Regex("""找到\s*([\d,]+)\s*筆""")
     private val YEAR = Regex("""\d{4}""")
 
+    /**
+     * 不綁 class 名稱：2026-10-04 列表頁從 `a.stub`（h3.stub-title、p.stub-meta）改成
+     * `a.site-card`（h3 無 class、p.site-card-meta），搜尋頁卻還是 stub，兩種版型同時存在。
+     * 改認「指向 /title/、且帶海報或片名標題的連結」；只有文字的連結（麵包屑、內文）不算卡片。
+     */
     fun parseCards(doc: Document, baseUrl: String): List<ImapleCard> =
-        doc.select("a.stub[href^=/title/]").mapNotNull { a ->
+        doc.select("a[href^=/title/]").mapNotNull { a ->
             val cuid = a.attr("href").removePrefix("/title/").substringBefore('?').substringBefore('/')
             if (cuid.isBlank()) return@mapNotNull null
             val img = a.selectFirst("img")
-            val title = a.selectFirst("h3.stub-title")?.attr("title")?.trim()?.takeIf { it.isNotEmpty() }
+            val heading = a.selectFirst("h3")
+            if (img == null && heading == null) return@mapNotNull null
+            val title = heading?.attr("title")?.trim()?.takeIf { it.isNotEmpty() }
+                ?: heading?.text()?.trim()?.takeIf { it.isNotEmpty() }
                 ?: img?.attr("alt")?.trim().orEmpty()
             if (title.isEmpty()) return@mapNotNull null
             ImapleCard(
                 cuid = cuid,
                 title = title,
                 coverUrl = absolutize(img?.attr("src").orEmpty(), baseUrl),
-                status = a.selectFirst("p.stub-meta")?.text()?.trim().orEmpty(),
+                status = a.selectFirst("p[class*=meta]")?.text()?.trim().orEmpty(),
             )
         }.distinctBy { it.cuid }
 
