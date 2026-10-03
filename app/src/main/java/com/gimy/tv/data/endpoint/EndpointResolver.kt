@@ -85,7 +85,12 @@ class EndpointResolver @Inject constructor(
                 EndpointCandidate("https://gimyai.tw", "poster"),
                 EndpointCandidate("https://gimytv.me", "card"),
             ),
-            SourceType.MOVIEFFM to listOf(EndpointCandidate("https://www.movieffm.net", null)),
+            // 2026-10-03 起整站 301 到 www.mvffm.net。舊網域留作第二候選：站方若再搬家，
+            // 舊網域的轉址通常會跟著指到最新網域，比沒有備援好。
+            SourceType.MOVIEFFM to listOf(
+                EndpointCandidate("https://www.mvffm.net", null),
+                EndpointCandidate("https://www.movieffm.net", null),
+            ),
             SourceType.GIMY_TW to listOf(EndpointCandidate("https://gimy.tw", null)),
             SourceType.EYNY_TV to listOf(EndpointCandidate("https://eynytv.com", null)),
             SourceType.IMAPLE_TV to listOf(EndpointCandidate("https://imaple.tv", null)),
