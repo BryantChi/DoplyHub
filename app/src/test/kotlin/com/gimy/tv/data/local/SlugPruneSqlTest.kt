@@ -1,6 +1,7 @@
 package com.gimy.tv.data.local
 
 import com.gimy.tv.data.local.dao.EMBED_SLUG_PRUNE_SQL
+import com.gimy.tv.data.local.dao.MOVIEFFM_SLUG_PRUNE_SQL
 import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Before
@@ -28,6 +29,10 @@ class SlugPruneSqlTest {
         exec(
             "CREATE TABLE embed_slugs (vodId INTEGER NOT NULL, slug TEXT NOT NULL, " +
                 "sourceType TEXT NOT NULL, cachedAt INTEGER NOT NULL, PRIMARY KEY(sourceType, vodId))"
+        )
+        exec(
+            "CREATE TABLE movieffm_slugs (vodId INTEGER PRIMARY KEY NOT NULL, slug TEXT NOT NULL, " +
+                "contentType TEXT NOT NULL, cachedAt INTEGER NOT NULL)"
         )
     }
 
@@ -75,6 +80,28 @@ class SlugPruneSqlTest {
         slug(4, "XNXX", fresh)
         prune(EMBED_SLUG_PRUNE_SQL)
         assertThat(remaining("embed_slugs")).containsExactly(4L)
+    }
+
+    private fun movieffmSlug(vodId: Long, cachedAt: Long) =
+        exec("INSERT INTO movieffm_slugs VALUES ($vodId, 'm$vodId', 'movies', $cachedAt)")
+
+    /** MovieFFM 的對照只在列表、搜尋、相關推薦寫入；開收藏只讀不寫，跟 embed_slugs 同一個問題。 */
+    @Test fun `movieffm favorites survive pruning`() {
+        movieffmSlug(10, old)
+        movieffmSlug(11, old)
+        movieffmSlug(12, fresh)
+        exec("INSERT INTO favorites VALUES (10, 'MOVIEFFM')")
+        exec("INSERT INTO watch_history VALUES (11, 'MOVIEFFM')")
+        prune(MOVIEFFM_SLUG_PRUNE_SQL)
+        assertThat(remaining("movieffm_slugs")).containsExactly(10L, 11L, 12L)
+    }
+
+    /** movieffm_slugs 沒有 sourceType 欄位，只能比對 'MOVIEFFM'：別的來源收藏同一個數字不算。 */
+    @Test fun `movieffm rows are not protected by other sources`() {
+        movieffmSlug(13, old)
+        exec("INSERT INTO favorites VALUES (13, 'GIMYTV')")
+        prune(MOVIEFFM_SLUG_PRUNE_SQL)
+        assertThat(remaining("movieffm_slugs")).isEmpty()
     }
 
     /** 各來源的 id 空間各自獨立：別的來源收藏了同一個數字，不能替這一列擋下清理。 */

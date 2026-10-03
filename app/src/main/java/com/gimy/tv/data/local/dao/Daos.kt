@@ -159,6 +159,17 @@ interface SearchHistoryDao {
     suspend fun deleteAll()
 }
 
+/**
+ * movieffm_slugs 的啟動清理。被收藏或觀看紀錄引用的列不刪（同 EMBED_SLUG_PRUNE_SQL 的理由）。
+ * 這張表沒有 sourceType 欄位，收藏端以 'MOVIEFFM' 比對。
+ */
+internal const val MOVIEFFM_SLUG_PRUNE_SQL =
+    "DELETE FROM movieffm_slugs WHERE cachedAt < :thresholdMs " +
+        "AND NOT EXISTS (SELECT 1 FROM favorites f " +
+        "WHERE f.vodId = movieffm_slugs.vodId AND f.sourceType = 'MOVIEFFM') " +
+        "AND NOT EXISTS (SELECT 1 FROM watch_history h " +
+        "WHERE h.vodId = movieffm_slugs.vodId AND h.sourceType = 'MOVIEFFM')"
+
 @Dao
 interface MovieffmSlugDao {
     @Query("SELECT slug FROM movieffm_slugs WHERE vodId = :vodId LIMIT 1")
@@ -184,7 +195,7 @@ interface MovieffmSlugDao {
     /** Drop slug rows whose cachedAt is older than [thresholdMs]. Used by a future
      *  periodic prune so this table doesn't grow without bound. Returns the
      *  number of rows removed. */
-    @Query("DELETE FROM movieffm_slugs WHERE cachedAt < :thresholdMs")
+    @Query(MOVIEFFM_SLUG_PRUNE_SQL)
     suspend fun pruneOlderThan(thresholdMs: Long): Int
 }
 
