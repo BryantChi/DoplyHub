@@ -21,6 +21,16 @@ val SourceType.displayName: String get() = when (this) {
 }
 
 /**
+ * 已併入其他來源、不再使用的型別。enum 值保留：收藏與觀看紀錄存的是型別名稱字串，刪掉的話
+ * 讀舊資料會在 valueOf 崩潰。2026-10-03 起 Eyny／Kubo 與 Imaple 是同一個資料庫，併入 IMAPLE_TV。
+ */
+val SourceType.isRetired: Boolean
+    get() = this == SourceType.EYNY_TV || this == SourceType.KUBO123
+
+/** 仍在使用的來源。列舉來源的地方（啟用清單、設定頁、端點探測）一律用這個，不要直接用 values()。 */
+fun activeSourceTypes(): List<SourceType> = SourceType.values().filterNot { it.isRetired }
+
+/**
  * 整站都是成人內容的來源。收藏／觀看紀錄用它自動標 isAdult，搜尋失敗時用它擋掉
  * 退回一般站台的備援。這份名單原本在兩個 repository 各寫一次，加新來源時很容易只改一邊，
  * 所以放在 SourceType 旁邊當唯一來源。

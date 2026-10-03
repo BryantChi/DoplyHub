@@ -561,14 +561,14 @@ private fun LoadingOverlay() {
 // ═══════════════════════════════════════
 
 /** Configuration: which (source, category) combinations to surface as bonus rows.
- *  Picks differentiated content per source: imaple's anime depth, momovod's chinese drama
- *  pool, etc. Each row only fetches when LazyColumn composes it (= when user scrolls into view). */
+ *  Imaple 同時提供三列：2026-10-03 起 eynytv／123kubo 已併入 Imaple，原本那兩列改由它供應，
+ *  首頁排版不變。Each row only fetches when LazyColumn composes it. */
 private val MORE_SOURCES: List<Pair<SourceType, StandardCategory>> = listOf(
     SourceType.IMAPLE_TV to StandardCategory.ANIME,
     SourceType.MOMOVOD to StandardCategory.CHINESE,
-    SourceType.KUBO123 to StandardCategory.KOREAN,
+    SourceType.IMAPLE_TV to StandardCategory.KOREAN,
     SourceType.GIMY_TW to StandardCategory.CHINESE,
-    SourceType.EYNY_TV to StandardCategory.MOVIE,
+    SourceType.IMAPLE_TV to StandardCategory.MOVIE,
 )
 
 

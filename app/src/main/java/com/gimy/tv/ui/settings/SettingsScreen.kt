@@ -29,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gimy.tv.domain.model.UpdateState
 import com.gimy.tv.domain.model.SourceType
+import com.gimy.tv.domain.model.activeSourceTypes
 import com.gimy.tv.domain.model.displayName
 import com.gimy.tv.ui.components.DoplyButton
 import com.gimy.tv.ui.components.PinInputDialog
@@ -142,7 +143,7 @@ fun SettingsScreen(
                         color = CinemaTextMuted, fontSize = 12.sp,
                     )
                     Spacer(Modifier.height(8.dp))
-                    SourceType.values().forEach { type ->
+                    activeSourceTypes().forEach { type ->
                         SourceToggleRow(
                             label = type.displayName,
                             enabled = type in enabledSources,

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import com.gimy.tv.domain.repository.SourcePreferences
 import com.gimy.tv.domain.model.SourceType
+import com.gimy.tv.domain.model.activeSourceTypes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,11 +38,11 @@ class SourcePreferencesRepository @Inject constructor(
     /** Set of currently-enabled sources. Eagerly hot — VodRepositoryImpl reads `.value` synchronously. */
     override val enabledSources: StateFlow<Set<SourceType>> = dataStore.data
         .map { prefs ->
-            SourceType.values().filter { type ->
+            activeSourceTypes().filter { type ->
                 prefs[keyFor(type)] ?: true
             }.toSet()
         }
-        .stateIn(scope, SharingStarted.Eagerly, SourceType.values().toSet())
+        .stateIn(scope, SharingStarted.Eagerly, activeSourceTypes().toSet())
 
     override suspend fun setEnabled(sourceType: SourceType, enabled: Boolean) {
         dataStore.edit { it[keyFor(sourceType)] = enabled }
@@ -58,7 +59,7 @@ class SourcePreferencesRepository @Inject constructor(
      */
     override suspend fun snapshot(): Set<SourceType> {
         val prefs = dataStore.data.first()
-        return SourceType.values().filter { prefs[keyFor(it)] ?: true }.toSet()
+        return activeSourceTypes().filter { prefs[keyFor(it)] ?: true }.toSet()
     }
 
     private fun keyFor(type: SourceType) = booleanPreferencesKey("source_${type.name}")

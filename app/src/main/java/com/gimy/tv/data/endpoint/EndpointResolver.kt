@@ -13,6 +13,7 @@ import com.gimy.tv.data.network.withBudget
 import com.gimy.tv.data.update.SemVer
 import com.gimy.tv.data.update.UpdateConfig
 import com.gimy.tv.domain.model.SourceType
+import com.gimy.tv.domain.model.activeSourceTypes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -93,7 +94,12 @@ class EndpointResolver @Inject constructor(
             ),
             SourceType.GIMY_TW to listOf(EndpointCandidate("https://gimy.tw", null)),
             SourceType.EYNY_TV to listOf(EndpointCandidate("https://eynytv.com", null)),
-            SourceType.IMAPLE_TV to listOf(EndpointCandidate("https://imaple.tv", null)),
+            // 2026-10-03 起 imaple／eynytv／123kubo 是同一套新平台、同一個資料庫，三個網域互為備援。
+            SourceType.IMAPLE_TV to listOf(
+                EndpointCandidate("https://imaple.tv", null),
+                EndpointCandidate("https://eynytv.com", null),
+                EndpointCandidate("https://123kubo.net", null),
+            ),
             SourceType.MOMOVOD to listOf(EndpointCandidate("https://momovod.app", null)),
             SourceType.KUBO123 to listOf(EndpointCandidate("https://123kubo.net", null)),
             SourceType.JABLE_TV to listOf(EndpointCandidate("https://jable.tv", null)),
@@ -203,7 +209,8 @@ class EndpointResolver @Inject constructor(
         // （每個候選最多 PROBE_TIMEOUT_MS × 11 個來源），久到錯誤畫面按重試根本等不完，
         // 只能做成 fire-and-forget、當次仍用舊網址。改成並行後整輪只等最慢的那一個。
         val results = coroutineScope {
-            SourceType.values().map { type -> async { type to resolveOne(type, remoteConfig) } }.awaitAll()
+            // 退役的來源不探測：已不註冊，探測只是白白打已停用的網站。
+            activeSourceTypes().map { type -> async { type to resolveOne(type, remoteConfig) } }.awaitAll()
         }
         val newResolved = results.associate { (type, outcome) -> type to outcome.candidate }
         val healthReport = results.mapNotNull { (type, outcome) ->

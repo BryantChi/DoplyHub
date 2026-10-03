@@ -3,14 +3,12 @@ package com.gimy.tv.data.repository
 import com.gimy.tv.data.cache.TtlLruCache
 import com.gimy.tv.data.endpoint.EndpointResolver
 import com.gimy.tv.domain.repository.SourcePreferences
-import com.gimy.tv.data.scraper.EynyTvSource
 import com.gimy.tv.data.scraper.Forum5278Source
 import com.gimy.tv.data.scraper.GimyMaxSource
 import com.gimy.tv.data.scraper.GimyTvSource
 import com.gimy.tv.data.scraper.GimyTwSource
 import com.gimy.tv.data.scraper.ImapleTvSource
 import com.gimy.tv.data.scraper.JableTvSource
-import com.gimy.tv.data.scraper.Kubo123Source
 import com.gimy.tv.data.scraper.MomovodSource
 import com.gimy.tv.data.scraper.MovieffmSource
 import com.gimy.tv.data.scraper.SiteSource
@@ -92,10 +90,8 @@ class VodRepositoryImpl @Inject constructor(
     private val gimyTvSource: GimyTvSource,
     private val movieffmSource: MovieffmSource,
     private val gimyTwSource: GimyTwSource,
-    private val eynyTvSource: EynyTvSource,
     private val imapleTvSource: ImapleTvSource,
     private val momovodSource: MomovodSource,
-    private val kubo123Source: Kubo123Source,
     private val jableTvSource: JableTvSource,
     private val xnxxSource: XnxxSource,
     private val forum5278Source: Forum5278Source,
@@ -132,10 +128,10 @@ class VodRepositoryImpl @Inject constructor(
         SourceType.GIMYTV -> gimyTvSource
         SourceType.MOVIEFFM -> movieffmSource
         SourceType.GIMY_TW -> gimyTwSource
-        SourceType.EYNY_TV -> eynyTvSource
-        SourceType.IMAPLE_TV -> imapleTvSource
+        // Eyny／Kubo 已併入 Imaple（同一個資料庫）。仍可能有舊收藏帶著這兩個型別：導向 Imaple 後，
+        // 開啟失敗時 SavedEntryRecovery 會先在 Imaple 以片名找回，並改指為 IMAPLE_TV。
+        SourceType.EYNY_TV, SourceType.KUBO123, SourceType.IMAPLE_TV -> imapleTvSource
         SourceType.MOMOVOD -> momovodSource
-        SourceType.KUBO123 -> kubo123Source
         SourceType.JABLE_TV -> jableTvSource
         SourceType.XNXX -> xnxxSource
         SourceType.FORUM5278 -> forum5278Source
@@ -211,7 +207,7 @@ class VodRepositoryImpl @Inject constructor(
     private val searchSourceOrder: List<SiteSource> by lazy {
         listOf(
             gimyTvSource, gimyMaxSource, imapleTvSource, gimyTwSource,
-            eynyTvSource, momovodSource, kubo123Source, movieffmSource,
+            momovodSource, movieffmSource,
         )
     }
 

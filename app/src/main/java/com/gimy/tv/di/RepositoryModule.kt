@@ -75,17 +75,11 @@ abstract class RepositoryModule {
     @Binds @IntoMap @SourceTypeKey(SourceType.GIMY_TW)
     abstract fun bindGimyTwIntoMap(s: GimyTwSource): SiteSource
 
-    @Binds @IntoMap @SourceTypeKey(SourceType.EYNY_TV)
-    abstract fun bindEynyTvIntoMap(s: EynyTvSource): SiteSource
-
     @Binds @IntoMap @SourceTypeKey(SourceType.IMAPLE_TV)
     abstract fun bindImapleTvIntoMap(s: ImapleTvSource): SiteSource
 
     @Binds @IntoMap @SourceTypeKey(SourceType.MOMOVOD)
     abstract fun bindMomovodIntoMap(s: MomovodSource): SiteSource
-
-    @Binds @IntoMap @SourceTypeKey(SourceType.KUBO123)
-    abstract fun bindKubo123IntoMap(s: Kubo123Source): SiteSource
 
     @Binds @IntoMap @SourceTypeKey(SourceType.JABLE_TV)
     abstract fun bindJableTvIntoMap(s: JableTvSource): SiteSource
