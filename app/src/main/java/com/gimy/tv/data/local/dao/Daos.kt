@@ -189,6 +189,18 @@ interface MovieffmSlugDao {
 }
 
 
+/**
+ * embed_slugs 的啟動清理。被收藏或觀看紀錄引用的列不刪：對照只在列表頁寫入、開收藏只讀不寫，
+ * 少了這個條件，30 天沒在列表出現的收藏就再也打不開（2026-10-03 查證）。
+ * 抽成常數是為了讓 SlugPruneSqlTest 執行與 @Query 完全相同的字串。
+ */
+internal const val EMBED_SLUG_PRUNE_SQL =
+    "DELETE FROM embed_slugs WHERE cachedAt < :thresholdMs " +
+        "AND NOT EXISTS (SELECT 1 FROM favorites f " +
+        "WHERE f.vodId = embed_slugs.vodId AND f.sourceType = embed_slugs.sourceType) " +
+        "AND NOT EXISTS (SELECT 1 FROM watch_history h " +
+        "WHERE h.vodId = embed_slugs.vodId AND h.sourceType = embed_slugs.sourceType)"
+
 @Dao
 interface EmbedSlugDao {
     @Query("SELECT slug FROM embed_slugs WHERE vodId = :vodId AND sourceType = :sourceType LIMIT 1")
@@ -197,6 +209,6 @@ interface EmbedSlugDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(rows: List<EmbedSlugEntity>)
 
-    @Query("DELETE FROM embed_slugs WHERE cachedAt < :thresholdMs")
+    @Query(EMBED_SLUG_PRUNE_SQL)
     suspend fun pruneOlderThan(thresholdMs: Long): Int
 }

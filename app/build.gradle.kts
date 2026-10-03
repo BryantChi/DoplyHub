@@ -168,4 +168,6 @@ dependencies {
     testImplementation(libs.coroutines.test)
     // android.jar 裡的 org.json 是會丟 "not mocked" 的 stub，JSON 解析的測試需要真實作。
     testImplementation("org.json:json:20240303")
+    // 只給清理 SQL 的測試用：在 JVM 上直接執行與 Room DAO 相同的 SQL 字串。
+    testImplementation("org.xerial:sqlite-jdbc:3.53.4.0")
 }
