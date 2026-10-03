@@ -9,12 +9,12 @@
     ],
     "gimytv": [
       {
-        "url": "https://gimytv.me",
-        "profile": "card"
-      },
-      {
         "url": "https://gimyai.tw",
         "profile": "poster"
+      },
+      {
+        "url": "https://gimytv.me",
+        "profile": "card"
       }
     ],
     "movieffm": [

@@ -77,9 +77,13 @@ class EndpointResolver @Inject constructor(
             SourceType.GIMYMAX to listOf(EndpointCandidate("https://gitube.tv", "browse")),
             // gimyai.tw mirrors gimytv.me's catalogue with identical ids (same id opens the
             // same title on both), so it is a genuine fallback rather than a separate site.
+            // 2026-10-03 起 gimyai.tw 排第一：gimytv.me 播放頁拿掉了 player_data（改由
+            // data-pk 打 /api.php/pk/q 取流），詳情頁也把所有線路併成單一「播放列表」，
+            // 一播就失敗、也沒有其他線路可換。它的列表頁仍正常，探測照樣判定健康，
+            // 所以只能靠排序避開，不能指望探測自動換掉。
             SourceType.GIMYTV to listOf(
-                EndpointCandidate("https://gimytv.me", "card"),
                 EndpointCandidate("https://gimyai.tw", "poster"),
+                EndpointCandidate("https://gimytv.me", "card"),
             ),
             SourceType.MOVIEFFM to listOf(EndpointCandidate("https://www.movieffm.net", null)),
             SourceType.GIMY_TW to listOf(EndpointCandidate("https://gimy.tw", null)),
