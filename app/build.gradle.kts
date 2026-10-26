@@ -23,8 +23,8 @@ android {
         applicationId = "com.gimy.tv"
         minSdk = 28
         targetSdk = 35
-        versionCode = 328
-        versionName = "3.1.18"
+        versionCode = 329
+        versionName = "3.1.19"
     }
 
     signingConfigs {
