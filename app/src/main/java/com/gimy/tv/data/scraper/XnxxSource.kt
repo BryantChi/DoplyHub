@@ -7,6 +7,8 @@ import okhttp3.OkHttpClient
 import org.jsoup.nodes.Document
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.time.LocalDate
+import java.time.YearMonth
 import com.gimy.tv.data.scraper.parser.attrText
 
 /**
@@ -15,16 +17,16 @@ import com.gimy.tv.data.scraper.parser.attrText
  * AdultPlusViewModel (writer) and VodRepositoryImpl (reader). Different instances
  * would silently break detail resolution.
  *
- * URL forms:
- *   List   /best/this_week, /best/today, /best/this_month, /tags/{tag}, /search/{kw}
+ * URL forms（2026-10-26 實測；this_week／today／this_month 與 /tags/ 都已轉址，見 [xnxxListPath]）:
+ *   List   /best/{yyyy-MM}, /search/{kw}
  *   Detail /video-{id}/{slug}       (id like "1h3vtvb4", slug is SEO text)
- *   Pagination: append /{page} (e.g. /best/this_week/2)
+ *   Pagination: append /{page-1}（站方頁碼 0 起算，例如第二頁是 /search/asian/1）
  *
  * Detail page m3u8: html5player.setVideoHLS('https://hls-cdn77.xnxx-cdn.com/{TOKEN}/.../hls.m3u8')
  * Token is IP-bound; same-NAT-IP playback works.
  *
- * Note: home page (/) returns ad-only HTML for mobile UA. /best/this_week works on both
- * desktop and mobile UA, so we route all rows through /best/N and /tags/N paths.
+ * Note: home page (/) returns ad-only HTML for mobile UA, so we route all rows through
+ * /best/{yyyy-MM} and /search/{kw} paths.
  */
 @Singleton
 class XnxxSource @Inject constructor(
@@ -37,12 +39,8 @@ class XnxxSource @Inject constructor(
 
     override val hlsRegex = Regex("""html5player\.setVideoHLS\(['"]([^'"]+\.m3u8[^'"]*)['"]\)""")
 
-    override fun buildListUrlForPath(path: String, page: Int): String {
-        // Caller passes opaque path keys: "best/this_week", "tags/asian", "search/keyword"
-        val cleanPath = path.trim('/')
-        val basePath = if (cleanPath.isEmpty()) "/best/this_week" else "/$cleanPath"
-        return if (page <= 1) "$baseUrl$basePath" else "$baseUrl$basePath/$page"
-    }
+    override fun buildListUrlForPath(path: String, page: Int): String =
+        baseUrl + xnxxListPath(path, page, LocalDate.now())
 
     override fun parseListCards(doc: Document): List<Vod> {
         val items = mutableListOf<Vod>()
@@ -124,24 +122,13 @@ class XnxxSource @Inject constructor(
 
     /**
      * XNXX uses `<div class="pagination">` with numeric anchors that point to
-     * `/best/{period}/N`, `/tags/{slug}/N`, `/search/{kw}/N` — last URL segment IS the
-     * page number, no rel=next anchor exists. Take the largest trailing-/N from any
+     * `/best/{yyyy-MM}/N`, `/search/{kw}/N` — last URL segment is the ZERO-based page
+     * number (see [xnxxMaxPage]), no rel=next anchor exists. Take the largest trailing-/N from any
      * anchor in a pagination block. Returns null if no pagination found (single-page
      * row) so the base class can fall through; AdultPlusBrowseViewModel's `gotNew`
      * gate will naturally stop infinite-load if items duplicate.
      */
-    override fun parseMaxPage(doc: Document): Int? {
-        val anchors = doc.select(".pagination a[href], nav.pagination a[href]")
-        if (anchors.isEmpty()) return null
-        val tailNum = Regex("/(\\d+)/?$")
-        return anchors
-            .mapNotNull {
-                val href = it.attr("href").substringBefore('?').trimEnd('/')
-                tailNum.find(href)?.groupValues?.get(1)?.toIntOrNull()
-            }
-            .maxOrNull()
-            ?.takeIf { it > 0 }
-    }
+    override fun parseMaxPage(doc: Document): Int? = xnxxMaxPage(doc)
 
     override fun detailUrlFor(vodId: Long): String {
         val key = slugForId(vodId)
@@ -167,4 +154,37 @@ class XnxxSource @Inject constructor(
         .replace("&quot;", "\"")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
+}
+
+/**
+ * XNXX 列表網址的路徑部分。[path] 是呼叫端給的鍵，例如 "best"、"search/asian"。
+ *
+ * - "best"（或空字串）展開成 /best/{上個月}：站方 /best 本身就是 301 到上個月的月榜，
+ *   但 /best/N 會被轉回第一頁，所以要自己組出月份才翻得了頁。
+ * - 站方頁碼從 0 起算（/x 是第一頁、/x/1 是第二頁），App 的 page 從 1 起算。
+ */
+internal fun xnxxListPath(path: String, page: Int, today: LocalDate): String {
+    val cleanPath = path.trim('/')
+    val basePath = if (cleanPath.isEmpty() || cleanPath == "best") {
+        "/best/" + YearMonth.from(today).minusMonths(1)
+    } else {
+        "/$cleanPath"
+    }
+    return if (page <= 1) basePath else "$basePath/${page - 1}"
+}
+
+/** 從分頁區塊取最大頁碼（App 的 1 起算）；沒有分頁區塊時回 null。 */
+internal fun xnxxMaxPage(doc: Document): Int? {
+    val anchors = doc.select(".pagination a[href], nav.pagination a[href]")
+    if (anchors.isEmpty()) return null
+    val tailNum = Regex("/(\\d+)/?$")
+    return anchors
+        .mapNotNull {
+            val href = it.attr("href").substringBefore('?').trimEnd('/')
+            tailNum.find(href)?.groupValues?.get(1)?.toIntOrNull()
+        }
+        .maxOrNull()
+        ?.takeIf { it > 0 }
+        // 連結尾碼是 0 起算的頁碼，換成 App 的 1 起算
+        ?.plus(1)
 }

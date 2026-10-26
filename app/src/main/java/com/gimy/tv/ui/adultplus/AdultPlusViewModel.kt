@@ -85,13 +85,12 @@ class AdultPlusViewModel @Inject constructor(
         AdultPlusRow(R.string.adultplus_row_jable_roleplay, SourceType.JABLE_TV, "categories/roleplay"),
         AdultPlusRow(R.string.adultplus_row_jable_uniform, SourceType.JABLE_TV, "categories/uniform"),
         AdultPlusRow(R.string.adultplus_row_jable_private_cam, SourceType.JABLE_TV, "categories/private-cam"),
-        // XNXX — /best/{period}, /tags/{slug}
-        AdultPlusRow(R.string.adultplus_row_xnxx_week, SourceType.XNXX, "best/this_week"),
-        AdultPlusRow(R.string.adultplus_row_xnxx_month, SourceType.XNXX, "best/this_month"),
-        AdultPlusRow(R.string.adultplus_row_xnxx_today, SourceType.XNXX, "best/today"),
-        AdultPlusRow(R.string.adultplus_row_xnxx_asian, SourceType.XNXX, "tags/asian"),
-        AdultPlusRow(R.string.adultplus_row_xnxx_japanese, SourceType.XNXX, "tags/japanese"),
-        AdultPlusRow(R.string.adultplus_row_xnxx_chinese, SourceType.XNXX, "tags/chinese"),
+        // XNXX — "best" 由 xnxxListPath 展開成月榜；/tags/ 已 301 到 /search/。
+        // 原本的本週／今日最佳 2026-10 起都轉到同一個月榜，三列內容相同，所以併成一列。
+        AdultPlusRow(R.string.adultplus_row_xnxx_month, SourceType.XNXX, "best"),
+        AdultPlusRow(R.string.adultplus_row_xnxx_asian, SourceType.XNXX, "search/asian"),
+        AdultPlusRow(R.string.adultplus_row_xnxx_japanese, SourceType.XNXX, "search/japanese"),
+        AdultPlusRow(R.string.adultplus_row_xnxx_chinese, SourceType.XNXX, "search/chinese"),
         // 5278 — Discuz forums
         AdultPlusRow(R.string.adultplus_row_5278_adult, SourceType.FORUM5278, "forum:23"),
         AdultPlusRow(R.string.adultplus_row_5278_sexy, SourceType.FORUM5278, "forum:42"),
