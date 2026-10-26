@@ -62,13 +62,14 @@ TMP_NOTES=$(mktemp)
 trap "rm -f $TMP_NOTES" EXIT
 
 # Reads commit subjects since LAST_TAG → sanitizes → emits notes
+# 純文字格式（【標題】、・項目、項目間空一行），原因見 release.sh 第 8 步的自動說明。
+# 排除「發版 vX」：上次 commit 後發布失敗、重跑時 HEAD 可能已是發版 commit。
 {
-  echo "## 變更紀錄"
-  echo ""
+  echo "【變更紀錄】"
   if [ -n "$LAST_TAG" ]; then
-    git log --pretty=format:'- %s' "${LAST_TAG}..HEAD"
+    git log --invert-grep --grep='^發版 v' --pretty=format:'%n・%s' "${LAST_TAG}..HEAD"
   else
-    git log --pretty=format:'- %s' -10
+    git log --invert-grep --grep='^發版 v' --pretty=format:'%n・%s' -10
   fi
   echo ""
 } | sed -E \
@@ -92,15 +93,9 @@ trap "rm -f $TMP_NOTES" EXIT
 # Append user-provided extra bullets (after `--`)
 if [ ${#EXTRA_BULLETS[@]} -gt 0 ]; then
   for bullet in "${EXTRA_BULLETS[@]}"; do
-    echo "- $bullet" >> "$TMP_NOTES"
+    printf '\n・%s\n' "$bullet" >> "$TMP_NOTES"
   done
 fi
-
-# Footer with download link
-{
-  echo ""
-  echo "📥 從本頁附件下載 APK 安裝即可（同 keystore，可直接覆蓋升級）"
-} >> "$TMP_NOTES"
 
 # Show what we're about to publish
 echo "════════════ Release notes 預覽（已過濾敏感詞）════════════"

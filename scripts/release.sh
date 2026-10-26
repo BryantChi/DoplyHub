@@ -210,18 +210,19 @@ if $PUBLISH_GH; then
         printf '%s\n' "$NOTES_INLINE" > "$TMP_NOTES"
     else
         # Auto: changelog from previous tag → HEAD
+        # 寫成純文字：這份說明會直接顯示在 App 的更新視窗（純 Text），v3.1.15 以前的 App 不會去掉
+        # markdown，`##`、`- `、連結語法都會原封不動顯示。項目間空一行，GitHub 網頁才不會併成一段。
+        # 排除「發版 vX」：發版 commit 在第 7 步已經做好，此時就是 HEAD，不排除會被列成一項。
         LAST_TAG=$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1 || true)
         {
-            echo "## 變更紀錄"
-            echo ""
+            echo "【變更紀錄】"
             if [ -n "$LAST_TAG" ]; then
-                git log --oneline "${LAST_TAG}..HEAD" --pretty=format:'- %s' || echo "- v${VERSION_NAME}"
+                git log "${LAST_TAG}..HEAD" --invert-grep --grep='^發版 v' --pretty=format:'%n・%s' \
+                    || printf '\n・v%s' "${VERSION_NAME}"
             else
-                git log --oneline -10 --pretty=format:'- %s'
+                git log -10 --invert-grep --grep='^發版 v' --pretty=format:'%n・%s'
             fi
             echo ""
-            echo ""
-            echo "📥 [DoplyHub-v${VERSION_NAME}.apk](https://github.com/${GH_REPO}/releases/download/${TAG}/${APK_FILENAME})"
         } > "$TMP_NOTES"
     fi
 
