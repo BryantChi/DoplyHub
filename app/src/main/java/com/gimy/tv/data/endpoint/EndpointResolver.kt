@@ -82,9 +82,10 @@ class EndpointResolver @Inject constructor(
             // data-pk 打 /api.php/pk/q 取流），詳情頁也把所有線路併成單一「播放列表」，
             // 一播就失敗、也沒有其他線路可換。它的列表頁仍正常，探測照樣判定健康，
             // 所以只能靠排序避開，不能指望探測自動換掉。
+            // 2026-10-26 起 gimytv.me 整站 301 到 gmtv.app，影片 id 改成英數雜湊（/vod/fF1sMvvyW0q），
+            // 現有解析器完全讀不懂，留著也不可能被選上，所以拿掉。GIMYTV 目前只剩 gimyai.tw。
             SourceType.GIMYTV to listOf(
                 EndpointCandidate("https://gimyai.tw", "poster"),
-                EndpointCandidate("https://gimytv.me", "card"),
             ),
             // 2026-10-03 起整站 301 到 www.mvffm.net。舊網域留作第二候選：站方若再搬家，
             // 舊網域的轉址通常會跟著指到最新網域，比沒有備援好。
