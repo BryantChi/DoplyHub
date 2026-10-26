@@ -20,7 +20,8 @@ data class AdultEntry(val typeId: Int, val label: String)
 
 /**
  * Per-source typeId table. `adultCategories` carries 0..N adult-zone IDs with labels
- * (multiple supported because gimy.tw exposes both露骨 and 劇情倫理 under different typeIds).
+ * (multiple supported because gimy.tw used to expose both 露骨 and 劇情倫理 under different
+ * typeIds; 2026-10 起站方已合併，目前每個來源最多一區).
  * Filtering uses each source's own list — never a single hard-coded constant.
  */
 data class SiteCategoryMap(
@@ -123,9 +124,9 @@ val SourceType.categoryMap: SiteCategoryMap get() = when (this) {
         movie = 1, series = 2, variety = 3, anime = 4,
         korean = 23, chinese = 13, hk = 14, taiwan = 15,
         japanese = 16, american = 24, documentary = 20,
-        // Two distinct adult zones: 39 = explicit, 27 = soft-core / R-rated drama
+        // 原本有 39「露骨」與 27「劇情倫理」兩區。2026-10-26 起站方已把兩者併成同一類：
+        // vodshow/39 與 vodshow/27 回同樣內容，39 頁面上的「更多」也直接指向 27，所以只留 27。
         adultCategories = listOf(
-            AdultEntry(39, "露骨"),
             AdultEntry(27, "劇情倫理"),
         ),
     )

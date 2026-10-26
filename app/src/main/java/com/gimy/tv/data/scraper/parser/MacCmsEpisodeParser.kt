@@ -34,9 +34,11 @@ object MacCmsEpisodeParser {
         }
 
         // Branch 2: playlist-mobile + div.gico + ul#con_playlist_ (gimy.tw redesign)
+        // 2026-10 起 gimy.tw 線路名改成 <i class="gico"></i><span>名稱</span>，div.gico 已不存在；
+        // 認不出來就會掉到 Branch 3，線路名變「線路 N」且桌面＋手機兩份清單重複收集。
         if (groups.isEmpty()) {
             for (container in doc.select("div.playlist-mobile.playlist")) {
-                val name = container.selectFirst("div.gico")?.text()?.trim()
+                val name = container.selectFirst("div.gico, i.gico + span")?.text()?.trim()
                     ?.replace(Regex("\\s*ᴴᴰ\\s*"), "")?.trim() ?: continue
                 val ul = container.selectFirst("ul[id^=con_playlist_]") ?: continue
                 val episodes = mutableListOf<Episode>()

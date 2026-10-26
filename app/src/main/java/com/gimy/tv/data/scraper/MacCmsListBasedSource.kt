@@ -12,7 +12,6 @@ import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.net.URLEncoder
-import com.gimy.tv.data.scraper.parser.attrText
 
 /**
  * Base class for MacCMS V10 myui-template sites where:
@@ -42,16 +41,19 @@ abstract class MacCmsListBasedSource(
      *  We previously used MacCMS V10 vodshow format ("/vodshow/{id}--------{page}---.html"),
      *  but that format silently strips the typeId on EynyTV / Gimy.tw / momovod / 123kubo —
      *  every category row served unrelated "最新-推薦" content. The static path form is the
-     *  one all five sites consistently honor. */
+     *  one all five sites consistently honor.
+     *  2026-10-26 起 gimy.tw 反過來：vodshow 保留分類、靜態路徑卻不再分頁，所以它改用
+     *  [MacCmsListStyle.VODSHOW]（見 GimyTwSource）。 */
     protected open val listUrlPath: String = "/vodtype"
+
+    /** 列表分頁網址格式，見 [MacCmsListStyle]。 */
+    protected open val listStyle: MacCmsListStyle = MacCmsListStyle.STATIC
 
     /** Per-source typeId table. Default falls back to enum extension. */
     open val categoryMap: SiteCategoryMap get() = sourceType.categoryMap
 
-    /** List page URL: "{listUrlPath}/{typeId}.html" for page 1, "...-{page}.html" beyond. */
     protected open fun buildListUrl(typeId: Int, page: Int): String =
-        if (page <= 1) "$baseUrl$listUrlPath/$typeId.html"
-        else "$baseUrl$listUrlPath/$typeId-$page.html"
+        macCmsListUrl(baseUrl, listUrlPath, typeId, page, listStyle)
 
     /** Search URL. Default: form GET style with wd query param. */
     /** Search endpoint shape. Sites that rename list/detail paths usually rename this too. */
@@ -74,9 +76,12 @@ abstract class MacCmsListBasedSource(
      *   閃電雲 (sdm3u8) — 3/5 sites,  0.64s  (imaple+momovod's v13.fentvoss instance is HTTP 000)
      *   極速雲 (jsm3u8) — 3/5 sites,  0.80s
      *   卧龍雲 (wolong) — 2/5 sites,  1.15s  (gimy.tw's wlcdn99 mirror is HTTP 000)
+     *
+     * 魔都雲 (modum3u8) 2026-10 才出現，沒有跨站測速資料，先排最後：gimy.tw 新片常只有這一條、
+     * momovod 抽測可播。排在清單內，至少勝過完全沒測過的線路。
      */
     protected open val stabilityOrder: List<String> =
-        listOf("無盡雲", "索尼雲", "優質雲", "閃電雲", "極速雲", "卧龍雲")
+        listOf("無盡雲", "索尼雲", "優質雲", "閃電雲", "極速雲", "卧龍雲", "魔都雲")
 
     private val userAgent =
         "Mozilla/5.0 (Linux; Android 10) Mobile Safari/537.36"
@@ -106,7 +111,8 @@ abstract class MacCmsListBasedSource(
 
     override suspend fun probeListCount(baseUrl: String, profile: String?): Int = withContext(Dispatchers.IO) {
         runCatching {
-            val url = "$baseUrl$listUrlPath/2.html"
+            // 探測要打 App 實際在用的列表網址，否則可能探測健康、實際卻抓不到。
+            val url = macCmsListUrl(baseUrl, listUrlPath, typeId = 2, page = 1, listStyle)
             parseVodList(Jsoup.parse(fetchHtml(url), url), 1).items.size
         }.getOrDefault(0)
     }
@@ -139,23 +145,10 @@ abstract class MacCmsListBasedSource(
         // Strip sidebar / ranking panels — they'd otherwise leak into our card sweep
         doc.select("#stickyside, .myui-side, aside, .rankings, .rank-list, .stui-pannel--side").remove()
 
-        val items = mutableListOf<Vod>()
-        val detailHrefRegex = Regex("$detailUrlPath/(\\d+)\\.html")
         // Prefer the first main vodlist container (the panel the user navigated into);
         // later panels are recommendations with off-topic content.
         val scope = doc.selectFirst(".myui-vodlist, ul.myui-vodlist__media, .module-list, .stui-vodlist") ?: doc
-        for (card in scope.select("a.myui-vodlist__thumb, a[class*=video-pic][data-original]")) {
-            val href = card.attr("href")
-            val id = detailHrefRegex.find(href)?.groupValues?.get(1)?.toLongOrNull() ?: continue
-            val title = card.attrText("title").ifBlank {
-                card.parent()?.selectFirst(".myui-vodlist__detail h4 a")?.text()?.trim().orEmpty()
-            }
-            if (title.isBlank()) continue
-            val cover = resolveUrl(macCmsCardCover(card))
-            val status = card.selectFirst("span.pic-text, span.note")?.text()?.trim() ?: ""
-            items.add(Vod(id, sourceType, title, cover, "", 0, status,
-                siteStatus = parseEpisodeStatus(status)))
-        }
+        val items = parseMacCmsCards(scope, detailUrlPath, sourceType, ::resolveUrl)
         val unique = items.distinctBy { it.id }
         val hasNext = doc.select("a:contains(下一頁), a:contains(下一页), a.next, a[title=下一頁]")
             .isNotEmpty()

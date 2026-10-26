@@ -42,6 +42,14 @@ class MacCmsCardCoverTest {
         assertThat(macCmsCardCover(card("""style="color:red""""))).isEmpty()
     }
 
+    /** 2026-10 gimy.tw 與 momovod 列表改版：錨點上沒有任何 lazy-load 屬性，封面改由內層 img 直接載入。 */
+    @Test fun `falls back to the inner img src`() {
+        val c = Jsoup.parse(
+            """<a class="myui-vodlist__thumb site-cover" href="/vod/529906.html" title="富閨可期"><img class="site-cover-img" src="https://img.azgo.me/x/8c61.jpg" alt="富閨可期"><span class="pic-text">更新至19集</span></a>"""
+        ).selectFirst("a")!!
+        assertThat(macCmsCardCover(c)).isEqualTo("https://img.azgo.me/x/8c61.jpg")
+    }
+
     @Test fun `no source at all yields empty`() {
         assertThat(macCmsCardCover(card("""class="myui-vodlist__thumb""""))).isEmpty()
     }
